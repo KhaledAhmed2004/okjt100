@@ -37,6 +37,15 @@
             "description": "`400 Bad Request` from `validateRequest` with the Zod error details.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"P@ssw0rd!\",\n  \"deviceToken\": \"fcm-or-apns-token-optional\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": [],
@@ -83,6 +92,15 @@
             "description": "`400 Bad Request` from `validateRequest`. Missing OTP at service-layer defence -> `400 \"OTP is required\"`.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": [],
@@ -129,6 +147,15 @@
             "description": "`400 Bad Request` from `validateRequest`. Note that malformed emails fail loudly (Zod 400), but unknown emails return silent 200 — the distinction is between \"shape is wrong\" (client bug) and \"email doesn't exist\" (intentional silence).",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -164,6 +191,15 @@
                   "type": "string"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"NewP@ssw0rd123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -192,6 +228,15 @@
             "description": "`400 \"Refresh token is required\"`.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": [],
@@ -245,6 +290,15 @@
                   "type": "string"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceToken\": \"fcm-or-apns-token-of-this-device\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -273,6 +327,15 @@
             "description": "`400 Bad Request` from `validateRequest`.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -301,6 +364,15 @@
             "description": "`400 Bad Request` from `validateRequest`.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"google\",\n  \"idToken\": \"eyJhbGciOiJSUzI1NiIs...\",\n  \"nonce\": \"aB3xK9mP2qR7sL4nT6vY8wXcZ1uV5oM0jE\",\n  \"deviceToken\": \"fcm-token-optional\",\n  \"platform\": \"ios\",\n  \"appVersion\": \"1.4.0\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -336,6 +408,15 @@
                   "type": "string"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"OldP@ssw0rd!\",\n  \"newPassword\": \"NewP@ssw0rd123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -364,6 +445,15 @@
             "description": "ACTIVE`, clears `deletedAt` / `recoveryDeadline`, bumps `tokenVersion` (so any leftover JWTs from before deletion stay invalid), and issues a fresh access + refresh token pair — same response shape as `POST /auth/login`.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"<the user's current password>\",\n  \"deviceToken\": \"fcm-or-apns-token-optional\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -720,6 +810,15 @@
                   "type": "string"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"<the user's current password>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -757,6 +856,15 @@
                   "type": "string"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newEmail\": \"new.address@example.com\",\n  \"password\": \"<the user's current password>\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -794,6 +902,15 @@
                   "type": "string"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -1170,6 +1287,15 @@
                   "type": "string"
                 }
               ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answer\": \"Wudu is performed by washing the hands, mouth, nostrils, face, arms, head, and feet in the prescribed order.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []

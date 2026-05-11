@@ -96,7 +96,7 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
 
   // Extract Request Body (JSON)
   // Only look for JSON blocks that are clearly labeled as Request Body to avoid picking up Response shapes
-  const requestBodySectionMatch = content.match(/## Request Body([\s\S]*?)(?:\n## |$)/);
+  const requestBodySectionMatch = content.match(/## (?:[\d.]+\s*)?Request Body([\s\S]*?)(?:\n## |$)/);
   let bodyRaw = null;
   if (requestBodySectionMatch) {
     const sectionContent = requestBodySectionMatch[1];
@@ -213,7 +213,7 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
   }
 
   // Extract Query Parameters from Markdown (Table or List)
-  const queryParamsSectionRegex = /## Query Parameters([\s\S]*?)(?:\n## |$)/;
+  const queryParamsSectionRegex = /## (?:[\d.]+\s*)?Query Parameters([\s\S]*?)(?:\n## |$)/;
   const queryParamsMatch = content.match(queryParamsSectionRegex);
 
   if (queryParamsMatch) {
