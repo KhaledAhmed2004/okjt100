@@ -45,6 +45,8 @@ Auth: User
     "userId": "60d5ecb86372ad46101f1920",
     "content": "Assalamu alaikum, looking forward to the next session!",
     "attachments": [],
+    "likesCount": 0,
+    "commentsCount": 0,
     "createdAt": "2026-05-09T10:45:00.000Z"
   }
 }

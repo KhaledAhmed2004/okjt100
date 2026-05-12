@@ -39,11 +39,14 @@ Auth: User
       "id": "60d5ecb86372ad46101f1930",
       "userId": {
         "id": "60d5ecb86372ad46101f1920",
-        "fullName": "John Doe",
+        "name": "John Doe",
         "profileImage": "https://storage.com/johndoe.jpg"
       },
       "content": "Assalamu alaikum, looking forward to the next session!",
       "attachments": [],
+      "likesCount": 5,
+      "commentsCount": 2,
+      "isLiked": true,
       "createdAt": "2026-05-09T10:45:00.000Z"
     }
   ]

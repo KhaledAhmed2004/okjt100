@@ -43,6 +43,9 @@ const seedAdmin_1 = require("./DB/seedAdmin");
 const socketHelper_1 = require("./helpers/socketHelper");
 const logger_1 = require("./shared/logger");
 const CacheHelper_1 = require("./app/shared/CacheHelper");
+const accountPurgeScheduler_1 = require("./app/modules/user/accountPurgeScheduler");
+const orphanFileCleaner_1 = require("./shared/orphanFileCleaner");
+const pending_email_scheduler_1 = require("./app/modules/pending-email/pending-email.scheduler");
 const bannerGenerator_1 = require("./shared/bannerGenerator");
 const startupSummary_1 = require("./shared/startupSummary");
 const spinnerHelper_1 = require("./shared/spinnerHelper");
@@ -123,6 +126,58 @@ function main() {
                 status: 'initialized',
                 message: 'In-memory cache ready',
             };
+            // Account purge scheduler — sweeps soft-deleted users past their
+            // 30-day recovery window and cascade-deletes their owned content.
+            const purgeSpinner = (0, spinnerHelper_1.createSpinner)({
+                text: 'Starting account purge scheduler...',
+                color: 'cyan',
+            });
+            try {
+                accountPurgeScheduler_1.AccountPurgeScheduler.start();
+                purgeSpinner.succeed('Account purge scheduler running (daily 03:00 UTC)');
+            }
+            catch (purgeErr) {
+                purgeSpinner.warn('Account purge scheduler failed to start');
+                logger_1.errorLogger.error('AccountPurgeScheduler.start() failed:', purgeErr);
+                // Don't throw — server can run without the cron; soft-deleted users
+                // just won't be purged until next deployment fixes the issue.
+            }
+            // Orphan-file cleanup — sweeps uploads/ for files no User
+            // references. Runs at 03:30 UTC, right after the account purge,
+            // so cascade-unlink failures get retried before being treated as
+            // true orphans.
+            const orphanSpinner = (0, spinnerHelper_1.createSpinner)({
+                text: 'Starting orphan-file cleanup scheduler...',
+                color: 'cyan',
+            });
+            try {
+                orphanFileCleaner_1.OrphanFileCleaner.start();
+                orphanSpinner.succeed('Orphan-file cleanup running (daily 03:30 UTC)');
+            }
+            catch (orphanErr) {
+                orphanSpinner.warn('Orphan-file cleanup failed to start');
+                logger_1.errorLogger.error('OrphanFileCleaner.start() failed:', orphanErr);
+                // Don't throw — orphan accumulation is a disk-leak concern, not
+                // a correctness one.
+            }
+            // Pending-email worker — drains the PendingEmail queue, reclaims
+            // expired leases, and pushes DEAD rows on max-attempts. Wrapped
+            // in its own try/catch so a scheduler-init failure never blocks
+            // server boot (mail just queues up for the next process start).
+            const pendingEmailSpinner = (0, spinnerHelper_1.createSpinner)({
+                text: 'Starting pending-email scheduler...',
+                color: 'cyan',
+            });
+            try {
+                pending_email_scheduler_1.PendingEmailScheduler.start();
+                pendingEmailSpinner.succeed('Pending-email scheduler running (every minute)');
+            }
+            catch (peErr) {
+                pendingEmailSpinner.warn('Pending-email scheduler failed to start');
+                logger_1.errorLogger.error('PendingEmailScheduler.start() failed:', peErr);
+                // Don't throw — failed-state emails build up in the PendingEmail
+                // collection and can be drained manually via the admin endpoint.
+            }
             // Validate performance thresholds
             if ((_b = (_a = config_1.default.tracing) === null || _a === void 0 ? void 0 : _a.performance) === null || _b === void 0 ? void 0 : _b.enabled) {
                 const thresholdSpinner = (0, spinnerHelper_1.createSpinner)({

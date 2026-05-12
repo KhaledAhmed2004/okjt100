@@ -10,15 +10,16 @@ Auth: Admin
 
 ## Request Body (Form Data)
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `title` | `string` | Title of the Khutba |
-| `mosqueName` | `string` | Name of the mosque |
-| `imam` | `string` | Name of the Imam |
-| `date` | `string` | Date of the Khutba (YYYY-MM-DD) |
-| `description` | `string` | (Optional) Brief description |
-| `audio` | `file` | Audio file (MP3/WAV, max 50MB) |
-| `thumbnail` | `file` | Thumbnail image (JPG/PNG/WebP, max 5MB) |
+| Field | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `title` | `string` | Title of the Khutba | `The Importance of Charity` |
+| `mosqueName` | `string` | Name of the mosque | `Central Mosque` |
+| `imam` | `string` | Name of the Imam | `Sheikh Khalid` |
+| `date` | `string` | Date of the Khutba (ISO 8601) | `2026-05-08T00:00:00.000Z` |
+| `description` | `string` | (Optional) Brief description | `A deep dive into Sadaqah.` |
+| `audio` | `file` | Audio file (MP3/WAV, max 50MB) | `khutba.mp3` |
+| `thumbnail` | `file` | Thumbnail image (JPG/PNG/WebP, max 5MB) | `thumbnail.jpg` |
+| `duration` | `string` | (Optional) Duration of the audio | `45:00` |
 
 ## Implementation
 
@@ -46,7 +47,7 @@ Auth: Admin
     "title": "The Importance of Charity",
     "mosqueName": "Central Mosque",
     "imam": "Sheikh Khalid",
-    "date": "2026-05-08",
+    "date": "2026-05-08T00:00:00.000Z",
     "description": "A deep dive into the benefits of Sadaqah.",
     "audioUrl": "https://storage.com/audio/charity.mp3",
     "thumbnailUrl": "https://storage.com/images/charity.jpg",

@@ -67,7 +67,6 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
     message: 'User logged in successfully.',
     data: {
       ...result.tokens,
-      isOnboardingCompleted: result.isOnboardingCompleted,
     },
   });
 });
@@ -201,7 +200,6 @@ const socialLogin = catchAsync(async (req: Request, res: Response) => {
     message: 'User logged in successfully.',
     data: {
       ...result.tokens,
-      isOnboardingCompleted: result.isOnboardingCompleted,
     },
   });
 });
@@ -227,7 +225,6 @@ const restoreAccount = catchAsync(async (req: Request, res: Response) => {
     message: 'Account restored successfully.',
     data: {
       ...result.tokens,
-      isOnboardingCompleted: result.isOnboardingCompleted,
     },
   });
 });

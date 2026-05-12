@@ -1051,7 +1051,7 @@ Future<void> signInWithApple() async {
   final credential = await SignInWithApple.getAppleIDCredential(
     scopes: [
       AppleIDAuthorizationScopes.email,
-      AppleIDAuthorizationScopes.fullName,
+      AppleIDAuthorizationScopes.name,
     ],
     nonce: hashedNonce,  // Apple gets the HASH
     // Android-er jonne webAuthenticationOptions lagbe — iOS-e lagbe na

@@ -52,7 +52,8 @@ const createPost = catchAsync(async (req: Request, res: Response) => {
 
 const getGroupFeed = catchAsync(async (req: Request, res: Response) => {
   const { groupId } = req.params;
-  const result = await GroupService.getGroupFeedFromDB(groupId, req.query);
+  const user = req.user as any;
+  const result = await GroupService.getGroupFeedFromDB(groupId, req.query, user?.id);
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
@@ -77,11 +78,66 @@ const toggleLike = catchAsync(async (req: Request, res: Response) => {
 const addComment = catchAsync(async (req: Request, res: Response) => {
   const user = req.user as any;
   const { postId } = req.params;
-  const result = await GroupService.addCommentInDB(postId, user.id, req.body.comment);
+  const result = await GroupService.addCommentInDB(
+    postId,
+    user.id,
+    req.body.comment,
+    req.body.parentCommentId,
+  );
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.CREATED,
     message: 'Comment added successfully',
+    data: result,
+  });
+});
+
+const deletePost = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user as any;
+  const { postId } = req.params;
+  await GroupService.deletePostInDB(postId, user.id, user.role);
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Post deleted successfully',
+  });
+});
+
+const deleteComment = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user as any;
+  const { commentId } = req.params;
+  await GroupService.deleteCommentInDB(commentId, user.id, user.role);
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Comment deleted successfully',
+  });
+});
+
+const updatePost = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user as any;
+  const { postId } = req.params;
+  const result = await GroupService.updatePostInDB(postId, user.id, req.body);
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Post updated successfully',
+    data: result,
+  });
+});
+
+const updateComment = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user as any;
+  const { commentId } = req.params;
+  const result = await GroupService.updateCommentInDB(
+    commentId,
+    user.id,
+    req.body.comment,
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'Comment updated successfully',
     data: result,
   });
 });
@@ -94,4 +150,8 @@ export const GroupController = {
   getGroupFeed,
   toggleLike,
   addComment,
+  deletePost,
+  deleteComment,
+  updatePost,
+  updateComment,
 };

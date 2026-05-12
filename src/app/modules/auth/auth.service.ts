@@ -21,7 +21,7 @@ import cryptoToken from '../../../util/cryptoToken';
 import generateOTP from '../../../util/generateOTP';
 import { ResetToken } from './resetToken/resetToken.model';
 import { User } from '../user/user.model';
-import { USER_STATUS } from '../../../enums/user';
+import { USER_STATUS, USER_ROLES } from '../../../enums/user';
 import {
   OTP_TTL_MS,
   RESET_TOKEN_TTL_MS,
@@ -58,10 +58,17 @@ const loginUserFromDB = async (
   }
 
   if (isExistUser.status === USER_STATUS.PENDING) {
-    throw new ApiError(
-      StatusCodes.FORBIDDEN,
-      'Your account is pending approval.'
-    );
+    if (!isExistUser.isVerified) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        'Your account is pending verification. Please verify your email.'
+      );
+    } else {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        'Admin Verification Pending. Your account is currently under review.'
+      );
+    }
   }
 
   if (isExistUser.status === USER_STATUS.REJECTED) {
@@ -92,7 +99,7 @@ const loginUserFromDB = async (
     );
   }
 
-  if (!isExistUser.verified) {
+  if (!isExistUser.isVerified) {
     throw new ApiError(
       StatusCodes.UNAUTHORIZED,
       'Please verify your account, then try to login again'
@@ -131,8 +138,6 @@ const loginUserFromDB = async (
     config.jwt.jwt_refresh_expire_in as string
   );
 
-  const isOnboardingCompleted = isExistUser.isOnboardingCompleted;
-
   // ✅ save device token
   if (deviceToken) {
     await User.addDeviceToken(
@@ -144,7 +149,7 @@ const loginUserFromDB = async (
     );
   }
 
-  return { tokens: { accessToken, refreshToken }, isOnboardingCompleted };
+  return { tokens: { accessToken, refreshToken } };
 };
 
 // logout
@@ -229,21 +234,35 @@ const verifyEmailToDB = async (payload: IVerifyEmail) => {
   let data;
   let tokens;
 
-  if (!isExistUser.verified) {
+  if (!isExistUser.isVerified) {
     // Mark as verified and clear OTP
-    const isOnboardingCompleted = isExistUser.isOnboardingCompleted;
-    await User.findOneAndUpdate(
+    const updatedUser = await User.findOneAndUpdate(
       { _id: isExistUser._id },
       {
         $set: {
-          verified: true,
+          isVerified: true,
           'authentication.oneTimeCode': null,
           'authentication.expireAt': null,
         },
-      }
+      },
+      { new: true }
     );
 
-    // Auto-login for new users after verification
+    if (updatedUser?.status === USER_STATUS.PENDING) {
+      message =
+        'Email verified successfully. Your account is now pending admin approval. You will receive an email once an administrator approves your account.';
+      return {
+        data: {
+          email: updatedUser.email,
+          isVerified: updatedUser.isVerified,
+          status: updatedUser.status,
+        },
+        message,
+        tokens: null,
+      };
+    }
+
+    // Auto-login for users who are already ACTIVE (e.g. email change or re-verify)
     const accessToken = jwtHelper.createToken(
       {
         id: isExistUser._id.toString(),
@@ -268,7 +287,13 @@ const verifyEmailToDB = async (payload: IVerifyEmail) => {
 
     tokens = { accessToken, refreshToken };
     message = 'Email verify successfully';
-    return { data: { ...tokens, isOnboardingCompleted }, message, tokens };
+    return {
+      data: {
+        ...tokens,
+      },
+      message,
+      tokens,
+    };
   } else {
     // For password reset flow
     await User.findOneAndUpdate(
@@ -571,12 +596,19 @@ const socialLoginToDB = async (
         'Your account has been deleted. Contact support.'
       );
     }
-    if (user.status === USER_STATUS.PENDING) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        'Your account is pending approval.'
-      );
-    }
+      if (user.status === USER_STATUS.PENDING) {
+        if (!user.isVerified) {
+          throw new ApiError(
+            StatusCodes.FORBIDDEN,
+            'Your account is pending verification. Please verify your email.'
+          );
+        } else {
+          throw new ApiError(
+            StatusCodes.FORBIDDEN,
+            'Admin Verification Pending. Your account is currently under review.'
+          );
+        }
+      }
     if (user.status === USER_STATUS.REJECTED) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
@@ -624,9 +656,10 @@ const socialLoginToDB = async (
     }
 
     user = await User.create({
-      name,
+      name: name,
       email,
-      verified: true,
+      isVerified: true,
+      status: USER_STATUS.PENDING,
       [providerField]: providerId,
     });
 
@@ -636,8 +669,6 @@ const socialLoginToDB = async (
       throw new ApiError(StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to create user');
     }
   }
-
-  const isOnboardingCompleted = user.isOnboardingCompleted;
 
   // Register device token
   if (deviceToken) {
@@ -673,7 +704,7 @@ const socialLoginToDB = async (
     config.jwt.jwt_refresh_expire_in as string
   );
 
-  return { tokens: { accessToken, refreshToken }, isOnboardingCompleted };
+  return { tokens: { accessToken, refreshToken } };
 };
 
 // Refresh token: verify and issue new tokens with rotation
@@ -861,7 +892,6 @@ const restoreAccountFromDB = async (
 
   return {
     tokens: { accessToken, refreshToken },
-    isOnboardingCompleted: restored.isOnboardingCompleted,
   };
 };
 

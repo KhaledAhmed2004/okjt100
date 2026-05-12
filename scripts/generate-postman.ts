@@ -105,7 +105,16 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
   }
 
   // Extract Request Body (Multipart Form-Data / Form Data)
-  const isMultipart = headersAndAuth.toLowerCase().includes('multipart/form-data');
+  let isMultipart = headersAndAuth.toLowerCase().includes('multipart/form-data');
+
+  // Fallback: Check if any section header explicitly mentions multipart/form-data
+  if (!isMultipart) {
+    const multipartHeaderRegex = /^## .*?\(multipart\/form-data\)/m;
+    if (multipartHeaderRegex.test(content)) {
+      isMultipart = true;
+    }
+  }
+
   const formData: any[] = [];
   
   if (isMultipart) {

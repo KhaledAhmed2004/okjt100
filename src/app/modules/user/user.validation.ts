@@ -6,14 +6,14 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-={}\[\
 const createUserZodSchema = z.object({
   body: z
     .object({
-      fullName: z.string({ required_error: 'Full name is required' }).min(1),
+      name: z.string({ required_error: 'Name is required' }).min(1),
       email: z
         .string({ required_error: 'Email is required' })
         .email('Invalid email address')
         .toLowerCase(),
       role: z.enum([USER_ROLES.BROTHER, USER_ROLES.SISTER], { required_error: 'Role is required' }),
-      revertDuration: z.string({ required_error: 'Revert duration is required' }),
-      dateOfBirth: z.string({ required_error: 'Date of birth is required' }).refine((dob) => {
+      revertDate: z.string({ required_error: 'Revert date is required' }).datetime(),
+      dateOfBirth: z.string({ required_error: 'Date of birth is required' }).datetime().refine((dob) => {
         const birthDate = new Date(dob);
         const today = new Date();
         let age = today.getFullYear() - birthDate.getFullYear();
@@ -29,6 +29,20 @@ const createUserZodSchema = z.object({
       verificationVideo: z.string().optional(),
       googleId: z.string().optional(),
       appleId: z.string().optional(),
+      aboutMe: z.string().optional(),
+      revertStory: z.string().optional(),
+      interests: z
+        .preprocess((v: unknown) => {
+          if (typeof v === 'string') {
+            try {
+              return JSON.parse(v);
+            } catch {
+              return v;
+            }
+          }
+          return v;
+        }, z.array(z.string()))
+        .optional(),
       // Cloudflare Turnstile token from the client widget. Verified by
       // the `verifyCaptcha` middleware downstream. Optional in the schema
       // so dev mode (TURNSTILE_SECRET unset) works without it; the
@@ -53,11 +67,12 @@ const createUserZodSchema = z.object({
 
 const updateUserZodSchema = z.object({
   body: z.object({
-    fullName: z.string().optional(),
+    name: z.string().optional(),
     aboutMe: z.string().optional(),
     revertStory: z.string().optional(),
     specialty: z.string().optional(),
     hospital: z.string().optional(),
+    revertDate: z.string().datetime().optional(),
     interests: z
       .preprocess((v: unknown) => {
         if (typeof v === 'string') {
@@ -92,14 +107,33 @@ export const UserValidation = {
       rejectionReason: z.string().optional()
     }),
   }),
+  updateUserReviewZodSchema: z.object({
+    params: z.object({
+      userId: z.string({ required_error: 'User ID is required' }),
+    }),
+    body: z.object({
+      status: z.enum([USER_STATUS.ACTIVE, USER_STATUS.REJECTED], {
+        required_error: 'Status is required (ACTIVE or REJECTED)',
+      }),
+      reason: z.string().optional(),
+    }).refine((data) => {
+      if (data.status === USER_STATUS.REJECTED && !data.reason) {
+        return false;
+      }
+      return true;
+    }, {
+      message: 'Reason is required when status is REJECTED',
+      path: ['reason'],
+    }),
+  }),
   adminUpdateUserZodSchema: z.object({
     params: z.object({
       userId: z.string({ required_error: 'User ID is required' }),
     }),
     body: z.object({
-      fullName: z.string().optional(),
+      name: z.string().optional(),
       email: z.string().email('Invalid email address').toLowerCase().optional(),
-      dateOfBirth: z.string().optional(),
+      dateOfBirth: z.string().datetime().optional(),
       status: z.enum([
         USER_STATUS.PENDING,
         USER_STATUS.ACTIVE,
@@ -112,6 +146,21 @@ export const UserValidation = {
         USER_ROLES.BROTHER, 
         USER_ROLES.SISTER
       ]).optional(),
+      revertDate: z.string().datetime().optional(),
+      aboutMe: z.string().optional(),
+      revertStory: z.string().optional(),
+      interests: z
+        .preprocess((v: unknown) => {
+          if (typeof v === 'string') {
+            try {
+              return JSON.parse(v);
+            } catch {
+              return v;
+            }
+          }
+          return v;
+        }, z.array(z.string()))
+        .optional(),
     }),
   }),
   getUserDetailsZodSchema: z.object({
@@ -166,6 +215,25 @@ export const UserValidation = {
       verificationVideo: z
         .string({ required_error: 'verificationVideo is required' })
         .min(1, 'verificationVideo is required'),
+    }),
+  }),
+  getAllUserRolesZodSchema: z.object({
+    query: z.object({
+      searchTerm: z.string().optional(),
+      email: z.string().optional(),
+      role: z.enum([USER_ROLES.SUPER_ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER]).optional(),
+      status: z.enum([
+        USER_STATUS.PENDING,
+        USER_STATUS.ACTIVE,
+        USER_STATUS.REJECTED,
+        USER_STATUS.SUSPENDED,
+        USER_STATUS.DELETED,
+      ]).optional(),
+      isVerified: z.string().optional(),
+      page: z.string().optional(),
+      limit: z.string().optional(),
+      sortBy: z.string().optional(),
+      sortOrder: z.enum(['asc', 'desc']).optional(),
     }),
   }),
 };

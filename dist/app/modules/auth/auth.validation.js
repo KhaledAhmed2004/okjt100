@@ -73,6 +73,26 @@ const createRefreshTokenZodSchema = zod_1.z.object({
     })
         .optional(),
 });
+const createResendOtpZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        email: zod_1.z
+            .string({ required_error: 'Email is required' })
+            .email('Invalid email address')
+            .toLowerCase(),
+    }),
+});
+const createRestoreAccountZodSchema = zod_1.z.object({
+    body: zod_1.z.object({
+        email: zod_1.z
+            .string({ required_error: 'Email is required' })
+            .email('Invalid email address')
+            .toLowerCase(),
+        password: zod_1.z
+            .string({ required_error: 'Password is required' })
+            .min(1, 'Password is required'),
+        deviceToken: zod_1.z.string().optional(),
+    }),
+});
 exports.AuthValidation = {
     createVerifyEmailZodSchema,
     createForgetPasswordZodSchema,
@@ -81,4 +101,6 @@ exports.AuthValidation = {
     createChangePasswordZodSchema,
     createRefreshTokenZodSchema,
     createSocialLoginZodSchema,
+    createResendOtpZodSchema,
+    createRestoreAccountZodSchema,
 };

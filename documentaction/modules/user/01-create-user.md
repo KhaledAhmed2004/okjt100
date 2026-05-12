@@ -42,6 +42,7 @@ Enforced by `createUserZodSchema.superRefine` when neither `googleId` nor `apple
 - The Zod schema accepts `role` as `BROTHER | SISTER` only — `SUPER_ADMIN` cannot be supplied through this route's body.
 - Admin path forces `isVerified: true` and `status: ACTIVE` server-side regardless of body.
 - Public path forces `isVerified: false` and `status: PENDING`.
+- **Workflow**: Creation (`PENDING`) -> OTP Verification (`isVerified: true`) -> Admin Approval (`ACTIVE`).
 
 ### 2.5 File Handling
 File upload is processed by `fileHandler` **before** validation, with an explicit override for this route: `{ maxFileSizeMB: 100 }`.
@@ -70,17 +71,20 @@ The body schema is `.strict()` — extra fields cause a `400 Bad Request`.
 
 | Field | Type | Required | Constraint |
 | :--- | :--- | :--- | :--- |
-| `fullName` | `string` | Yes | min length 1 |
+| `name` | `string` | Yes | min length 1 |
 | `email` | `string` | Yes | valid email format |
 | `role` | `enum` | Yes | `BROTHER` or `SISTER` |
-| `revertDuration` | `string` | Yes | — |
-| `dateOfBirth` | `string` | Yes | parsed as `Date`, computed age must be `>= 16` |
+| `revertDate` | `string` | Yes | — |
+| `dateOfBirth` | `string` | Yes | full ISO 8601 timestamp, computed age must be `>= 16` |
 | `password` | `string` | Conditional | required if `googleId`/`appleId` absent; must match regex above |
 | `profileImage` | `string` | No (set by fileHandler) | — |
 | `verificationImage` | `string` | No (set by fileHandler) | — |
 | `verificationVideo` | `string` | No (set by fileHandler) | — |
 | `googleId` | `string` | No | — |
 | `appleId` | `string` | No | — |
+| `aboutMe` | `string` | No | Short biography or intro |
+| `revertStory` | `string` | No | Personal story of converting to Islam |
+| `interests` | `string[]` | No | Array of strings (tags) |
 | `captchaToken` | `string` | Required in prod (when `TURNSTILE_SECRET` env is set) | Cloudflare Turnstile token from the client widget. Verified server-side. Optional in dev (env unset). |
 
 ### 2.7 Atomicity (Mongoose Session)
@@ -133,17 +137,20 @@ Files persisted under `/uploads` with route-defined subfolders:
 
 | Field | Type | Required (Public) | Required (Admin) | Description | Example |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `fullName` | `string` | Yes | Yes | Legal name | `Jane Doe` |
-| `email` | `string` | Yes | Yes | Globally unique | `jane@example.com` |
-| `password` | `string` | Yes (if no `googleId`/`appleId`) | Yes (if no `googleId`/`appleId`) | Must match regex | `StrongPassword123!` |
-| `role` | `enum` | Yes (`BROTHER`/`SISTER`) | Yes (`BROTHER`/`SISTER`) | `SUPER_ADMIN` not accepted via body | `SISTER` |
-| `revertDuration` | `string` | Yes | Yes | — | `2 years` |
-| `dateOfBirth` | `string` | Yes | Yes | `YYYY-MM-DD`, age >= 16 | `1995-05-15` |
-| `googleId` | `string` | No | No | OAuth alt. to password | `1234567890` |
-| `appleId` | `string` | No | No | OAuth alt. to password | `000123.abc.0987` |
-| `profileImage` | `file` | Yes | No | Image, <= 100 MB | — |
-| `verificationImage` | `file` | Yes | No | Image, <= 100 MB | — |
-| `verificationVideo` | `file` | Yes | No | Video, <= 100 MB | — |
+| `name` | `string` | Yes | Yes | The user's full legal name as it should appear on their profile. | `Jane Doe` |
+| `email` | `string` | Yes | Yes | Primary email address. Must be globally unique and valid. | `jane@example.com` |
+| `password` | `string` | Yes (if no `googleId`/`appleId`) | Yes (if no `googleId`/`appleId`) | Account password. Must be 8+ chars with mixed case, digit, and special char. | `StrongPassword123!` |
+| `role` | `enum` | Yes (`BROTHER`/`SISTER`) | Yes (`BROTHER`/`SISTER`) | User role. Limited to `BROTHER` or `SISTER` during public registration. | `SISTER` |
+| `revertDate` | `string` | Yes | Yes | The date the user converted to Islam in Full ISO 8601 format. | `2024-05-11T00:00:00.000Z` |
+| `dateOfBirth` | `string` | Yes | Yes | User's birth date in Full ISO 8601 format. Must be 16+ years old. | `1995-05-15T00:00:00.000Z` |
+| `googleId` | `string` | No | No | Optional OAuth ID from Google. | `1234567890` |
+| `appleId` | `string` | No | No | Optional OAuth ID from Apple. | `000123.abc.0987` |
+| `profileImage` | `file` | Yes | No | Profile photo upload (multipart). | — |
+| `verificationImage` | `file` | Yes | No | Government ID or proof image for admin verification. | — |
+| `verificationVideo` | `file` | Yes | No | Short face-verification video for admin review. | — |
+| `aboutMe` | `string` | No | No | A short biography or intro about the user. | `I am a teacher...` |
+| `revertStory` | `string` | No | No | The user's personal story of converting to Islam. | `I found Islam through...` |
+| `interests` | `array` | No | No | Array of strings representing user interests. | `["Quran", "Arabic"]` |
 
 ---
 
@@ -153,16 +160,18 @@ Files persisted under `/uploads` with route-defined subfolders:
 - **Service**: [src/app/modules/user/user.service.ts](file:///src/app/modules/user/user.service.ts) — `createUserToDB`
 - **Validation**: [src/app/modules/user/user.validation.ts](file:///src/app/modules/user/user.validation.ts) — `UserValidation.createUserZodSchema`
 
-**Middleware order**: `rateLimitMiddleware({ windowMs: 1h, max: 5, routeName: 'registration' })` -> `fileHandler([...], { maxFileSizeMB: 100 })` -> `validateRequest(createUserZodSchema)` -> `UserController.createUser`.
+**Middleware order**: `idempotency('registration')` -> `fileHandler([...], { maxFileSizeMB: 100 })` -> `validateRequest(createUserZodSchema)` -> `UserController.createUser`.
 
 The controller inspects `req.headers.authorization` itself; only a valid `Bearer` JWT with role `SUPER_ADMIN` flips the service into admin mode (`isAdmin = true`).
 
 ---
 
 ## 7. Security
-- **Rate limit**: 5 requests / hour / IP, identified by `routeName: 'registration'`. On exceed -> `429 Too Many Requests` (`"message": "Too many requests, please try again later"`).
+- **Idempotency**: `idempotency('registration')` prevents double-submission of the same registration request.
 - **CAPTCHA (Cloudflare Turnstile)**: when the `TURNSTILE_SECRET` env var is set, the [verifyCaptcha](../../../src/app/middlewares/captcha.ts) middleware verifies the client-supplied `captchaToken` against Cloudflare's `/siteverify` endpoint. Token must accompany every registration request. Failed verification -> `401 Unauthorized` (`"message": "Captcha verification failed. Please try again."`). When the env is unset (dev), the middleware no-ops — devs can register without setting up a Cloudflare account, but **production deployments MUST set the env to activate bot protection**. Client-side: render the Turnstile widget on the register screen and send its token as `captchaToken` in the multipart body.
 - **MIME validation**: enforced against file headers (not just extensions).
+- **Rate limit**: None (Public Registration / Admin Create).
+- **Admin bypass**: valid `SUPER_ADMIN` tokens bypass public registration rules.
 - **Path sanitization**: filenames sanitized to prevent directory traversal.
 - **Idempotency**: supports the `Idempotency-Key` header (`routeName: 'registration'`). See [system-concepts.md — Idempotency](../../system-concepts.md#idempotency) for the full contract.
 
@@ -176,14 +185,11 @@ The controller inspects `req.headers.authorization` itself; only a valid `Bearer
 {
   "success": true,
   "statusCode": 201,
-  "message": "User created successfully",
+  "message": "User created successfully. Please verify your email with the OTP sent.",
   "data": {
-    "id": "664a1b2c3d4e5f6a7b8c9d0e",
     "email": "user@example.com",
-    "fullName": "Jane Doe",
-    "role": "SISTER",
-    "status": "PENDING",
-    "isVerified": false
+    "isVerified": false,
+    "status": "PENDING"
   }
 }
 ```
@@ -193,14 +199,11 @@ The controller inspects `req.headers.authorization` itself; only a valid `Bearer
 {
   "success": true,
   "statusCode": 201,
-  "message": "User created successfully",
+  "message": "User created successfully. Please verify your email with the OTP sent.",
   "data": {
-    "id": "664a1b2c3d4e5f6a7b8c9d0e",
     "email": "new_admin@example.com",
-    "fullName": "Admin User",
-    "role": "BROTHER",
-    "status": "ACTIVE",
-    "isVerified": true
+    "isVerified": true,
+    "status": "ACTIVE"
   }
 }
 ```
@@ -213,7 +216,8 @@ The controller inspects `req.headers.authorization` itself; only a valid `Bearer
   "message": "Validation Error",
   "errorMessages": [
     { "path": "body.password", "message": "Password must include upper, lower, number, special and be 8+ chars" },
-    { "path": "body.dateOfBirth", "message": "Minimum age is 16 years" }
+    { "path": "body.revertDate", "message": "Invalid date: 2024-05-11T00:00:00.000Z" },
+    { "path": "body.dateOfBirth", "message": "Minimum age is 16 years based on 1995-05-15T00:00:00.000Z" }
   ]
 }
 ```
@@ -293,4 +297,4 @@ The controller inspects `req.headers.authorization` itself; only a valid `Bearer
 - **OTP not received / expired** -> request a fresh one: [auth/07-resend-otp.md](../auth/07-resend-otp.md).
 - **Alternative registration path** (no password, no OTP) -> [auth/08-social-login.md](../auth/08-social-login.md).
 - **First sign-in after verification** -> [auth/01-login.md](../auth/01-login.md).
-- **Onboarding completion (first-time setup)** -> [05-complete-onboarding.md](./05-complete-onboarding.md).
+```

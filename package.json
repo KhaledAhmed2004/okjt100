@@ -19,7 +19,7 @@
     "generate:module": "node scripts/generate-module/index.js",
     "generate:openapi": "node scripts/generate-module/generators/openapi-generator.js",
     "generate:frontend-types": "node scripts/generate-module/generators/frontend-types-generator.js",
-    "generate:postman": "ts-node scripts/generate-postman.ts"
+    "postman": "ts-node scripts/generate-postman.ts"
   },
   "keywords": [],
   "author": "",

@@ -21,7 +21,7 @@ type IEmailChangeNotification = {
 
 type IAccountRejected = {
   email: string;
-  fullName?: string;
+  name?: string;
   reverifyToken: string;
   reverifyTtlHours: number;
   rejectionReason?: string;
@@ -111,7 +111,7 @@ const emailChangeNotification = (values: IEmailChangeNotification) => {
 // consumes. The token (not an OTP) is opaque and longer-lived than a
 // 3-minute OTP because re-shooting verification video takes real time.
 const accountRejected = (values: IAccountRejected) => {
-  const greeting = values.fullName ? `Hi ${values.fullName},` : 'Hi,';
+  const greeting = values.name ? `Hi ${values.name},` : 'Hi,';
   const reasonBlock = values.rejectionReason
     ? `<p style="color: #555; font-size: 16px; line-height: 1.5; margin-bottom: 20px;"><strong>Reason from our reviewer:</strong> ${values.rejectionReason}</p>`
     : '';

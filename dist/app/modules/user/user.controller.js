@@ -32,7 +32,7 @@ const user_1 = require("../../../enums/user");
 const jwtHelper_1 = require("../../../helpers/jwtHelper");
 const config_1 = __importDefault(require("../../../config"));
 const createUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const userData = __rest(req.body, []);
+    const _a = req.body, { profileImage, verificationImage, verificationVideo } = _a, userData = __rest(_a, ["profileImage", "verificationImage", "verificationVideo"]);
     // Check if requester is an admin (optional auth for this specific endpoint)
     let isAdmin = false;
     const authHeader = req.headers.authorization;
@@ -40,7 +40,8 @@ const createUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
         const token = authHeader.split(' ')[1];
         try {
             const verifiedUser = jwtHelper_1.jwtHelper.verifyToken(token, config_1.default.jwt.jwt_secret);
-            if (verifiedUser && verifiedUser.role === user_1.USER_ROLES.SUPER_ADMIN) {
+            if (verifiedUser &&
+                verifiedUser.role === user_1.USER_ROLES.SUPER_ADMIN) {
                 isAdmin = true;
             }
         }
@@ -48,20 +49,28 @@ const createUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
             // Ignore token errors; fallback to public registration flow
         }
     }
-    const result = yield user_service_1.UserService.createUserToDB(userData, isAdmin);
-    // Convert to object and sanitize response (remove password)
-    const responseData = result.toObject ? result.toObject() : Object.assign({}, result);
-    delete responseData.password;
+    const result = yield user_service_1.UserService.createUserToDB(Object.assign(Object.assign({}, userData), { profileImage,
+        verificationImage,
+        verificationVideo }), isAdmin);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.CREATED,
-        message: 'User created successfully',
-        data: responseData,
+        message: 'User created successfully. Please verify your email with the OTP sent.',
+        data: {
+            email: result.email,
+            isVerified: result.isVerified,
+            status: result.status,
+        },
     });
 }));
 const getUserProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
     const result = yield user_service_1.UserService.getUserProfileFromDB(user);
+    // Private payload (email, dateOfBirth, verification artefacts). Forbid
+    // any shared cache and disable disk persistence. Clients may still keep
+    // an in-memory copy for the session.
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
@@ -72,23 +81,24 @@ const getUserProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
 const updateProfile = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
     // All files + text data are in req.body
-    const payload = Object.assign({}, req.body);
+    const _a = req.body, { profileImage } = _a, rest = __rest(_a, ["profileImage"]);
+    const payload = Object.assign(Object.assign({}, rest), (profileImage ? { profileImage } : {}));
     const result = yield user_service_1.UserService.updateProfileToDB(user, payload);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Profile updated successfully',
-        data: result,
+        data: Object.assign(Object.assign({ id: result === null || result === void 0 ? void 0 : result._id }, payload), { updatedAt: result === null || result === void 0 ? void 0 : result.updatedAt }),
     });
 }));
-const updateUserStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const updateUserReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userId } = req.params;
-    const { status } = req.body;
-    const result = yield user_service_1.UserService.updateUserStatusInDB(userId, status);
+    const { status, reason } = req.body;
+    const result = yield user_service_1.UserService.updateUserStatusInDB(userId, status, reason);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'User status updated',
+        message: 'User review status updated',
         data: result,
     });
 }));
@@ -99,8 +109,11 @@ const adminUpdateUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'User updated',
-        data: result,
+        message: 'User updated successfully',
+        data: {
+            id: result === null || result === void 0 ? void 0 : result._id,
+            updatedAt: result === null || result === void 0 ? void 0 : result.updatedAt,
+        },
     });
 }));
 const deleteUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -109,8 +122,8 @@ const deleteUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'User deleted',
-        data: result,
+        message: 'User deleted permanently',
+        data: { id: result === null || result === void 0 ? void 0 : result._id },
     });
 }));
 const getAllUserRoles = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -135,7 +148,12 @@ const getUserById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
 }));
 const getUserDetailsById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userId } = req.params;
-    const result = yield user_service_1.UserService.getUserDetailsByIdFromDB(userId);
+    const requester = req.user;
+    const result = yield user_service_1.UserService.getUserDetailsByIdFromDB(userId, requester);
+    // User-scoped, may change the moment the target updates. Disable shared
+    // and disk caching. Clients treat each call as fresh.
+    res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
@@ -143,22 +161,127 @@ const getUserDetailsById = (0, catchAsync_1.default)((req, res) => __awaiter(voi
         data: result,
     });
 }));
-const getUsersStats = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield user_service_1.UserService.getUsersStatsFromDB();
+const getUserMetrics = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield user_service_1.UserService.getUserMetricsFromDB();
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'User statistics retrieved',
+        message: 'User metrics retrieved',
         data: result,
     });
 }));
-const completeOnboarding = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const requestAccountDeletion = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
-    const result = yield user_service_1.UserService.completeOnboardingToDB(user);
+    const { password } = req.body;
+    const result = yield user_service_1.UserService.requestAccountDeletionFromDB(user, password);
+    // The user's tokens were just invalidated server-side; clear the cookie too.
+    res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: config_1.default.node_env === 'production',
+        sameSite: 'lax',
+        path: '/',
+    });
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Onboarding marked as completed',
+        message: 'Account scheduled for deletion. You can restore it within the recovery window.',
+        data: result,
+    });
+}));
+const requestEmailChange = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = req.user;
+    const { newEmail, password } = req.body;
+    const result = yield user_service_1.UserService.requestEmailChangeFromDB(user, {
+        newEmail,
+        password,
+    });
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Verification code sent to the new email. Confirm within the OTP window to complete the change.',
+        data: result,
+    });
+}));
+const reverifyAccount = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { token, verificationImage, verificationVideo, profileImage } = req.body;
+    const result = yield user_service_1.UserService.reverifyAccountFromDB({
+        token,
+        verificationImage,
+        verificationVideo,
+        profileImage,
+    });
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Documents re-submitted. Your account is back in review — you will receive an email once an admin approves it.',
+        data: result,
+    });
+}));
+const listMySessions = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = req.user;
+    const result = yield user_service_1.UserService.listMySessionsFromDB(user);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Active sessions retrieved.',
+        data: result,
+    });
+}));
+const revokeMySession = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = req.user;
+    const { tokenId } = req.params;
+    const result = yield user_service_1.UserService.revokeMySessionFromDB(user, tokenId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Session revoked.',
+        data: result,
+    });
+}));
+const revokeAllMySessions = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = req.user;
+    const result = yield user_service_1.UserService.revokeAllMySessionsFromDB(user);
+    // tokenVersion was bumped — wipe the refresh cookie so the current
+    // browser can't ride its old refresh token.
+    res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: config_1.default.node_env === 'production',
+        sameSite: 'lax',
+        path: '/',
+    });
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'All sessions revoked. Please log in again.',
+        data: result,
+    });
+}));
+const exportMyData = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = req.user;
+    const result = yield user_service_1.UserService.exportMyDataFromDB(user);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Personal data export generated.',
+        data: result,
+    });
+}));
+const confirmEmailChange = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = req.user;
+    const { otp } = req.body;
+    const result = yield user_service_1.UserService.confirmEmailChangeFromDB(user, otp);
+    // tokenVersion was bumped — wipe the refresh-token cookie so the browser
+    // can't retry with stale credentials.
+    res.clearCookie('refreshToken', {
+        httpOnly: true,
+        secure: config_1.default.node_env === 'production',
+        sameSite: 'lax',
+        path: '/',
+    });
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Email changed successfully. Please log in again with the new email.',
         data: result,
     });
 }));
@@ -167,11 +290,18 @@ exports.UserController = {
     getUserProfile,
     updateProfile,
     getAllUserRoles,
-    updateUserStatus,
+    updateUserReview,
     adminUpdateUser,
     deleteUser,
     getUserById,
     getUserDetailsById,
-    getUsersStats,
-    completeOnboarding,
+    getUserMetrics,
+    requestAccountDeletion,
+    requestEmailChange,
+    confirmEmailChange,
+    exportMyData,
+    listMySessions,
+    revokeMySession,
+    revokeAllMySessions,
+    reverifyAccount,
 };

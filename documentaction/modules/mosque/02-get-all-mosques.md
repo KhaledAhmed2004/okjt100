@@ -18,6 +18,8 @@ Auth: None
 | `area` | `string` | Filter by specific area |
 | `sortBy` | `string` | Sort field (default: `mosqueName`) |
 | `sortOrder` | `string` | `asc` or `desc` (default: `asc`) |
+| `latitude` | `number` | User's latitude for distance calculation |
+| `longitude` | `number` | User's longitude for distance calculation |
 
 ## Implementation
 
@@ -27,7 +29,8 @@ Auth: None
 
 ### Business Logic
 1. **Query Building**: Applies filters and search terms to the database query.
-2. **Pagination**: Calculates skip and limit for results.
+2. **Distance Calculation**: If `latitude` and `longitude` are provided, calculates distance (in Km) for each mosque.
+3. **Pagination**: Calculates skip and limit for results.
 
 ## Responses
 
@@ -47,7 +50,9 @@ Auth: None
     {
       "id": "60d5ecb86372ad46101f1929",
       "mosqueName": "Baitul Mukarram",
+      "address": "Baitul Mukarram, Dhaka",
       "area": "Motijheel",
+      "distanceInKm": 2.5,
       "prayerTimes": {
         "fajr": "04:30",
         "dhuhr": "12:15",

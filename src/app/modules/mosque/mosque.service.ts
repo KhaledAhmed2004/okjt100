@@ -1,6 +1,7 @@
 import { StatusCodes } from 'http-status-codes';
 import ApiError from '../../../errors/ApiError';
 import QueryBuilder from '../../builder/QueryBuilder';
+import { calculateDistance } from '../../helpers/distanceHelper';
 import { IMosque } from './mosque.interface';
 import Mosque from './mosque.model';
 
@@ -10,15 +11,39 @@ const createMosqueIntoDB = async (payload: IMosque) => {
 };
 
 const getAllMosquesFromDB = async (query: Record<string, unknown>) => {
-  const mosqueQuery = new QueryBuilder(Mosque.find(), query)
+  const { latitude, longitude } = query;
+
+  const mosqueQuery = new QueryBuilder(Mosque.find().lean(), query)
     .textSearch()
     .filter()
     .sort()
     .paginate()
     .fields();
 
-  const data = await mosqueQuery.modelQuery;
+  const data = (await mosqueQuery.modelQuery) as IMosque[];
   const pagination = await mosqueQuery.getPaginationInfo();
+
+  if (latitude && longitude) {
+    const userLat = parseFloat(latitude as string);
+    const userLng = parseFloat(longitude as string);
+
+    if (!isNaN(userLat) && !isNaN(userLng)) {
+      data.forEach(mosque => {
+        if (
+          mosque.location &&
+          mosque.location.latitude &&
+          mosque.location.longitude
+        ) {
+          mosque.distanceInKm = calculateDistance(
+            userLat,
+            userLng,
+            mosque.location.latitude,
+            mosque.location.longitude,
+          );
+        }
+      });
+    }
+  }
 
   return {
     data,

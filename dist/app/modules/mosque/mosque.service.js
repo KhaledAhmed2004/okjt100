@@ -27,21 +27,35 @@ exports.MosqueService = void 0;
 const http_status_codes_1 = require("http-status-codes");
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
+const distanceHelper_1 = require("../../helpers/distanceHelper");
 const mosque_model_1 = __importDefault(require("./mosque.model"));
 const createMosqueIntoDB = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield mosque_model_1.default.create(payload);
     return result;
 });
 const getAllMosquesFromDB = (query) => __awaiter(void 0, void 0, void 0, function* () {
-    const searchableFields = ['mosqueName', 'area', 'address'];
-    const mosqueQuery = new QueryBuilder_1.default(mosque_model_1.default.find(), query)
-        .textSearch(searchableFields)
+    const { latitude, longitude } = query;
+    const mosqueQuery = new QueryBuilder_1.default(mosque_model_1.default.find().lean(), query)
+        .textSearch()
         .filter()
         .sort()
         .paginate()
         .fields();
-    const data = yield mosqueQuery.modelQuery;
+    const data = (yield mosqueQuery.modelQuery);
     const pagination = yield mosqueQuery.getPaginationInfo();
+    if (latitude && longitude) {
+        const userLat = parseFloat(latitude);
+        const userLng = parseFloat(longitude);
+        if (!isNaN(userLat) && !isNaN(userLng)) {
+            data.forEach(mosque => {
+                if (mosque.location &&
+                    mosque.location.latitude &&
+                    mosque.location.longitude) {
+                    mosque.distance = (0, distanceHelper_1.calculateDistance)(userLat, userLng, mosque.location.latitude, mosque.location.longitude);
+                }
+            });
+        }
+    }
     return {
         data,
         pagination,

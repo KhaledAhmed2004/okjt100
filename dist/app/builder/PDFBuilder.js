@@ -198,7 +198,6 @@ class PDFBuilder {
                 PDFBuilder.browser = yield puppeteer_1.default.launch({
                     headless: true,
                     args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security'],
-                    ignoreHTTPSErrors: true,
                 });
             }
             return PDFBuilder.browser;

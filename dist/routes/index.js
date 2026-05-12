@@ -12,6 +12,10 @@ const admin_route_1 = require("../app/modules/admin/admin.route");
 const legal_route_1 = require("../app/modules/legal/legal.route");
 const khutbah_route_1 = require("../app/modules/khutbah/khutbah.route");
 const mosque_route_1 = require("../app/modules/mosque/mosque.route");
+const ask_imam_route_1 = require("../app/modules/ask-imam/ask-imam.route");
+const group_route_1 = require("../app/modules/group/group.route");
+const pending_email_route_1 = require("../app/modules/pending-email/pending-email.route");
+const support_ticket_route_1 = require("../app/modules/support-ticket/support-ticket.route");
 const router = express_1.default.Router();
 const apiRoutes = [
     {
@@ -45,6 +49,22 @@ const apiRoutes = [
     {
         path: '/mosques',
         route: mosque_route_1.MosqueRoutes,
+    },
+    {
+        path: '/ask-imam',
+        route: ask_imam_route_1.AskImamRoutes,
+    },
+    {
+        path: '/groups',
+        route: group_route_1.GroupRoutes,
+    },
+    {
+        path: '/admin/pending-emails',
+        route: pending_email_route_1.PendingEmailRoutes,
+    },
+    {
+        path: '/support-tickets',
+        route: support_ticket_route_1.SupportTicketRoutes,
     },
 ];
 apiRoutes.forEach(route => router.use(route.path, route.route));

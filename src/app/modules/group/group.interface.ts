@@ -22,6 +22,8 @@ export interface IGroupPost extends Document {
   userId: Schema.Types.ObjectId;
   content: string;
   attachments: string[];
+  likesCount: number;
+  commentsCount: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,6 +38,7 @@ export interface IPostComment extends Document {
   postId: Schema.Types.ObjectId;
   userId: Schema.Types.ObjectId;
   comment: string;
+  parentCommentId?: Schema.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }

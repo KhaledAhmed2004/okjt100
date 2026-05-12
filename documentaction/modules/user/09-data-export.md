@@ -132,10 +132,10 @@ None. Empty body or `{}`.
     "schemaVersion": 1,
     "profile": {
       "_id": "664a1b2c3d4e5f6a7b8c9d0e",
-      "fullName": "Jane Doe",
+      "name": "Jane Doe",
       "email": "jane@example.com",
       "role": "SISTER",
-      "dateOfBirth": "1995-05-15",
+      "dateOfBirth": "1995-05-15T00:00:00.000Z",
       "profileImage": "uploads/users/profiles/pic.jpg",
       "deviceTokens": [
         { "platform": "ios", "appVersion": "1.4.0", "lastSeenAt": "2026-05-09T22:11:00.000Z" }

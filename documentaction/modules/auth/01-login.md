@@ -7,7 +7,7 @@ Auth: None (Public — credentials validated inline)
 ```
 
 ## 1. Overview
-Standard email + password sign-in. Returns an access-token / refresh-token pair plus the user's onboarding state so the client knows where to route next. The refresh token is also set as an `httpOnly` cookie so browser clients don't have to handle it in JS. Status checks happen at the service layer **before** password comparison so the user gets the right reason (suspended / rejected / unverified) instead of a generic 401.
+Standard email + password sign-in. Returns an access-token / refresh-token pair. The refresh token is also set as an `httpOnly` cookie so browser clients don't have to handle it in JS. Status checks happen at the service layer **before** password comparison so the user gets the right reason (suspended / rejected / unverified) instead of a generic 401.
 
 ---
 
@@ -22,9 +22,10 @@ Enforced by the login service at [src/app/modules/auth/auth.service.ts:48-88](..
 
 | Status | Outcome |
 | :--- | :--- |
-| `ACTIVE` (and `verified = true`) | Allowed — tokens issued. |
-| `ACTIVE` but `verified = false` | `401 Unauthorized` (`"message": "Please verify your account, then try to login again"`). |
-| `PENDING` | `403 Forbidden` (`"message": "Your account is pending approval."`). |
+| `ACTIVE` (and `isVerified = true`) | Allowed — tokens issued. |
+| `ACTIVE` but `isVerified = false` | `401 Unauthorized` (`"message": "Please verify your account, then try to login again"`). |
+| `PENDING` (and `isVerified = false`) | `403 Forbidden` (`"message": "Your account is pending verification. Please verify your email."`). |
+| `PENDING` (and `isVerified = true`) | `403 Forbidden` (`"message": "Admin Verification Pending. Your account is currently under review."`). |
 | `REJECTED` | `403 Forbidden` (`"message": "Your account was rejected."`). Re-submit via [user/13-reverify-account.md](../user/13-reverify-account.md). |
 | `SUSPENDED` | `403 Forbidden` (`"message": "Your account has been suspended."`). |
 | `RESTRICTED` | `403 Forbidden` (`"message": "Your account is restricted. Contact support."`). |
@@ -99,8 +100,7 @@ Schema violations -> `400 Bad Request` from `validateRequest` with the Zod error
   "message": "User logged in successfully.",
   "data": {
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "isOnboardingCompleted": true
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
 }
 ```

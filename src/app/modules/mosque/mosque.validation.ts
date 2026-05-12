@@ -29,6 +29,11 @@ const createMosqueZodSchema = z.object({
 });
 
 const updateMosqueZodSchema = z.object({
+  params: z.object({
+    mosqueId: z.string({
+      required_error: 'Mosque ID is required',
+    }),
+  }),
   body: z.object({
     mosqueName: z.string().optional(),
     address: z.string().optional(),

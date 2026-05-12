@@ -54,4 +54,30 @@ router.post(
   GroupController.addComment,
 );
 
+router.patch(
+  '/posts/:postId',
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
+  validateRequest(GroupValidation.updatePostZodSchema),
+  GroupController.updatePost,
+);
+
+router.delete(
+  '/posts/:postId',
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
+  GroupController.deletePost,
+);
+
+router.patch(
+  '/comments/:commentId',
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
+  validateRequest(GroupValidation.updateCommentZodSchema),
+  GroupController.updateComment,
+);
+
+router.delete(
+  '/comments/:commentId',
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
+  GroupController.deleteComment,
+);
+
 export const GroupRoutes = router;

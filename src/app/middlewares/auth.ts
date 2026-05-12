@@ -65,13 +65,16 @@ const auth =
         dbUser.status === USER_STATUS.RESTRICTED ||
         dbUser.status === USER_STATUS.SUSPENDED ||
         dbUser.status === USER_STATUS.REJECTED ||
-        dbUser.status === USER_STATUS.INACTIVE
+        dbUser.status === USER_STATUS.INACTIVE ||
+        dbUser.status === USER_STATUS.PENDING
       ) {
         let message: string;
         if (dbUser.status === USER_STATUS.SUSPENDED) {
           message = 'Account is suspended. Please contact support.';
         } else if (dbUser.status === USER_STATUS.REJECTED) {
           message = 'Account verification was rejected. Please re-submit your documents.';
+        } else if (dbUser.status === USER_STATUS.PENDING) {
+          message = 'Admin Verification Pending. Your account is currently under review.';
         } else {
           message = 'Account is no longer active';
         }

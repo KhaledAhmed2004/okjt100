@@ -153,9 +153,16 @@ const createStorage = (mode) => {
     ensureDir(path_1.default.join(baseUploadDir, 'media'));
     ensureDir(path_1.default.join(baseUploadDir, 'documents'));
     return multer_1.default.diskStorage({
-        destination: (_req, file, cb) => {
+        destination: (req, file, cb) => {
+            var _a;
             const canonicalFolder = getFolderByMime(file.mimetype);
-            const folderPath = path_1.default.join(baseUploadDir, canonicalFolder);
+            // Check if there's a custom subfolder for this field
+            const options = req._fileHandlerOptions;
+            const customSub = (_a = options === null || options === void 0 ? void 0 : options.perFieldSubfolder) === null || _a === void 0 ? void 0 : _a[file.fieldname];
+            const folderPath = customSub
+                ? path_1.default.join(baseUploadDir, customSub)
+                : path_1.default.join(baseUploadDir, canonicalFolder);
+            ensureDir(folderPath);
             cb(null, folderPath);
         },
         filename: (_req, file, cb) => {
@@ -203,9 +210,11 @@ const optimizeFile = (file, storageMode) => __awaiter(void 0, void 0, void 0, fu
     return buffer;
 });
 const generateFileUrl = (file, storageMode, provider, baseUrl) => __awaiter(void 0, void 0, void 0, function* () {
-    const folder = getFolderByMime(file.mimetype);
+    const canonicalFolder = getFolderByMime(file.mimetype);
     if (storageMode === 'local') {
-        return `${baseUrl}/uploads/${folder}/${path_1.default.basename(file.path)}`;
+        // Generate relative URL path
+        const relativePath = file.path.split('uploads')[1].replace(/\\/g, '/');
+        return `${baseUrl}/uploads${relativePath}`;
     }
     const buffer = yield optimizeFile(file, storageMode);
     const ext = file.mimetype.split('/')[1];
@@ -265,12 +274,13 @@ const processFilesToUrls = (filesByField, storageMode, provider, baseUrl) => __a
     }
     return processed;
 });
-const normalizeOptions = (options) => {
+const normalizeOptions = (fields, options) => {
     var _a;
     const arrayToOptions = (arr) => {
         var _a, _b;
         const enforceAllowedFields = [];
         const perFieldMaxCount = {};
+        const perFieldSubfolder = {};
         for (const entry of arr) {
             if (typeof entry === 'string') {
                 enforceAllowedFields.push(entry);
@@ -279,22 +289,26 @@ const normalizeOptions = (options) => {
             else if (entry && typeof entry.name === 'string') {
                 enforceAllowedFields.push(entry.name);
                 perFieldMaxCount[entry.name] = (_b = entry.maxCount) !== null && _b !== void 0 ? _b : 1;
+                if (entry.subfolder) {
+                    perFieldSubfolder[entry.name] = entry.subfolder;
+                }
             }
         }
-        return { enforceAllowedFields, perFieldMaxCount };
+        return { enforceAllowedFields, perFieldMaxCount, perFieldSubfolder };
     };
-    const base = Array.isArray(options) ? arrayToOptions(options) : options || {};
-    const storageMode = base.storageMode || (process.env.UPLOAD_MODE === 'memory' ? 'memory' : 'local');
-    const cloudProvider = base.cloudProvider || process.env.CLOUD_PROVIDER || 's3';
-    const maxFileSizeMB = base.maxFileSizeMB || 10;
-    const maxFilesTotal = (_a = base.maxFilesTotal) !== null && _a !== void 0 ? _a : 10;
-    return Object.assign(Object.assign({}, base), { storageMode, cloudProvider, maxFileSizeMB, maxFilesTotal });
+    const baseFields = Array.isArray(fields) ? arrayToOptions(fields) : fields || {};
+    const merged = Object.assign(Object.assign({}, baseFields), options);
+    const storageMode = merged.storageMode || (process.env.UPLOAD_MODE === 'memory' ? 'memory' : 'local');
+    const cloudProvider = merged.cloudProvider || process.env.CLOUD_PROVIDER || 's3';
+    const maxFileSizeMB = merged.maxFileSizeMB || 10;
+    const maxFilesTotal = (_a = merged.maxFilesTotal) !== null && _a !== void 0 ? _a : 10;
+    return Object.assign(Object.assign({}, merged), { storageMode, cloudProvider, maxFileSizeMB, maxFilesTotal });
 };
 // ===============================
 // Middleware
 // ===============================
-const fileHandler = (options) => {
-    const resolved = normalizeOptions(options);
+const fileHandler = (fields, options) => {
+    const resolved = normalizeOptions(fields, options);
     const provider = CLOUD_PROVIDERS[resolved.cloudProvider];
     const upload = (0, multer_1.default)({
         storage: createStorage(resolved.storageMode),
@@ -302,6 +316,8 @@ const fileHandler = (options) => {
         limits: { fileSize: resolved.maxFileSizeMB * 1024 * 1024, files: resolved.maxFilesTotal },
     }).any();
     return (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+        // Attach options to request so destination() can access them
+        req._fileHandlerOptions = resolved;
         upload(req, res, (err) => __awaiter(void 0, void 0, void 0, function* () {
             if (err) {
                 if (err instanceof multer_1.default.MulterError) {

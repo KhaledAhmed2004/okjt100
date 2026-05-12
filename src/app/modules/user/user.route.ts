@@ -16,11 +16,6 @@ const router = express.Router();
 // Create new user (Public Registration)
 router.post(
   '/',
-  rateLimitMiddleware({
-    windowMs: 3600_000, // 1 hour
-    max: 5,
-    routeName: 'registration',
-  }),
   idempotency('registration'),
   fileHandler([
     { name: 'profileImage', maxCount: 1, subfolder: 'users/profiles' },
@@ -74,25 +69,18 @@ router.get(
 
 // Fetch own profile details
 router.get(
-  '/profile',
+  '/me',
   auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
   UserController.getUserProfile,
 );
 
 // Update own profile
 router.patch(
-  '/profile',
+  '/me',
   auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
   fileHandler([{ name: 'profileImage', maxCount: 1, subfolder: 'users/profiles' }]),
   validateRequest(UserValidation.updateUserZodSchema),
   UserController.updateProfile,
-);
-
-// Mark onboarding as completed
-router.patch(
-  '/complete-onboarding',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  UserController.completeOnboarding,
 );
 
 // Request account self-deletion (soft-delete with 30-day recovery window).
@@ -162,6 +150,53 @@ router.delete(
   auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
   validateRequest(UserValidation.revokeSessionZodSchema),
   UserController.revokeMySession,
+);
+
+// --- Admin Only ---
+
+// List all users with stats (Admin)
+router.get(
+  '/',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(UserValidation.getAllUserRolesZodSchema),
+  UserController.getAllUserRoles,
+);
+
+// Get user metrics (Admin)
+router.get(
+  '/metrics',
+  auth(USER_ROLES.SUPER_ADMIN),
+  UserController.getUserMetrics,
+);
+
+// Review user (Approve/Reject)
+router.patch(
+  '/:userId/review',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(UserValidation.updateUserReviewZodSchema),
+  UserController.updateUserReview,
+);
+
+// Get specific user details by ID (Admin)
+router.get(
+  '/:userId',
+  auth(USER_ROLES.SUPER_ADMIN),
+  UserController.getUserById,
+);
+
+// Admin: Update any user (Update fields including specialty, role, status)
+router.patch(
+  '/:userId',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(UserValidation.adminUpdateUserZodSchema),
+  UserController.adminUpdateUser,
+);
+
+// Admin: Delete user permanently
+router.delete(
+  '/:userId',
+  auth(USER_ROLES.SUPER_ADMIN),
+  UserController.deleteUser,
 );
 
 export const UserRoutes = router;

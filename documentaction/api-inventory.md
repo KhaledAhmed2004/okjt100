@@ -31,10 +31,9 @@
 |---|---|---|---|:---:|---|---|
 | 2.1 | POST | `/users` | Public / SUPER_ADMIN | ✅ | [Module 2.1](./modules/user/01-create-user.md) | — |
 | 2.2 | GET | `/users/:userId/user` | User / Admin | ✅ | [Module 2.2](./modules/user/02-get-user-details-public.md) | — |
-| 2.3 | GET | `/users/profile` | Bearer | ✅ | [Module 2.3](./modules/user/03-get-own-profile.md) | — |
-| 2.4 | PATCH | `/users/profile` | Bearer | ✅ | [Module 2.4](./modules/user/04-update-own-profile.md) | — |
-| 2.5 | PATCH | `/users/complete-onboarding` | Bearer | ✅ | [Module 2.5](./modules/user/05-complete-onboarding.md) | — |
-| 2.6 | DELETE | `/users/profile` | Bearer | ✅ | [Module 2.6](./modules/user/06-delete-account.md) | — |
+| 2.3 | GET | `/users/me` | Bearer | ✅ | [Module 2.3](./modules/user/03-get-own-profile.md) | — |
+| 2.4 | PATCH | `/users/me` | Bearer | ✅ | [Module 2.4](./modules/user/04-update-own-profile.md) | — |
+| 2.6 | DELETE | `/users/me` | Bearer | ✅ | [Module 2.6](./modules/user/06-delete-account.md) | — |
 | 2.7 | POST | `/users/email-change-request` | Bearer | ✅ | [Module 2.7](./modules/user/07-email-change-request.md) | — |
 | 2.8 | POST | `/users/email-change-confirm` | Bearer | ✅ | [Module 2.8](./modules/user/08-email-change-confirm.md) | — |
 | 2.9 | GET | `/users/data-export` | Bearer | ✅ | [Module 2.9](./modules/user/09-data-export.md) | — |
@@ -42,6 +41,12 @@
 | 2.11 | DELETE | `/users/sessions/:sessionId` | Bearer | ✅ | [Module 2.11](./modules/user/11-revoke-session.md) | — |
 | 2.12 | DELETE | `/users/sessions` | Bearer | ✅ | [Module 2.12](./modules/user/12-revoke-all-sessions.md) | — |
 | 2.13 | POST | `/users/reverify` | Public | ✅ | [Module 2.13](./modules/user/13-reverify-account.md) | — |
+| 2.14 | GET | `/users` | SUPER_ADMIN | ✅ | [Module 2.14](./modules/user/14-list-users-admin.md) | — |
+| 2.15 | GET | `/users/metrics` | SUPER_ADMIN | ✅ | [Module 2.15](./modules/user/15-user-stats-admin.md) | — |
+| 2.16 | GET | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.16](./modules/user/16-get-user-admin.md) | — |
+| 2.17 | PATCH | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.17](./modules/user/17-update-user-admin.md) | — |
+| 2.18 | DELETE | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.18](./modules/user/18-delete-user-admin.md) | — |
+| 2.19 | PATCH | `/users/:userId/review` | SUPER_ADMIN | ✅ | [Module 2.19](./modules/user/21-review-user-admin.md) | — |
 
 ## Ask Imam Module
 
@@ -111,8 +116,17 @@
 | 9.1 | GET | `/admin/growth-metrics` | SUPER_ADMIN | ✅ | [Module 9.1](./modules/admin/01-growth-metrics.md) | — |
 | 9.2 | GET | `/admin/preference-cards/trends/monthly` | SUPER_ADMIN | ✅ | [Module 9.2](./modules/admin/02-monthly-preference-cards-trend.md) | — |
 | 9.3 | GET | `/admin/subscriptions/trends/monthly` | SUPER_ADMIN | ✅ | [Module 9.3](./modules/admin/03-monthly-active-subscriptions-trend.md) | — |
-| 9.4 | GET | `/admin/users/stats` | SUPER_ADMIN | ✅ | [Module 9.4](./modules/admin/04-user-stats-dashboard.md) | — |
-| 9.5 | GET | `/admin/users` | SUPER_ADMIN | ✅ | [Module 9.5](./modules/admin/05-list-users.md) | — |
-| 9.6 | GET | `/admin/users/:userId` | SUPER_ADMIN | ✅ | [Module 9.6](./modules/admin/06-get-user-by-id.md) | — |
-| 9.7 | PATCH | `/admin/users/:userId` | SUPER_ADMIN | ✅ | [Module 9.7](./modules/admin/07-update-user.md) | — |
-| 9.8 | DELETE | `/admin/users/:userId` | SUPER_ADMIN | ✅ | [Module 9.8](./modules/admin/08-delete-user.md) | — |
+
+## Learning Content Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 10.1 | POST | `/learning-contents` | SUPER_ADMIN | ✅ | [Module 10.1](./modules/learning-content/01-create-content.md) | — |
+| 10.2 | GET | `/learning-contents` | Bearer | ✅ | [Module 10.2](./modules/learning-content/02-list-contents.md) | — |
+| 10.3 | GET | `/learning-contents/:contentId` | Bearer | ✅ | [Module 10.3](./modules/learning-content/03-get-content.md) | — |
+| 10.4 | PATCH | `/learning-contents/:contentId` | SUPER_ADMIN | ✅ | [Module 10.4](./modules/learning-content/04-update-content.md) | — |
+| 10.5 | DELETE | `/learning-contents/:contentId` | SUPER_ADMIN | ✅ | [Module 10.5](./modules/learning-content/05-delete-content.md) | — |
+| 10.6 | POST | `/learning-contents/:contentId/like` | BROTHER, SISTER | ✅ | [Module 10.6](./modules/learning-content/06-like-content.md) | — |
+| 10.7 | POST | `/learning-contents/:contentId/comments` | BROTHER, SISTER | ✅ | [Module 10.7](./modules/learning-content/07-add-comment.md) | — |
+| 10.8 | GET | `/learning-contents/:contentId/comments` | Bearer | ✅ | [Module 10.8](./modules/learning-content/08-list-comments.md) | — |
+| 10.9 | DELETE | `/learning-contents/comments/:commentId` | Bearer | ✅ | [Module 10.9](./modules/learning-content/09-delete-comment.md) | — |

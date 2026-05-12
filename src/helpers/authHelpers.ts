@@ -47,7 +47,7 @@ export const sendVerificationOTP = async (email: string, session?: ClientSession
   );
 
   const emailData = emailTemplate.createAccount({
-    name: user.fullName, // fixed from user.name
+    name: user.name,
     email: user.email,
     otp,
   });

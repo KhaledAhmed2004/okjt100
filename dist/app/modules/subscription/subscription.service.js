@@ -40,7 +40,7 @@ const getAllSubscriptions = (query) => __awaiter(void 0, void 0, void 0, functio
             .limit(Number(limit))
             .skip((Number(page) - 1) * Number(limit))
             .sort({ updatedAt: -1 })
-            .populate('userId', 'fullName email'),
+            .populate('userId', 'name email'),
         subscription_model_1.Subscription.countDocuments(filter),
     ]);
     return { data, total };
@@ -68,7 +68,7 @@ const getPendingWebhooks = () => __awaiter(void 0, void 0, void 0, function* () 
 });
 exports.getPendingWebhooks = getPendingWebhooks;
 const getSubscriptionById = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    return subscription_model_1.Subscription.findById(id).populate('userId', 'fullName email');
+    return subscription_model_1.Subscription.findById(id).populate('userId', 'name email');
 });
 exports.getSubscriptionById = getSubscriptionById;
 const getSubscriptionEvents = (userId) => __awaiter(void 0, void 0, void 0, function* () {

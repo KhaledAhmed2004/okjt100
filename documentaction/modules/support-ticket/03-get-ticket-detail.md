@@ -19,8 +19,8 @@ Returns the parent ticket document. **Does not include messages** — those are 
 
 ### 2.2 Population
 Once authorized, the controller returns a second query that populates:
-- `userId` → `{ fullName, email, profileImage }`
-- `assignedAdminId` → `{ fullName, email, profileImage }` (nullable)
+- `userId` → `{ name, email, profileImage }`
+- `assignedAdminId` → `{ name, email, profileImage }` (nullable)
 
 ## 3. URL Parameters
 
@@ -46,7 +46,7 @@ Once authorized, the controller returns a second query that populates:
     "ticketNumber": "TCK-1001",
     "userId": {
       "id": "664a1b2c3d4e5f6a7b8c9d0a",
-      "fullName": "Jane Doe",
+      "name": "Jane Doe",
       "email": "jane@example.com",
       "profileImage": "http://localhost:5000/uploads/users/profiles/.../avatar.png"
     },
@@ -56,7 +56,7 @@ Once authorized, the controller returns a second query that populates:
     "priority": "HIGH",
     "assignedAdminId": {
       "id": "664a1b2c3d4e5f6a7b8c9d10",
-      "fullName": "Admin User",
+      "name": "Admin User",
       "email": "admin@example.com",
       "profileImage": "..."
     },

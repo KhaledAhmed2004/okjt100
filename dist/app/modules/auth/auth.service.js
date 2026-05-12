@@ -38,7 +38,7 @@ const googleAudience = [
     config_1.default.google.clientIdAndroid,
     config_1.default.google.clientIdWeb,
 ].filter(Boolean);
-const loginUserFromDB = (payload) => __awaiter(void 0, void 0, void 0, function* () {
+const loginUserFromDB = (payload, sessionMetadata) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { email, password, deviceToken } = payload;
     // `tokenVersion` is `select: false` on the schema — pull it explicitly
@@ -50,13 +50,27 @@ const loginUserFromDB = (payload) => __awaiter(void 0, void 0, void 0, function*
     if (isExistUser.status === user_1.USER_STATUS.DELETED) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account has been deleted. Contact support.');
     }
+    if (isExistUser.status === user_1.USER_STATUS.PENDING) {
+        if (!isExistUser.isVerified) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account is pending verification. Please verify your email.');
+        }
+        else {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Admin Verification Pending. Your account is currently under review.');
+        }
+    }
+    if (isExistUser.status === user_1.USER_STATUS.REJECTED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account was rejected.');
+    }
+    if (isExistUser.status === user_1.USER_STATUS.SUSPENDED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account has been suspended.');
+    }
     if (isExistUser.status === user_1.USER_STATUS.RESTRICTED) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account is restricted. Contact support.');
     }
     if (isExistUser.status === user_1.USER_STATUS.INACTIVE) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account is inactive. Please activate it or contact support.');
     }
-    if (!isExistUser.verified) {
+    if (!isExistUser.isVerified) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'Please verify your account, then try to login again');
     }
     if (!password) {
@@ -79,17 +93,23 @@ const loginUserFromDB = (payload) => __awaiter(void 0, void 0, void 0, function*
         email: isExistUser.email,
         tokenVersion: (_b = isExistUser.tokenVersion) !== null && _b !== void 0 ? _b : 0,
     }, config_1.default.jwt.jwt_refresh_secret, config_1.default.jwt.jwt_refresh_expire_in);
-    const isOnboardingCompleted = isExistUser.isOnboardingCompleted;
     // ✅ save device token
     if (deviceToken) {
-        yield user_model_1.User.addDeviceToken(isExistUser._id.toString(), deviceToken);
+        yield user_model_1.User.addDeviceToken(isExistUser._id.toString(), deviceToken, undefined, undefined, sessionMetadata);
     }
-    return { tokens: { accessToken, refreshToken }, isOnboardingCompleted };
+    return { tokens: { accessToken, refreshToken } };
 });
 // logout
+//
+// `deviceToken` is OPTIONAL. A client that has lost or never registered
+// its push token should still be able to end its session (clear the
+// refresh cookie via the controller). When supplied, the matching entry
+// in `User.deviceTokens[]` is removed; when omitted, the call is a
+// no-op at the service layer and the controller-level cookie-clear
+// still happens.
 const logoutUserFromDB = (user, deviceToken) => __awaiter(void 0, void 0, void 0, function* () {
     if (!deviceToken) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Device token is required');
+        return; // no-op — controller still wipes the refresh-token cookie
     }
     yield user_model_1.User.removeDeviceToken(user.id, deviceToken);
 });
@@ -102,21 +122,23 @@ const forgetPasswordToDB = (email) => __awaiter(void 0, void 0, void 0, function
     }
     // Clear any existing reset tokens for this user (invalidate old requests)
     yield resetToken_model_1.ResetToken.deleteMany({ user: isExistUser._id });
-    //send mail
     const otp = (0, generateOTP_1.default)();
     const value = {
         otp,
         email: isExistUser.email,
     };
-    console.log('Sending email to:', isExistUser.email, 'with OTP:', otp);
-    const forgetPassword = emailTemplate_1.emailTemplate.resetPassword(value);
-    emailHelper_1.emailHelper.sendEmail(forgetPassword);
-    //save to DB (atomic update for OTP)
+    // Persist the OTP BEFORE enqueuing the email. Race fix: previously
+    // the email went out first, then the user-doc was updated, leaving
+    // a window where a fast user could submit the OTP before it was
+    // committed (and hit "Invalid or expired"). The `console.log` that
+    // used to live here leaked the OTP to stdout — removed.
     const authentication = {
         oneTimeCode: otp,
         expireAt: new Date(Date.now() + auth_constants_1.OTP_TTL_MS),
     };
     yield user_model_1.User.findOneAndUpdate({ email, status: { $ne: user_1.USER_STATUS.DELETED } }, { $set: { authentication } });
+    const forgetPassword = emailTemplate_1.emailTemplate.resetPassword(value);
+    yield emailHelper_1.emailHelper.enqueue(forgetPassword, { kind: 'forgot_password_otp' });
 });
 //verify email
 const verifyEmailToDB = (payload) => __awaiter(void 0, void 0, void 0, function* () {
@@ -140,17 +162,29 @@ const verifyEmailToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
     let message;
     let data;
     let tokens;
-    if (!isExistUser.verified) {
+    if (!isExistUser.isVerified) {
         // Mark as verified and clear OTP
-        const isOnboardingCompleted = isExistUser.isOnboardingCompleted;
-        yield user_model_1.User.findOneAndUpdate({ _id: isExistUser._id }, {
+        const updatedUser = yield user_model_1.User.findOneAndUpdate({ _id: isExistUser._id }, {
             $set: {
-                verified: true,
+                isVerified: true,
                 'authentication.oneTimeCode': null,
                 'authentication.expireAt': null,
             },
-        });
-        // Auto-login for new users after verification
+        }, { new: true });
+        if ((updatedUser === null || updatedUser === void 0 ? void 0 : updatedUser.status) === user_1.USER_STATUS.PENDING) {
+            message =
+                'Email verified successfully. Your account is now pending admin approval. You will receive an email once an administrator approves your account.';
+            return {
+                data: {
+                    email: updatedUser.email,
+                    isVerified: updatedUser.isVerified,
+                    status: updatedUser.status,
+                },
+                message,
+                tokens: null,
+            };
+        }
+        // Auto-login for users who are already ACTIVE (e.g. email change or re-verify)
         const accessToken = jwtHelper_1.jwtHelper.createToken({
             id: isExistUser._id.toString(),
             role: isExistUser.role,
@@ -165,7 +199,11 @@ const verifyEmailToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
         }, config_1.default.jwt.jwt_refresh_secret, config_1.default.jwt.jwt_refresh_expire_in);
         tokens = { accessToken, refreshToken };
         message = 'Email verify successfully';
-        return { data: Object.assign(Object.assign({}, tokens), { isOnboardingCompleted }), message, tokens };
+        return {
+            data: Object.assign({}, tokens),
+            message,
+            tokens,
+        };
     }
     else {
         // For password reset flow
@@ -191,6 +229,7 @@ const verifyEmailToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
 });
 //reset password
 const resetPasswordToDB = (token, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const { newPassword } = payload;
     if (!token) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Reset token is required');
@@ -204,22 +243,40 @@ const resetPasswordToDB = (token, payload) => __awaiter(void 0, void 0, void 0, 
     if (!isExistToken) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'Invalid or expired reset token');
     }
-    // Check user permission (one-time flag)
+    // Check user permission (one-time flag). Pull password + passwordHistory
+    // so we can run the reuse check below.
     const isExistUser = yield user_model_1.User.findOne({
         _id: isExistToken.user,
         'authentication.isResetPassword': true,
         status: { $ne: user_1.USER_STATUS.DELETED },
-    }).select('+authentication');
+    }).select('+authentication +password +passwordHistory');
     if (!isExistUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, "Invalid request or session. Please click 'Forgot Password' again.");
     }
+    // Reuse check — block the current password AND any of the previous
+    // N-1 in history. Reset-password has no "current password" challenge
+    // from the user, so we compare against the stored hash directly here.
+    if (isExistUser.password &&
+        (yield user_model_1.User.isMatchPassword(newPassword, isExistUser.password))) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You have recently used this password. Please choose a different one.');
+    }
+    const recentlyUsed = yield user_model_1.User.isPasswordReused(newPassword, isExistUser.passwordHistory);
+    if (recentlyUsed) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You have recently used this password. Please choose a different one.');
+    }
     // Hash new password
     const hashPassword = yield bcrypt_1.default.hash(newPassword, Number(config_1.default.bcrypt_salt_rounds));
+    // Push the OLD hash onto history, FIFO-trim to the configured depth.
+    const updatedHistory = [
+        { hash: isExistUser.password, changedAt: new Date() },
+        ...((_a = isExistUser.passwordHistory) !== null && _a !== void 0 ? _a : []),
+    ].slice(0, auth_constants_1.PASSWORD_HISTORY_DEPTH);
     // Update user AND increment tokenVersion to invalidate all existing sessions
     // Also clear the reset flag atomically
     yield user_model_1.User.findOneAndUpdate({ _id: isExistUser._id }, {
         $set: {
             password: hashPassword,
+            passwordHistory: updatedHistory,
             'authentication.isResetPassword': false,
         },
         $inc: { tokenVersion: 1 },
@@ -230,8 +287,9 @@ const resetPasswordToDB = (token, payload) => __awaiter(void 0, void 0, void 0, 
     yield resetToken_model_1.ResetToken.deleteMany({ user: isExistUser._id });
 });
 const changePasswordToDB = (user, payload) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const { currentPassword, newPassword } = payload;
-    const isExistUser = yield user_model_1.User.findById(user.id).select('+password');
+    const isExistUser = yield user_model_1.User.findById(user.id).select('+password +passwordHistory');
     if (!isExistUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, "User doesn't exist!");
     }
@@ -244,11 +302,28 @@ const changePasswordToDB = (user, payload) => __awaiter(void 0, void 0, void 0, 
     if (currentPassword === newPassword) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Please give different password from current password');
     }
+    // Reuse check — block recently-used passwords. The current password
+    // is NOT in history (gets pushed below), so this catches the previous
+    // N-1 passwords. Combined with the same-as-current check above, the
+    // user is blocked from reusing any of their last N passwords.
+    const recentlyUsed = yield user_model_1.User.isPasswordReused(newPassword, isExistUser.passwordHistory);
+    if (recentlyUsed) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You have recently used this password. Please choose a different one.');
+    }
     const hashPassword = yield bcrypt_1.default.hash(newPassword, Number(config_1.default.bcrypt_salt_rounds));
+    // Push the OLD hash onto history, FIFO-trim to the configured depth.
+    // We push the OLD (not the new) because the new is now `password`.
+    const updatedHistory = [
+        { hash: isExistUser.password, changedAt: new Date() },
+        ...((_a = isExistUser.passwordHistory) !== null && _a !== void 0 ? _a : []),
+    ].slice(0, auth_constants_1.PASSWORD_HISTORY_DEPTH);
     // Update user AND increment tokenVersion to invalidate all existing sessions
     // Also clear the reset flag atomically
     yield user_model_1.User.findOneAndUpdate({ _id: user.id }, {
-        $set: { password: hashPassword },
+        $set: {
+            password: hashPassword,
+            passwordHistory: updatedHistory,
+        },
         $inc: { tokenVersion: 1 },
     }, { new: true });
 });
@@ -256,7 +331,7 @@ const resendVerifyEmailToDB = (email) => __awaiter(void 0, void 0, void 0, funct
     return (0, authHelpers_1.sendVerificationOTP)(email);
 });
 // Social login (Google / Apple ID token verification)
-const socialLoginToDB = (payload) => __awaiter(void 0, void 0, void 0, function* () {
+const socialLoginToDB = (payload, sessionMetadata) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { provider, idToken, nonce, deviceToken, platform, appVersion } = payload;
     let email;
@@ -318,12 +393,32 @@ const socialLoginToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
     const providerField = provider === 'google' ? 'googleId' : 'appleId';
     let user = yield user_model_1.User.findOne({ [providerField]: providerId }).select('+tokenVersion');
     if (user) {
-        // Status checks
+        // Status checks — same messages as POST /auth/login so the two
+        // sign-in surfaces behave uniformly. Without this block a SUSPENDED
+        // user could still get tokens here and would only be stopped on the
+        // next protected call by the auth middleware.
         if (user.status === user_1.USER_STATUS.DELETED) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account has been deleted. Contact support.');
         }
+        if (user.status === user_1.USER_STATUS.PENDING) {
+            if (!user.isVerified) {
+                throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account is pending verification. Please verify your email.');
+            }
+            else {
+                throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Admin Verification Pending. Your account is currently under review.');
+            }
+        }
+        if (user.status === user_1.USER_STATUS.REJECTED) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account was rejected.');
+        }
+        if (user.status === user_1.USER_STATUS.SUSPENDED) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account has been suspended.');
+        }
         if (user.status === user_1.USER_STATUS.RESTRICTED) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account is restricted. Contact support.');
+        }
+        if (user.status === user_1.USER_STATUS.INACTIVE) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Your account is inactive. Please activate it or contact support.');
         }
     }
     else {
@@ -342,9 +437,10 @@ const socialLoginToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Email is required to create an account. Please allow email sharing.');
         }
         user = yield user_model_1.User.create({
-            name,
+            name: name,
             email,
-            verified: true,
+            isVerified: true,
+            status: user_1.USER_STATUS.PENDING,
             [providerField]: providerId,
         });
         // Re-fetch with tokenVersion
@@ -353,10 +449,9 @@ const socialLoginToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to create user');
         }
     }
-    const isOnboardingCompleted = user.isOnboardingCompleted;
     // Register device token
     if (deviceToken) {
-        yield user_model_1.User.addDeviceToken(user._id.toString(), deviceToken, platform, appVersion);
+        yield user_model_1.User.addDeviceToken(user._id.toString(), deviceToken, platform, appVersion, sessionMetadata);
     }
     // Issue tokens
     const accessToken = jwtHelper_1.jwtHelper.createToken({
@@ -371,7 +466,7 @@ const socialLoginToDB = (payload) => __awaiter(void 0, void 0, void 0, function*
         email: user.email,
         tokenVersion: (_b = user.tokenVersion) !== null && _b !== void 0 ? _b : 0,
     }, config_1.default.jwt.jwt_refresh_secret, config_1.default.jwt.jwt_refresh_expire_in);
-    return { tokens: { accessToken, refreshToken }, isOnboardingCompleted };
+    return { tokens: { accessToken, refreshToken } };
 });
 // Refresh token: verify and issue new tokens with rotation
 const refreshTokenToDB = (token) => __awaiter(void 0, void 0, void 0, function* () {
@@ -397,11 +492,19 @@ const refreshTokenToDB = (token) => __awaiter(void 0, void 0, void 0, function* 
     if (user.tokenVersion !== tokenVersion) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'Refresh token expired or already used. Please login again.');
     }
-    // Increment tokenVersion in DB to invalidate ALL currently issued tokens
-    // and ensure the new ones are unique.
-    const updatedUser = yield user_model_1.User.findByIdAndUpdate(userId, { $inc: { tokenVersion: 1 } }, { new: true });
+    // Conditional update guards the verify-then-bump race. Without it,
+    // two parallel valid refreshes both pass the version check above and
+    // both run $inc — only the second client's tokens would actually
+    // match the new DB version, the first client gets dead tokens.
+    //
+    // With the `tokenVersion: tokenVersion` filter, only the FIRST update
+    // matches; subsequent parallel updates find no document and return
+    // null, surfacing as the same 401 the natural reuse-detection
+    // produces — which is the correct outcome (one of them used a
+    // refresh token that's now stale).
+    const updatedUser = yield user_model_1.User.findOneAndUpdate({ _id: userId, tokenVersion }, { $inc: { tokenVersion: 1 } }, { new: true }).select('+tokenVersion');
     if (!updatedUser) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to rotate token');
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'Refresh token expired or already used. Please login again.');
     }
     // Issue new tokens with the NEW tokenVersion
     const accessToken = jwtHelper_1.jwtHelper.createToken({
@@ -418,6 +521,64 @@ const refreshTokenToDB = (token) => __awaiter(void 0, void 0, void 0, function* 
     }, config_1.default.jwt.jwt_refresh_secret, config_1.default.jwt.jwt_refresh_expire_in);
     return { tokens: { accessToken, refreshToken: newRefreshToken } };
 });
+// Restore an account that is in DELETED status and still inside its
+// 30-day recovery window. Validates credentials the same way login does,
+// flips status back to ACTIVE, clears soft-delete markers, bumps
+// tokenVersion (so any leftover JWTs from before deletion stay invalid),
+// and issues a fresh access + refresh token pair.
+const restoreAccountFromDB = (payload, sessionMetadata) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b;
+    const { email, password, deviceToken } = payload;
+    const isExistUser = yield user_model_1.User.findOne({ email }).select('+password +tokenVersion');
+    // Avoid leaking existence of soft-deleted vs purged users — both
+    // collapse to the same generic credential failure.
+    if (!isExistUser || !isExistUser.password) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'Invalid email or password');
+    }
+    const passwordOk = yield user_model_1.User.isMatchPassword(password, isExistUser.password);
+    if (!passwordOk) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'Invalid email or password');
+    }
+    if (isExistUser.status !== user_1.USER_STATUS.DELETED) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Account is not in recovery state');
+    }
+    const now = new Date();
+    if (!isExistUser.recoveryDeadline ||
+        isExistUser.recoveryDeadline.getTime() <= now.getTime()) {
+        // Past the 30-day window. The cron should have purged this row by
+        // now; if it hasn't yet, treat it as gone for the client.
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'Invalid email or password');
+    }
+    const restored = yield user_model_1.User.findByIdAndUpdate(isExistUser._id, {
+        $set: {
+            status: user_1.USER_STATUS.ACTIVE,
+            deletedAt: null,
+            recoveryDeadline: null,
+        },
+        $inc: { tokenVersion: 1 },
+    }, { new: true }).select('+tokenVersion');
+    if (!restored) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.INTERNAL_SERVER_ERROR, 'Failed to restore account');
+    }
+    const accessToken = jwtHelper_1.jwtHelper.createToken({
+        id: restored._id.toString(),
+        role: restored.role,
+        email: restored.email,
+        tokenVersion: (_a = restored.tokenVersion) !== null && _a !== void 0 ? _a : 0,
+    }, config_1.default.jwt.jwt_secret, config_1.default.jwt.jwt_expire_in);
+    const refreshToken = jwtHelper_1.jwtHelper.createToken({
+        id: restored._id.toString(),
+        role: restored.role,
+        email: restored.email,
+        tokenVersion: (_b = restored.tokenVersion) !== null && _b !== void 0 ? _b : 0,
+    }, config_1.default.jwt.jwt_refresh_secret, config_1.default.jwt.jwt_refresh_expire_in);
+    if (deviceToken) {
+        yield user_model_1.User.addDeviceToken(restored._id.toString(), deviceToken, undefined, undefined, sessionMetadata);
+    }
+    return {
+        tokens: { accessToken, refreshToken },
+    };
+});
 exports.AuthService = {
     verifyEmailToDB,
     loginUserFromDB,
@@ -428,4 +589,5 @@ exports.AuthService = {
     logoutUserFromDB,
     socialLoginToDB,
     refreshTokenToDB,
+    restoreAccountFromDB,
 };

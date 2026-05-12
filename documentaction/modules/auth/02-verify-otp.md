@@ -7,57 +7,35 @@ Auth: None (Public — OTP validated inline)
 ```
 
 ## 1. Overview
-Single endpoint that handles **two distinct flows** based on the user's `verified` state at the moment of OTP submission:
+Single endpoint that handles **two distinct flows** based on the user's `isVerified` state at the moment of OTP submission:
 
-- **Registration flow** (`verified: false`): flips the user to `verified: true`, clears the OTP, and **auto-logs the user in** by issuing an access + refresh token pair. Saves the registration friction of "go to login screen and re-enter your password".
-- **Forgot-password flow** (`verified: true`): sets the one-time `authentication.isResetPassword = true` flag, clears the OTP, and returns a freshly-generated `resetToken` that the client passes to [04-reset-password.md](./04-reset-password.md) within `RESET_TOKEN_TTL_MS` (5 min).
+- **Registration flow** (`isVerified: false`): flips the user to `isVerified: true` and clears the OTP.
+    - If user status is `PENDING` (new users): Returns a success message but **no tokens**. The user must wait for admin approval.
+    - If user status is `ACTIVE` (e.g. email change): **Auto-logs the user in** by issuing tokens.
+- **Forgot-password flow** (`isVerified: true`): sets the one-time `authentication.isResetPassword = true` flag, clears the OTP, and returns a freshly-generated `resetToken`.
 
-The branch is decided server-side from the user's existing `verified` state — the client doesn't pass a "purpose" flag.
+The branch is decided server-side from the user's existing `isVerified` state.
 
 ---
 
 ## 2. Business Rules (Source of Truth)
 
 ### 2.1 Authentication
-- **Public route** — no `auth` middleware. The `(email, otp)` pair is the credential. A matching pair is required and the OTP must not have expired.
+- **Public route** — no `auth` middleware. The `(email, otp)` pair is the credential.
 
 ### 2.2 Account Status Rules
-- The lookup explicitly excludes `DELETED` users (`status: { $ne: USER_STATUS.DELETED }` at [auth.service.ts:195](../../../src/app/modules/auth/auth.service.ts#L195)). A soft-deleted user trying to verify an old OTP gets the generic `400 "Invalid or expired verification code"` — same response as wrong/expired OTP (anti-enumeration).
-- Other statuses (`PENDING`, `ACTIVE`, `SUSPENDED`, etc.) are not blocked at this endpoint — verification is permitted because it's an identity-proof step, not an authenticated action.
+- The lookup explicitly excludes `DELETED` users.
+- For `PENDING` users: OTP verification is allowed, but auto-login is blocked (see §2.6a).
 
-### 2.3 Role-Based Access
-Not applicable — public endpoint.
+### 2.3 Side Effects
 
-### 2.4 Input Validation (Zod — `createVerifyEmailZodSchema`)
-| Field | Type | Required | Constraint |
-| :--- | :--- | :--- | :--- |
-| `email` | `string` | Yes | Valid email format. |
-| `otp` | `string` | Yes | Non-empty string. Code does not enforce a digit-only pattern at validation time; the OTP lookup compares the raw string against what was stored. |
-
-Schema violations -> `400 Bad Request` from `validateRequest`. Missing OTP at service-layer defence -> `400 "OTP is required"`.
-
-### 2.5 Atomic OTP Lookup
-The find query is intentionally atomic so race-conditions (double-submit, parallel attempts) cannot consume the OTP twice:
-
-```ts
-User.findOne({
-  email,
-  'authentication.oneTimeCode': otp,
-  'authentication.expireAt': { $gt: new Date() },
-  status: { $ne: USER_STATUS.DELETED },
-})
-```
-
-No match (wrong OTP, expired OTP, no user, deleted user) -> `400 "Invalid or expired verification code"`.
-
-### 2.6 Dual-Flow Side Effects
-
-#### 2.6a — Registration flow (`verified === false`)
+#### 2.6a — Registration flow (`isVerified === false`)
 On match:
-1. `verified = true`, `authentication.oneTimeCode = null`, `authentication.expireAt = null`.
-2. Issue `accessToken` + `refreshToken` (both carry `tokenVersion`).
-3. Return `{ accessToken, refreshToken, isOnboardingCompleted }`.
-4. Message: `"Email verify successfully"` (note: spelled "verify" not "verified" in code — see [auth.service.ts:249](../../../src/app/modules/auth/auth.service.ts#L249)).
+1. `isVerified = true`, `authentication.oneTimeCode = null`, `authentication.expireAt = null`.
+2. **Conditional Response**:
+    - If `status === 'PENDING'`: Returns success data with `email`, `isVerified`, and `status`. No tokens.
+    - If `status === 'ACTIVE'`: Issues `accessToken` + `refreshToken` and returns them in `data`.
+3. Message: `"Email verify successfully"` (or the pending-specific message: `"Email verified successfully. Your account is now pending admin approval. You will receive an email once an administrator approves your account."`).
 
 #### 2.6b — Forgot-password flow (`verified === true`)
 On match:
@@ -119,8 +97,21 @@ The controller sets the `refreshToken` cookie on the success path that returns t
   "message": "Email verify successfully",
   "data": {
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "isOnboardingCompleted": false
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+### Success (200) — Registration flow (pending approval)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Email verified successfully. Your account is now pending admin approval. You will receive an email once an administrator approves your account.",
+  "data": {
+    "email": "user@example.com",
+    "isVerified": true,
+    "status": "PENDING"
   }
 }
 ```

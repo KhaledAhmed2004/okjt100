@@ -22,6 +22,7 @@ export interface IMosque extends Document {
   website?: string;
   location: ILocation;
   prayerTimes: IPrayerTimes;
+  distanceInKm?: number;
   createdAt: Date;
   updatedAt: Date;
 }

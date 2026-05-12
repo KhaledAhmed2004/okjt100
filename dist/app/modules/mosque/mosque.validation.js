@@ -27,6 +27,11 @@ const createMosqueZodSchema = zod_1.z.object({
     }),
 });
 const updateMosqueZodSchema = zod_1.z.object({
+    params: zod_1.z.object({
+        mosqueId: zod_1.z.string({
+            required_error: 'Mosque ID is required',
+        }),
+    }),
     body: zod_1.z.object({
         mosqueName: zod_1.z.string().optional(),
         address: zod_1.z.string().optional(),

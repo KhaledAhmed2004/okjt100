@@ -120,7 +120,7 @@ const updateProfileToDB = async (
 
 const getAllUsersFromDB = async (query: Record<string, unknown>) => {
   const userQuery = new QueryBuilder(User.find(), query)
-    .search(['fullName', 'email'])
+    .search(['name', 'email'])
     .filter()
     .sort()
     .paginate()
@@ -135,28 +135,32 @@ const getAllUsersFromDB = async (query: Record<string, unknown>) => {
   };
 };
 
-const getUsersStatsFromDB = async () => {
+const getUserMetricsFromDB = async () => {
   const aggregationBuilder = new AggregationBuilder(User);
+  const excludeAdminFilter = { role: { $ne: USER_ROLES.SUPER_ADMIN } };
   
-  // Overall user growth
-  const totalStats = await aggregationBuilder.calculateGrowth({ period: 'month' });
+  // Overall user growth (excluding SUPER_ADMIN)
+  const totalStats = await aggregationBuilder.calculateGrowth({ 
+    filter: excludeAdminFilter,
+    period: 'month' 
+  });
   
-  // Status based growth
+  // Status based growth (excluding SUPER_ADMIN)
   aggregationBuilder.reset();
   const activeStats = await aggregationBuilder.calculateGrowth({ 
-    filter: { status: USER_STATUS.ACTIVE }, 
+    filter: { ...excludeAdminFilter, status: USER_STATUS.ACTIVE }, 
     period: 'month' 
   });
   
   aggregationBuilder.reset();
-  const inactiveStats = await aggregationBuilder.calculateGrowth({ 
-    filter: { status: USER_STATUS.INACTIVE }, 
+  const pendingStats = await aggregationBuilder.calculateGrowth({ 
+    filter: { ...excludeAdminFilter, status: USER_STATUS.PENDING }, 
     period: 'month' 
   });
   
   aggregationBuilder.reset();
-  const blockedStats = await aggregationBuilder.calculateGrowth({ 
-    filter: { status: USER_STATUS.SUSPENDED }, 
+  const suspendedStats = await aggregationBuilder.calculateGrowth({ 
+    filter: { ...excludeAdminFilter, status: USER_STATUS.SUSPENDED }, 
     period: 'month' 
   });
 
@@ -172,111 +176,58 @@ const getUsersStatsFromDB = async () => {
     },
     totalUsers: formatMetric(totalStats),
     activeUsers: formatMetric(activeStats),
-    inactiveUsers: formatMetric(inactiveStats),
-    blockedUsers: formatMetric(blockedStats),
+    pendingUsers: formatMetric(pendingStats),
+    suspendedUsers: formatMetric(suspendedStats),
   };
 };
 
 const getAllUserRolesFromDB = async (query: Record<string, unknown>) => {
-  const { search, email, role, status, specialty, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+  const { searchTerm, email, role, status, isVerified, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = query;
   
   const skip = (Number(page) - 1) * Number(limit);
 
-  const match: Record<string, any> = {};
+  const match: Record<string, any> = {
+    role: { $ne: USER_ROLES.SUPER_ADMIN },
+  };
   if (status) match.status = status;
+  if (isVerified !== undefined) match.isVerified = isVerified === 'true' ? true : isVerified === 'false' ? false : isVerified;
   if (role) match.role = role;
   if (email) match.email = { $regex: email, $options: 'i' };
-  if (search) {
+  if (searchTerm) {
     match.$or = [
-      { fullName: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } },
+      { name: { $regex: searchTerm, $options: 'i' } },
+      { email: { $regex: searchTerm, $options: 'i' } },
     ];
   }
 
   const basePipeline: PipelineStage[] = [
     { $match: match },
-    // Lookup preference cards created by this user
     {
-      $lookup: {
-        from: 'preferencecards',
-        let: { userIdStr: { $toString: '$_id' } },
-        pipeline: [
-          { $match: { $expr: { $eq: ['$createdBy', '$$userIdStr'] } } },
-        ],
-        as: 'cards',
-      },
-    },
-    // Compute specialties and cards count
-    {
-      $addFields: {
-        cardsCount: { $size: '$cards' },
-        specialties: {
-          $setDifference: [
-            {
-              $setUnion: [
-                {
-                  $map: {
-                    input: '$cards',
-                    as: 'c',
-                    in: { $ifNull: ['$$c.surgeon.specialty', null] },
-                  },
-                },
-                [],
-              ],
+      $project:
+        status === USER_STATUS.PENDING
+          ? {
+              _id: 1,
+              name: 1,
+              email: 1,
+              role: 1,
+              verificationImage: 1,
+              verificationVideo: 1,
+              createdAt: 1,
+            }
+          : {
+              _id: 1,
+              name: 1,
+              email: 1,
+              phone: 1,
+              specialty: 1,
+              hospital: 1,
+              status: 1,
+              isVerified: 1,
+              role: 1,
+              profileImage: 1,
+              createdAt: 1,
+              updatedAt: 1,
             },
-            [null],
-          ],
-        },
-      },
-    },
-    // Optional specialty filter
-    ...(specialty
-      ? ([
-          {
-            $match: {
-              specialties: { $elemMatch: { $regex: specialty, $options: 'i' } },
-            },
-          },
-        ] as PipelineStage[])
-      : []),
-    // Lookup subscription status
-    {
-      $lookup: {
-        from: SubscriptionModel.collection.name,
-        localField: '_id',
-        foreignField: 'userId',
-        as: 'subscription',
-      },
-    },
-    {
-      $addFields: {
-        subscriptionStatus: {
-          $ifNull: [{ $arrayElemAt: ['$subscription.status', 0] }, 'inactive'],
-        },
-        subscriptionPlan: {
-          $ifNull: [{ $arrayElemAt: ['$subscription.plan', 0] }, 'FREE'],
-        },
-      },
-    },
-    {
-      $project: {
-        _id: 1,
-        name: 1,
-        email: 1,
-        phone: 1,
-        specialty: 1,
-        hospital: 1,
-        status: 1,
-        verified: 1,
-        role: 1,
-        profilePicture: 1,
-        specialties: 1,
-        cardsCount: 1,
-        subscriptionStatus: 1,
-        subscriptionPlan: 1,
-        createdAt: 1,
-        updatedAt: 1,
-      },
     },
   ];
 
@@ -327,10 +278,19 @@ const SESSION_INVALIDATING_STATUSES: USER_STATUS[] = [
   USER_STATUS.INACTIVE,
 ];
 
-const updateUserStatusInDB = async (id: string, status: USER_STATUS) => {
-  const user = await User.isExistUserById(id);
+const updateUserStatusInDB = async (id: string, status: USER_STATUS, reason?: string) => {
+  const user = await User.findById(id).select('+authentication'); // Need authentication for isVerified check
   if (!user) {
     throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
+  }
+
+  // Safety checks for "Review" transitions (Reviewing from PENDING to ACTIVE/REJECTED)
+  const isReviewProcess = (status === USER_STATUS.ACTIVE || status === USER_STATUS.REJECTED) && user.status === USER_STATUS.PENDING;
+  
+  if (isReviewProcess) {
+    if (!user.isVerified) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'User must verify OTP before admin approval');
+    }
   }
 
   // Detect the REJECTED transition. When an admin flips a user to
@@ -351,6 +311,9 @@ const updateUserStatusInDB = async (id: string, status: USER_STATUS) => {
     SESSION_INVALIDATING_STATUSES.includes(status) && user.status !== status;
 
   const update: Record<string, unknown> = { status };
+  if (reason) {
+    update.rejectionReason = reason;
+  }
 
   let reverifyToken: string | null = null;
   if (flippingToRejected) {
@@ -372,7 +335,7 @@ const updateUserStatusInDB = async (id: string, status: USER_STATUS) => {
     await emailHelper.enqueue(
       emailTemplate.accountRejected({
         email: updatedUser.email,
-        fullName: updatedUser.fullName,
+        name: updatedUser.name,
         reverifyToken,
         reverifyTtlHours: REVERIFY_TOKEN_TTL_HOURS,
         rejectionReason: (updatedUser as any).rejectionReason,
@@ -421,7 +384,7 @@ const updateUserByAdminInDB = async (id: string, payload: Partial<IUser>) => {
   }
 
   // Whitelist fields admin can update (excluding password/auth info)
-  if (payload.fullName !== undefined) (user as any).fullName = payload.fullName;
+  if (payload.name !== undefined) (user as any).name = payload.name;
   if (payload.aboutMe !== undefined) (user as any).aboutMe = payload.aboutMe;
   if (payload.revertStory !== undefined) (user as any).revertStory = payload.revertStory;
   if (payload.specialty !== undefined) (user as any).specialty = payload.specialty;
@@ -429,6 +392,7 @@ const updateUserByAdminInDB = async (id: string, payload: Partial<IUser>) => {
   if (payload.interests !== undefined) (user as any).interests = payload.interests;
   if (payload.email !== undefined) (user as any).email = payload.email;
   if (payload.dateOfBirth !== undefined) (user as any).dateOfBirth = payload.dateOfBirth;
+  if (payload.revertDate !== undefined) (user as any).revertDate = payload.revertDate;
   if (payload.location !== undefined) (user as any).location = payload.location;
   if (payload.gender !== undefined) (user as any).gender = payload.gender;
   if (payload.profileImage !== undefined) (user as any).profileImage = payload.profileImage;
@@ -468,7 +432,7 @@ const updateUserByAdminInDB = async (id: string, payload: Partial<IUser>) => {
     await emailHelper.enqueue(
       emailTemplate.accountRejected({
         email: user.email,
-        fullName: user.fullName,
+        name: user.name,
         reverifyToken,
         reverifyTtlHours: REVERIFY_TOKEN_TTL_HOURS,
         rejectionReason: (user as any).rejectionReason,
@@ -485,6 +449,7 @@ const updateUserByAdminInDB = async (id: string, payload: Partial<IUser>) => {
   return plain as IUser;
 };
 
+// Approve user
 const getUserByIdFromDB = async (id: string) => {
   // Only return user info; remove task/bid side data
   const user = await User.findById(id).select('-password -authentication');
@@ -496,7 +461,7 @@ const getUserByIdFromDB = async (id: string) => {
 
 const getUserDetailsByIdFromDB = async (id: string, requester: JwtPayload) => {
   const user = await User.findById(id).select(
-    '_id fullName role profileImage location isVerified revertDuration aboutMe interests specialty hospital createdAt status deletedAt'
+    '_id name role profileImage location isVerified revertDate aboutMe revertStory interests specialty hospital createdAt status deletedAt'
   );
 
   // 1. Check existence and visibility
@@ -1010,22 +975,6 @@ const exportMyDataFromDB = async (user: JwtPayload) => {
   return payload;
 };
 
-const completeOnboardingToDB = async (user: JwtPayload) => {
-  const { id } = user;
-  const isExistUser = await User.isExistUserById(id);
-  if (!isExistUser) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "User doesn't exist!");
-  }
-
-  const updatedUser = await User.findByIdAndUpdate(
-    id,
-    { $set: { isOnboardingCompleted: true } },
-    { new: true },
-  );
-
-  return updatedUser;
-};
-
 export const UserService = {
   createUserToDB,
   getUserProfileFromDB,
@@ -1037,8 +986,7 @@ export const UserService = {
   deleteUserPermanentlyFromDB,
   getUserByIdFromDB,
   getUserDetailsByIdFromDB,
-  getUsersStatsFromDB,
-  completeOnboardingToDB,
+  getUserMetricsFromDB,
   requestAccountDeletionFromDB,
   requestEmailChangeFromDB,
   confirmEmailChangeFromDB,

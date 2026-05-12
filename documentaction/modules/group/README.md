@@ -42,6 +42,8 @@ Stores posts created within groups.
 | `userId` | ObjectId | ✅ | Reference to poster |
 | `content` | String | ✅ | Post text |
 | `attachments` | String[] | ❌ | List of file/image URLs |
+| `likesCount` | Number | ✅ | Total likes (Auto-updated) |
+| `commentsCount` | Number | ✅ | Total comments (Auto-updated) |
 
 ---
 
@@ -56,3 +58,5 @@ Stores posts created within groups.
 | 05 | GET | `/groups/:groupId/posts` | User | **Done**: Get group feed | [05-get-feed.md](./05-get-feed.md) |
 | 06 | POST | `/groups/posts/:postId/like` | User | **Done**: Like/Unlike a post | [06-like-post.md](./06-like-post.md) |
 | 07 | POST | `/groups/posts/:postId/comments`| User | **Done**: Add a comment | [07-add-comment.md](./07-add-comment.md) |
+| 08 | DELETE | `/groups/posts/:postId` | Author/Admin | **Done**: Delete a post | [08-delete-post.md](./08-delete-post.md) |
+| 09 | DELETE | `/groups/comments/:commentId` | Author/Admin | **Done**: Delete a comment | [09-delete-comment.md](./09-delete-comment.md) |

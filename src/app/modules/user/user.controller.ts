@@ -42,15 +42,15 @@ const createUser = catchAsync(async (req: Request, res: Response) => {
     isAdmin
   );
 
-  // Convert to object and sanitize response (remove password)
-  const responseData = (result as any).toObject ? (result as any).toObject() : { ...result };
-  delete responseData.password;
-
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.CREATED,
-    message: 'User created successfully',
-    data: responseData,
+    message: 'User created successfully. Please verify your email with the OTP sent.',
+    data: {
+      email: result.email,
+      isVerified: result.isVerified,
+      status: result.status,
+    },
   });
 });
 
@@ -94,20 +94,24 @@ const updateProfile = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Profile updated successfully',
-    data: result,
+    data: {
+      id: result?._id,
+      ...payload,
+      updatedAt: result?.updatedAt,
+    },
   });
 });
 
-const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
+const updateUserReview = catchAsync(async (req: Request, res: Response) => {
   const { userId } = req.params;
-  const { status } = req.body as { status: USER_STATUS };
+  const { status, reason } = req.body as { status: USER_STATUS; reason?: string };
 
-  const result = await UserService.updateUserStatusInDB(userId, status);
+  const result = await UserService.updateUserStatusInDB(userId, status, reason);
 
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: 'User status updated',
+    message: 'User review status updated',
     data: result,
   });
 });
@@ -120,8 +124,11 @@ const adminUpdateUser = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: 'User updated',
-    data: result,
+    message: 'User updated successfully',
+    data: {
+      id: result?._id,
+      updatedAt: result?.updatedAt,
+    },
   });
 });
 
@@ -132,8 +139,8 @@ const deleteUser = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: 'User deleted',
-    data: result,
+    message: 'User deleted permanently',
+    data: { id: result?._id },
   });
 });
 
@@ -181,25 +188,13 @@ const getUserDetailsById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getUsersStats = catchAsync(async (req: Request, res: Response) => {
-  const result = await UserService.getUsersStatsFromDB();
+const getUserMetrics = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.getUserMetricsFromDB();
 
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: 'User statistics retrieved',
-    data: result,
-  });
-});
-
-const completeOnboarding = catchAsync(async (req: Request, res: Response) => {
-  const user = req.user as JwtPayload;
-  const result = await UserService.completeOnboardingToDB(user);
-
-  sendResponse(res, {
-    success: true,
-    statusCode: StatusCodes.OK,
-    message: 'Onboarding marked as completed',
+    message: 'User metrics retrieved',
     data: result,
   });
 });
@@ -359,13 +354,12 @@ export const UserController = {
   getUserProfile,
   updateProfile,
   getAllUserRoles,
-  updateUserStatus,
+  updateUserReview,
   adminUpdateUser,
   deleteUser,
   getUserById,
   getUserDetailsById,
-  getUsersStats,
-  completeOnboarding,
+  getUserMetrics,
   requestAccountDeletion,
   requestEmailChange,
   confirmEmailChange,

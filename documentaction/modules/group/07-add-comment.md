@@ -19,6 +19,7 @@ Auth: User
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `comment` | `string` | Content of the comment |
+| `parentCommentId` | `string` | (Optional) ID of the comment being replied to |
 
 ## Implementation
 

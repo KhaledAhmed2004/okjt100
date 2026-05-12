@@ -12,11 +12,11 @@ const validateRequest_1 = __importDefault(require("../../middlewares/validateReq
 const notification_validation_1 = require("./notification.validation");
 const router = express_1.default.Router();
 // Notification list + unread count
-router.get('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.USER), (0, validateRequest_1.default)(notification_validation_1.listNotificationsSchema), notification_controller_1.NotificationController.listMyNotifications);
+router.get('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.ADMIN, user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(notification_validation_1.listNotificationsSchema), notification_controller_1.NotificationController.listMyNotifications);
 // Mark specific notification as read
-router.patch('/:notificationId/read', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.USER), (0, validateRequest_1.default)(notification_validation_1.markReadSchema), notification_controller_1.NotificationController.markRead);
+router.patch('/:notificationId/read', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.ADMIN, user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(notification_validation_1.markReadSchema), notification_controller_1.NotificationController.markRead);
 // Mark all notifications as read
-router.patch('/read-all', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.USER), notification_controller_1.NotificationController.markAllRead);
+router.patch('/read-all', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.ADMIN, user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), notification_controller_1.NotificationController.markAllRead);
 // Delete notification
-router.delete('/:notificationId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.USER), (0, validateRequest_1.default)(notification_validation_1.paramIdSchema), notification_controller_1.NotificationController.deleteNotification);
+router.delete('/:notificationId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.ADMIN, user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(notification_validation_1.paramIdSchema), notification_controller_1.NotificationController.deleteNotification);
 exports.NotificationRoutes = router;

@@ -39,7 +39,7 @@ export const getAllSubscriptions = async (
       .limit(Number(limit))
       .skip((Number(page) - 1) * Number(limit))
       .sort({ updatedAt: -1 })
-      .populate('userId', 'fullName email'),
+      .populate('userId', 'name email'),
     SubscriptionModel.countDocuments(filter),
   ]);
 
@@ -73,7 +73,7 @@ export const getPendingWebhooks = async () => {
 export const getSubscriptionById = async (
   id: string
 ): Promise<ISubscription | null> => {
-  return SubscriptionModel.findById(id).populate('userId', 'fullName email');
+  return SubscriptionModel.findById(id).populate('userId', 'name email');
 };
 
 export const getSubscriptionEvents = async (

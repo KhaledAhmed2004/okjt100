@@ -7,10 +7,11 @@ import { AdminRoutes } from '../app/modules/admin/admin.route';
 import { LegalRoutes } from '../app/modules/legal/legal.route';
 import { KhutbaRoutes } from '../app/modules/khutbah/khutbah.route';
 import { MosqueRoutes } from '../app/modules/mosque/mosque.route';
-import { AskImamRoutes } from '../app/modules/ask-imam/ask-imam.route';
+import { AskQuestionRoutes } from '../app/modules/ask-question/ask-question.route';
 import { GroupRoutes } from '../app/modules/group/group.route';
 import { PendingEmailRoutes } from '../app/modules/pending-email/pending-email.route';
 import { SupportTicketRoutes } from '../app/modules/support-ticket/support-ticket.route';
+import { LearningContentRoutes } from '../app/modules/learning-content/learning-content.route';
 
 const router = express.Router();
 
@@ -48,8 +49,8 @@ const apiRoutes = [
     route: MosqueRoutes,
   },
   {
-    path: '/ask-imam',
-    route: AskImamRoutes,
+    path: '/ask-question',
+    route: AskQuestionRoutes,
   },
   {
     path: '/groups',
@@ -62,6 +63,10 @@ const apiRoutes = [
   {
     path: '/support-tickets',
     route: SupportTicketRoutes,
+  },
+  {
+    path: '/learning-contents',
+    route: LearningContentRoutes,
   },
 ];
 

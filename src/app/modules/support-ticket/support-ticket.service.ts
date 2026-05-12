@@ -231,7 +231,7 @@ const getMyTickets = async (
 
 const getAllTickets = async (query: Record<string, unknown>) => {
   const builder = new QueryBuilder(
-    SupportTicket.find().populate('userId', 'fullName email profileImage'),
+    SupportTicket.find().populate('userId', 'name email profileImage'),
     query,
   )
     .search(['subject', 'ticketNumber'])
@@ -256,8 +256,8 @@ const getTicketById = async (
   assertTicketAccess(ticket, requester);
 
   const detailed = await SupportTicket.findById(ticketId)
-    .populate('userId', 'fullName email profileImage')
-    .populate('assignedAdminId', 'fullName email profileImage')
+    .populate('userId', 'name email profileImage')
+    .populate('assignedAdminId', 'name email profileImage')
     .lean();
 
   return detailed as unknown as ISupportTicket;
@@ -278,7 +278,7 @@ const getTicketMessages = async (
   const builder = new QueryBuilder(
     TicketMessage.find({ ticketId: ticket._id }).populate(
       'senderId',
-      'fullName email profileImage role',
+      'name email profileImage role',
     ),
     querySort,
   )

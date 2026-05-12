@@ -30,6 +30,16 @@ const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const auth_service_1 = require("./auth.service");
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
+// Pull the bits of session metadata we persist on `deviceTokens[]` —
+// IP (will be hashed by the model) and User-Agent (plain). Kept here
+// so every credential-issuing controller (login, social-login,
+// restore) feeds the same shape into the service.
+const sessionMetadataFromReq = (req) => {
+    var _a, _b, _c, _d, _e;
+    const ip = (_d = (_a = req.headers['cf-connecting-ip']) !== null && _a !== void 0 ? _a : (_c = (_b = req.headers['x-forwarded-for']) === null || _b === void 0 ? void 0 : _b.split(',')[0]) === null || _c === void 0 ? void 0 : _c.trim()) !== null && _d !== void 0 ? _d : req.ip;
+    const userAgent = (_e = req.headers['user-agent']) !== null && _e !== void 0 ? _e : undefined;
+    return { ip, userAgent };
+};
 const verifyEmail = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const verifyData = __rest(req.body, []);
@@ -53,7 +63,7 @@ const verifyEmail = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
 const loginUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const loginData = __rest(req.body, []);
-    const result = yield auth_service_1.AuthService.loginUserFromDB(loginData);
+    const result = yield auth_service_1.AuthService.loginUserFromDB(loginData, sessionMetadataFromReq(req));
     // Set refresh token in httpOnly cookie for better security
     if ((_a = result === null || result === void 0 ? void 0 : result.tokens) === null || _a === void 0 ? void 0 : _a.refreshToken) {
         res.cookie('refreshToken', result.tokens.refreshToken, {
@@ -66,7 +76,7 @@ const loginUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'User logged in successfully.',
-        data: Object.assign(Object.assign({}, result.tokens), { isOnboardingCompleted: result.isOnboardingCompleted }),
+        data: Object.assign({}, result.tokens),
     });
 }));
 const logoutUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -160,7 +170,7 @@ const refreshToken = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
 }));
 const socialLogin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const result = yield auth_service_1.AuthService.socialLoginToDB(req.body);
+    const result = yield auth_service_1.AuthService.socialLoginToDB(req.body, sessionMetadataFromReq(req));
     // Set refresh token in httpOnly cookie
     if ((_a = result === null || result === void 0 ? void 0 : result.tokens) === null || _a === void 0 ? void 0 : _a.refreshToken) {
         res.cookie('refreshToken', result.tokens.refreshToken, {
@@ -174,7 +184,25 @@ const socialLogin = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'User logged in successfully.',
-        data: Object.assign(Object.assign({}, result.tokens), { isOnboardingCompleted: result.isOnboardingCompleted }),
+        data: Object.assign({}, result.tokens),
+    });
+}));
+const restoreAccount = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const result = yield auth_service_1.AuthService.restoreAccountFromDB(req.body, sessionMetadataFromReq(req));
+    if ((_a = result === null || result === void 0 ? void 0 : result.tokens) === null || _a === void 0 ? void 0 : _a.refreshToken) {
+        res.cookie('refreshToken', result.tokens.refreshToken, {
+            httpOnly: true,
+            secure: config_1.default.node_env === 'production',
+            sameSite: 'lax',
+            path: '/',
+        });
+    }
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Account restored successfully.',
+        data: Object.assign({}, result.tokens),
     });
 }));
 exports.AuthController = {
@@ -187,4 +215,5 @@ exports.AuthController = {
     resendVerifyEmail,
     socialLogin,
     refreshToken,
+    restoreAccount,
 };

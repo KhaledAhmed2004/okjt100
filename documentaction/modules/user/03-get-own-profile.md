@@ -1,7 +1,7 @@
 # 03. Get Own Profile
 
 ```http
-GET /users/profile
+GET /users/me
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
@@ -60,12 +60,12 @@ The auth middleware already throws `401 "User no longer exists"` if the JWT user
 
 ### Returned (Owner-Only)
 All User document fields **except** the excluded list below. Notably included:
-- `_id`, `fullName`, `email`, `role`
-- `dateOfBirth`, `revertDuration`
+- `_id`, `name`, `email`, `role`
+- `dateOfBirth`, `revertDate`
 - `profileImage`, `verificationImage`, `verificationVideo` (owner can review their own submission)
 - `aboutMe`, `revertStory`, `interests`, `specialty`, `hospital`
 - `location` (full nested object: `country`, `city`, `coordinates`)
-- `isVerified`, `isOnboardingCompleted`
+- `isVerified`
 - `status`
 - `googleId`, `appleId` (if present)
 - `createdAt`, `updatedAt`
@@ -80,7 +80,7 @@ All User document fields **except** the excluded list below. Notably included:
 ---
 
 ## 4. Implementation
-- **Route**: [src/app/modules/user/user.route.ts](file:///src/app/modules/user/user.route.ts) — `router.get('/profile', ...)`
+- **Route**: [src/app/modules/user/user.route.ts](file:///src/app/modules/user/user.route.ts) — `router.get('/me', ...)`
 - **Controller**: [src/app/modules/user/user.controller.ts](file:///src/app/modules/user/user.controller.ts) — `getUserProfile`
 - **Service**: [src/app/modules/user/user.service.ts](file:///src/app/modules/user/user.service.ts) — `getUserProfileFromDB`
 
@@ -116,11 +116,11 @@ All User document fields **except** the excluded list below. Notably included:
   "message": "Profile data retrieved successfully",
   "data": {
     "_id": "664a1b2c3d4e5f6a7b8c9d0e",
-    "fullName": "Jane Doe",
+    "name": "Jane Doe",
     "email": "jane@example.com",
     "role": "SISTER",
-    "dateOfBirth": "1995-05-15",
-    "revertDuration": "3 years",
+    "dateOfBirth": "1995-05-15T00:00:00.000Z",
+    "revertDate": "2024-05-11T00:00:00.000Z",
     "profileImage": "uploads/users/profiles/pic.jpg",
     "verificationImage": "uploads/users/verifications/id.jpg",
     "verificationVideo": "uploads/users/videos/face.mp4",
@@ -135,8 +135,9 @@ All User document fields **except** the excluded list below. Notably included:
       "coordinates": { "lat": 40.7128, "lng": -74.006 }
     },
     "status": "ACTIVE",
+    "googleId": "1234567890",
+    "appleId": "apple_id_98765",
     "isVerified": true,
-    "isOnboardingCompleted": true,
     "createdAt": "2026-05-09T10:00:00.000Z",
     "updatedAt": "2026-05-10T12:00:00.000Z"
   }
@@ -239,4 +240,3 @@ All User document fields **except** the excluded list below. Notably included:
 - **Change password** -> [auth/09-change-password.md](../auth/09-change-password.md).
 - **Forgot password (locked out)** -> [auth/03-forgot-password.md](../auth/03-forgot-password.md).
 - **End the session on this device** -> [auth/06-logout.md](../auth/06-logout.md).
-- **Read onboarding state** — `isOnboardingCompleted` is returned in this endpoint's response. Write it via [05-complete-onboarding.md](./05-complete-onboarding.md).

@@ -39,6 +39,15 @@ catch (_b) {
         exists: () => __awaiter(void 0, void 0, void 0, function* () { return false; }),
     };
 }
+let SupportTicket;
+try {
+    ({ SupportTicket } = require('../app/modules/support-ticket/support-ticket.model'));
+}
+catch (_c) {
+    SupportTicket = {
+        findById: () => __awaiter(void 0, void 0, void 0, function* () { return null; }),
+    };
+}
 const node_cache_1 = __importDefault(require("node-cache"));
 const presenceHelper_1 = require("../app/helpers/presenceHelper");
 // -------------------------
@@ -48,6 +57,8 @@ const presenceHelper_1 = require("../app/helpers/presenceHelper");
 // CHAT_ROOM: group room for each chat conversation
 const USER_ROOM = (userId) => `user::${userId}`;
 const CHAT_ROOM = (chatId) => `chat::${chatId}`;
+const TICKET_ROOM = (ticketId) => `ticket::${ticketId}`;
+const ADMIN_TICKETS_ROOM = 'admin-tickets';
 const TYPING_KEY = (chatId, userId) => `typing:${chatId}:${userId}`;
 const TYPING_TTL_SECONDS = 5; // throttle window
 const typingThrottle = new node_cache_1.default({ stdTTL: TYPING_TTL_SECONDS, checkperiod: 10, useClones: false });
@@ -89,6 +100,14 @@ const socket = (io) => {
             socket.join(USER_ROOM(userId)); // join user’s personal private room
             logger_1.logger.info(colors_1.default.blue(`✅ User ${userId} connected & joined ${USER_ROOM(userId)}`));
             logEvent('socket_connected', `for user_id: ${userId}`);
+            // Admins auto-join the global support-ticket broadcast room so they
+            // receive TICKET_CREATED/TICKET_REPLY events without needing to
+            // subscribe per-ticket. Per-ticket rooms (ticket::{id}) are still
+            // joined on demand via JOIN_TICKET for the detail view.
+            const role = payload === null || payload === void 0 ? void 0 : payload.role;
+            if (role === 'SUPER_ADMIN') {
+                socket.join(ADMIN_TICKETS_ROOM);
+            }
             // -----------------------------
             // 🔹 Helper Function: Simplify repetitive event logging & activity update
             // -----------------------------
@@ -174,6 +193,45 @@ const socket = (io) => {
                     lastActive,
                 });
                 logger_1.logger.info(colors_1.default.yellow(`User ${userId} left chat room ${CHAT_ROOM(chatId)}`));
+            }));
+            // ---------------------------------------------
+            // 🔹 Support Ticket Room Join / Leave Events
+            // ---------------------------------------------
+            socket.on('JOIN_TICKET', (_a) => __awaiter(void 0, [_a], void 0, function* ({ ticketId }) {
+                if (!ticketId)
+                    return;
+                try {
+                    const ticket = yield SupportTicket.findById(ticketId).select('_id userId');
+                    if (!ticket) {
+                        socket.emit('ACK_ERROR', {
+                            message: 'Ticket not found',
+                            ticketId: String(ticketId),
+                        });
+                        handleEventProcessed('JOIN_TICKET_DENIED', `not_found ticket_id: ${ticketId}`);
+                        return;
+                    }
+                    const isAdmin = role === 'SUPER_ADMIN';
+                    const isOwner = String(ticket.userId) === String(userId);
+                    if (!isAdmin && !isOwner) {
+                        socket.emit('ACK_ERROR', {
+                            message: 'You do not have access to this ticket',
+                            ticketId: String(ticketId),
+                        });
+                        handleEventProcessed('JOIN_TICKET_DENIED', `forbidden ticket_id: ${ticketId}`);
+                        return;
+                    }
+                    socket.join(TICKET_ROOM(String(ticketId)));
+                    handleEventProcessed('JOIN_TICKET', `for ticket_id: ${ticketId}`);
+                }
+                catch (err) {
+                    logger_1.logger.error(colors_1.default.red(`JOIN_TICKET error: ${String(err)}`));
+                }
+            }));
+            socket.on('LEAVE_TICKET', (_a) => __awaiter(void 0, [_a], void 0, function* ({ ticketId }) {
+                if (!ticketId)
+                    return;
+                socket.leave(TICKET_ROOM(String(ticketId)));
+                handleEventProcessed('LEAVE_TICKET', `for ticket_id: ${ticketId}`);
             }));
             // ---------------------------------------------
             // 🔹 Typing Indicators

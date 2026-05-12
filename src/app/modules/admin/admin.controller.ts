@@ -34,6 +34,7 @@ const getActiveSubscriptionMonthly = catchAsync(async (req: Request, res: Respon
   });
 });
 
+
 export const AdminController = {
   getDashboardStats,
   getPreferenceCardMonthly,

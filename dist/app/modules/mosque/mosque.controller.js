@@ -63,7 +63,7 @@ const deleteMosque = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, v
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'Mosque deleted successfully',
-        data: result,
+        data: { id: result === null || result === void 0 ? void 0 : result._id },
     });
 }));
 exports.MosqueController = {

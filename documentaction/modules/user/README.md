@@ -7,7 +7,6 @@
 > **UX Flows referencing this module**:
 > - [App - Auth Screen] — Registration (`POST /users`)
 > - [App - Profile Screen] — Profile read/update, account deletion, email change, sessions, GDPR export
-> - [App - Onboarding Flow] — Complete onboarding (`PATCH /users/complete-onboarding`)
 > - [App - Re-verify Flow] — Public `POST /users/reverify` after admin rejection
 > - [Dashboard - User Management Screen] — see [../admin/](../admin/) for the admin-side endpoints
 
@@ -19,9 +18,8 @@
 |---|---|---|---|---|
 | 01 | POST | `/users` | Public / SUPER_ADMIN | [01-create-user.md](./01-create-user.md) |
 | 02 | GET | `/users/:userId/user` | Bearer | [02-get-user-details-public.md](./02-get-user-details-public.md) |
-| 03 | GET | `/users/profile` | Bearer | [03-get-own-profile.md](./03-get-own-profile.md) |
-| 04 | PATCH | `/users/profile` | Bearer | [04-update-own-profile.md](./04-update-own-profile.md) |
-| 05 | PATCH | `/users/complete-onboarding` | Bearer | [05-complete-onboarding.md](./05-complete-onboarding.md) |
+| 03 | GET | `/users/me` | Bearer | [03-get-own-profile.md](./03-get-own-profile.md) |
+| 04 | PATCH | `/users/me` | Bearer | [04-update-own-profile.md](./04-update-own-profile.md) |
 | 06 | DELETE | `/users/me` | Bearer | [06-delete-account.md](./06-delete-account.md) |
 | 07 | POST | `/users/me/email-change/request` | Bearer | [07-email-change-request.md](./07-email-change-request.md) |
 | 08 | POST | `/users/me/email-change/confirm` | Bearer | [08-email-change-confirm.md](./08-email-change-confirm.md) |
@@ -30,8 +28,15 @@
 | 11 | DELETE | `/users/me/sessions/:tokenId` | Bearer | [11-revoke-session.md](./11-revoke-session.md) |
 | 12 | POST | `/users/me/sessions/revoke-all` | Bearer | [12-revoke-all-sessions.md](./12-revoke-all-sessions.md) |
 | 13 | POST | `/users/reverify` | Public (token) | [13-reverify-account.md](./13-reverify-account.md) |
+| 14 | GET | `/users` | SUPER_ADMIN | [14-list-users-admin.md](./14-list-users-admin.md) |
+| 15 | GET | `/users/metrics` | SUPER_ADMIN | [15-user-stats-admin.md](./15-user-stats-admin.md) |
+| 16 | GET | `/users/:userId` | SUPER_ADMIN | [16-get-user-admin.md](./16-get-user-admin.md) |
+| 17 | PATCH | `/users/:userId` | SUPER_ADMIN | [17-update-user-admin.md](./17-update-user-admin.md) |
+| 18 | DELETE | `/users/:userId` | SUPER_ADMIN | [18-delete-user-admin.md](./18-delete-user-admin.md) |
+| 19 | PATCH | `/users/approve/:id` | SUPER_ADMIN | [19-approve-user-admin.md](./19-approve-user-admin.md) |
+| 20 | PATCH | `/users/reject/:id` | SUPER_ADMIN | [20-reject-user-admin.md](./20-reject-user-admin.md) |
 
-> The admin-side user-management endpoints (list users, user stats, admin update, admin delete, admin status flip) live at `/api/v1/admin/users/*` and are documented in [../admin/](../admin/). See [../admin/05-list-users.md](../admin/05-list-users.md) through [../admin/08-delete-user.md](../admin/08-delete-user.md).
+> Admin-side user-management endpoints (list, stats, update, delete, approve/reject) have been consolidated into this module under `/api/v1/users/*`.
 
 ---
 
@@ -49,9 +54,8 @@
 |---|---|:---:|:---:|---|
 | 01 | `POST /users` | Done | Public / SUPER_ADMIN | Multipart + 100 MB cap; transactional create; CAPTCHA hook-point; idempotent |
 | 02 | `GET /users/:userId/user` | Done | User / Admin | Rate-limited 60/min; same-role enforcement; `no-store` cache |
-| 03 | `GET /users/profile` | Done | User / Admin | Full self profile; `no-store` cache |
-| 04 | `PATCH /users/profile` | Done | User / Admin | Profile + avatar upload (10 MB); auto-unlink + orphan-cron safety net |
-| 05 | `PATCH /users/complete-onboarding` | Done | User / Admin | Idempotent at data level |
+| 03 | `GET /users/me` | Done | User / Admin | Full self profile; `no-store` cache |
+| 04 | `PATCH /users/me` | Done | User / Admin | Profile + avatar upload (10 MB); auto-unlink + orphan-cron safety net |
 | 06 | `DELETE /users/me` | Done | User / Admin | Self soft-delete; 30-day recovery via auth/10-restore; idempotent |
 | 07 | `POST /users/me/email-change/request` | Done | User / Admin | OTP to new + heads-up to old; idempotent |
 | 08 | `POST /users/me/email-change/confirm` | Done | User / Admin | Commit + tokenVersion bump; race-safe via E11000 catch; idempotent |

@@ -22,9 +22,12 @@ const payload = {
     email: config_1.default.super_admin.email,
     role: user_1.USER_ROLES.SUPER_ADMIN,
     password: config_1.default.super_admin.password,
-    phone: '+00000000000',
-    country: 'System',
-    verified: true,
+    revertDate: '1970-01-01T00:00:00.000Z',
+    dateOfBirth: '1970-01-01T00:00:00.000Z',
+    verificationImage: 'https://i.ibb.co/z5YHLV9/profile.png',
+    verificationVideo: 'https://i.ibb.co/z5YHLV9/profile.png',
+    isVerified: true,
+    status: user_1.USER_STATUS.ACTIVE,
 };
 const seedSuperAdmin = () => __awaiter(void 0, void 0, void 0, function* () {
     const isExistSuperAdmin = yield user_model_1.User.findOne({

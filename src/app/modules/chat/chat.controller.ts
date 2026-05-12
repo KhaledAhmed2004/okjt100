@@ -23,8 +23,8 @@ const createChat = catchAsync(async (req: Request, res: Response) => {
 
 const getChat = catchAsync(async (req: Request, res: Response) => {
   const user = req.user;
-  const search = req.query.search as string;
-  const chatList = await ChatService.getChatFromDB(user, search);
+  const searchTerm = req.query.searchTerm as string;
+  const chatList = await ChatService.getChatFromDB(user, searchTerm);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,

@@ -11,7 +11,7 @@ Paginated list of messages belonging to a single ticket. Threads in this system 
 ## 2. Business Rules
 - Same `assertTicketAccess` check as [03-get-ticket-detail.md](./03-get-ticket-detail.md). Owner OR `SUPER_ADMIN`.
 - Default sort is `createdAt` **ASC** (oldest first) so threaded UIs can render top-to-bottom. Override with `?sort=-createdAt` for reverse chronological.
-- `senderId` is populated with `{ fullName, email, profileImage, role }`.
+- `senderId` is populated with `{ name, email, profileImage, role }`.
 
 ## 3. Query Parameters
 
@@ -50,7 +50,7 @@ Paginated list of messages belonging to a single ticket. Threads in this system 
       "senderType": "USER",
       "senderId": {
         "id": "664a1b2c3d4e5f6a7b8c9d0a",
-        "fullName": "Jane Doe",
+        "name": "Jane Doe",
         "role": "SISTER",
         "profileImage": "..."
       },
@@ -63,7 +63,7 @@ Paginated list of messages belonging to a single ticket. Threads in this system 
     {
       "id": "664a1b2c3d4e5f6a7b8c9d11",
       "senderType": "ADMIN",
-      "senderId": { "id": "664a1b2c3d4e5f6a7b8c9d10", "fullName": "Admin User", "role": "SUPER_ADMIN" },
+      "senderId": { "id": "664a1b2c3d4e5f6a7b8c9d10", "name": "Admin User", "role": "SUPER_ADMIN" },
       "message": "Thanks for the report — checking with payments now.",
       "createdAt": "2026-05-11T10:30:00.000Z"
     }

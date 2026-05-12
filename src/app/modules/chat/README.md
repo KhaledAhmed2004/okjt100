@@ -154,7 +154,7 @@ export type ChatModel = Model<IChat, Record<string, unknown>>;
 ### Core Operations
 
 - `createChat(userId, participantId)` - Create chat between two users
-- `getUserChats(userId, query?)` - Get user's chat conversations
+- `getUserChats(userId, query?)` - Get user's chat conversations (supports `searchTerm`, `page`, `limit`)
 - `getChatById(chatId, userId)` - Get specific chat with validation
 - `updateChatStatus(chatId, status)` - Activate/deactivate chat
 - `findExistingChat(user1Id, user2Id)` - Check if chat already exists
@@ -277,7 +277,8 @@ try {
 
 ```typescript
 const query = {
-  status: true,  // Only active chats
+  searchTerm: 'John',  // Search by participant name
+  status: true,        // Only active chats
   page: 1,
   limit: 20,
   sort: 'updatedAt',
@@ -285,7 +286,7 @@ const query = {
 };
 
 const chats = await ChatService.getUserChats(userId, query);
-console.log(`User has ${chats.length} active chats`);
+console.log(`User has ${chats.length} active chats matching "John"`);
 ```
 
 ### Checking Chat Access

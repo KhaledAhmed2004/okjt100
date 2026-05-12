@@ -59,7 +59,7 @@ const deleteMosque = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Mosque deleted successfully',
-    data: result,
+    data: { id: result?._id },
   });
 });
 

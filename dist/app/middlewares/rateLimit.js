@@ -29,6 +29,7 @@ const rateLimitMiddleware = (options) => {
                 logger_1.logger.warn(`⚠️ Rate limit exceeded for IP: ${identifier} on route: ${routeName || req.path}`);
                 return res.status(429).json({
                     success: false,
+                    statusCode: 429,
                     message: 'Too many requests, please try again later',
                 });
             }

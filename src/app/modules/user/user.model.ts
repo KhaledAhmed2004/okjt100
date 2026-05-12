@@ -66,7 +66,7 @@ const DeviceTokenSchema = new Schema<IDeviceToken>({
 
 const userSchema = new Schema<IUser>(
   {
-    fullName: {
+    name: {
       type: String,
       required: true,
       trim: true,
@@ -106,12 +106,12 @@ const userSchema = new Schema<IUser>(
       default: [],
       select: false,
     },
-    revertDuration: {
-      type: String,
+    revertDate: {
+      type: Date,
       required: true,
     },
     dateOfBirth: {
-      type: String,
+      type: Date,
       required: true,
     },
     profileImage: {
@@ -163,10 +163,6 @@ const userSchema = new Schema<IUser>(
       type: String,
     },
     isVerified: {
-      type: Boolean,
-      default: false,
-    },
-    isOnboardingCompleted: {
       type: Boolean,
       default: false,
     },
@@ -355,7 +351,11 @@ userSchema.statics.addDeviceToken = async (
   const updated = await User.findOneAndUpdate(
     {
       _id: userId,
-      $or: [{ 'deviceTokens.token': token }, { 'deviceTokens.tokenHash': tokenHash }],
+      deviceTokens: {
+        $elemMatch: {
+          $or: [{ token: token }, { tokenHash: tokenHash }],
+        },
+      },
     },
     {
       $set: {
@@ -401,7 +401,7 @@ userSchema.statics.addDeviceToken = async (
 // leaking the original identity. See system-concepts.md "Public User
 // Display" for the policy.
 const DELETED_USER_PROJECTION = {
-  fullName: '[Deleted User]',
+  name: '[Deleted User]',
   profileImage: '/default-avatar.svg',
 };
 
@@ -412,7 +412,7 @@ const projectPublic = (doc: any): any => {
   if (isDeleted) {
     return {
       _id: doc._id,
-      fullName: DELETED_USER_PROJECTION.fullName,
+      name: DELETED_USER_PROJECTION.name,
       profileImage: DELETED_USER_PROJECTION.profileImage,
       role: doc.role,
       isDeleted: true,
@@ -420,7 +420,7 @@ const projectPublic = (doc: any): any => {
   }
   return {
     _id: doc._id,
-    fullName: doc.fullName,
+    name: doc.name,
     profileImage: doc.profileImage,
     role: doc.role,
     isDeleted: false,
@@ -429,14 +429,14 @@ const projectPublic = (doc: any): any => {
 
 userSchema.statics.findPublicById = async (id: string | unknown) => {
   const doc = await User.findById(id as any)
-    .select('_id fullName profileImage role status deletedAt')
+    .select('_id name profileImage role status deletedAt')
     .lean();
   return projectPublic(doc);
 };
 
 userSchema.statics.findPublicByIds = async (ids: Array<string | unknown>) => {
   const docs = await User.find({ _id: { $in: ids as any[] } })
-    .select('_id fullName profileImage role status deletedAt')
+    .select('_id name profileImage role status deletedAt')
     .lean();
   return docs.map(projectPublic).filter(Boolean);
 };

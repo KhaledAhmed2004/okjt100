@@ -15,7 +15,7 @@ During registration, users must select their role:
 This selection is used for profile visibility, matching, group permissions, and content filtering.
 
 ### 2.2 Registration Fields
-* **Full Name** (Required)
+* **Name** (Required)
 * **Email Address** (Required, Unique)
 * **Password** (Required, Hashed)
 * **Revert Duration** (How long since becoming Muslim)
@@ -60,7 +60,7 @@ Admins can **Approve** or **Reject** the user.
 ## 6. User Profile Module
 
 ### 6.1 Profile Information
-* **Public Profile**: Full Name, Age, Gender, Location, Revert Duration, About Me, Revert Story, Interests (Tags), Member Since.
+* **Public Profile**: Name, Age, Gender, Location, Revert Duration, About Me, Revert Story, Interests (Tags), Member Since.
 * **About Me**: Short intro about personality, lifestyle, goals, and journey.
 * **Revert Story**: Personal journey of accepting Islam.
 * **Interest Tags**: Tags for matching and community discovery (e.g., Quran Study, Sports, Fitness).
@@ -105,11 +105,11 @@ Users can update their About Me, Revert Story, Interests, Profile Image, and Loc
 ```json
 {
   "id": "string",
-  "fullName": "string",
+  "name": "string",
   "email": "string",
   "password": "hashed_string",
   "role": "BROTHER | SISTER | ADMIN | SUPER_ADMIN",
-  "revertDuration": "string",
+  "revertDate": "string",
   "age": "number",
   "profileImage": "string",
   "verificationVideo": "string",

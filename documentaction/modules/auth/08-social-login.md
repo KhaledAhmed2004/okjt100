@@ -7,7 +7,7 @@ Auth: None (Public — provider ID token validated inline)
 ```
 
 ## 1. Overview
-Unified sign-in / sign-up via Google or Apple ID tokens. Verifies the provider-issued JWT cryptographically (Google: RSA against `googleAudience` array of iOS/Android/Web client IDs; Apple: RSA + nonce-hash match), then either logs an existing user in (matched strictly by `googleId` / `appleId`) or creates a new account. Refuses to auto-link a provider identity to an existing email-based account — that's an OWASP-flagged account-hijack vector. Returns the same `{ accessToken, refreshToken, isOnboardingCompleted }` envelope as [01-login.md](./01-login.md).
+Unified sign-in / sign-up via Google or Apple ID tokens. Verifies the provider-issued JWT cryptographically (Google: RSA against `googleAudience` array of iOS/Android/Web client IDs; Apple: RSA + nonce-hash match), then either logs an existing user in (matched strictly by `googleId` / `appleId`) or creates a new account. Refuses to auto-link a provider identity to an existing email-based account — that's an OWASP-flagged account-hijack vector. Returns the same `{ accessToken, refreshToken }` envelope as [01-login.md](./01-login.md).
 
 ---
 
@@ -22,8 +22,9 @@ Mirrors [01-login.md](./01-login.md) §2.2 exactly — both sign-in surfaces pro
 
 | Status | Outcome |
 | :--- | :--- |
-| `ACTIVE` (social-login auto-sets `verified: true` on creation) | Allowed — tokens issued. |
-| `PENDING` | `403 Forbidden` (`"message": "Your account is pending approval."`). |
+| `ACTIVE` (social-login auto-sets `isVerified: true` on creation) | Allowed — tokens issued. |
+| `PENDING` (and `isVerified = false`) | `403 Forbidden` (`"message": "Your account is pending verification. Please verify your email."`). |
+| `PENDING` (and `isVerified = true`) | `403 Forbidden` (`"message": "Admin Verification Pending. Your account is currently under review."`). |
 | `REJECTED` | `403 Forbidden` (`"message": "Your account was rejected."`). Re-submit via [user/13-reverify-account.md](../user/13-reverify-account.md). |
 | `SUSPENDED` | `403 Forbidden` (`"message": "Your account has been suspended."`). |
 | `RESTRICTED` | `403 Forbidden` (`"message": "Your account is restricted. Contact support."`). |
@@ -122,8 +123,7 @@ For Apple, `nonce` is required (min 32 chars). For Google, `nonce` is optional (
   "message": "User logged in successfully.",
   "data": {
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "isOnboardingCompleted": false
+    "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
 }
 ```

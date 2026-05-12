@@ -42,12 +42,12 @@ export interface ILocation {
 }
 
 export interface IUser {
-  fullName: string;
+  name: string;
   email: string;
   password?: string;
   role: USER_ROLES;
-  revertDuration: string;
-  dateOfBirth: string;
+  revertDate: Date;
+  dateOfBirth: Date;
   profileImage: string;
   verificationImage: string;
   verificationVideo: string;
@@ -60,7 +60,6 @@ export interface IUser {
   status: USER_STATUS;
   rejectionReason?: string;
   isVerified: boolean;
-  isOnboardingCompleted: boolean;
   deviceTokens?: IDeviceToken[];
   googleId?: string;
   appleId?: string;
@@ -91,7 +90,7 @@ export interface IUser {
 
 export type PublicUserProjection = {
   _id: any;
-  fullName: string;
+  name: string;
   profileImage: string;
   role: USER_ROLES;
   isDeleted: boolean;

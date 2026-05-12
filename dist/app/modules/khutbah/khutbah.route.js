@@ -14,13 +14,13 @@ const khutbah_validation_1 = require("./khutbah.validation");
 const router = express_1.default.Router();
 router.get('/', khutbah_controller_1.KhutbaController.getAllKhutbahs);
 router.get('/:khutbaId', khutbah_controller_1.KhutbaController.getSingleKhutba);
-router.post('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, fileHandler_1.fileHandler)([
+router.post('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.ADMIN), (0, fileHandler_1.fileHandler)([
     { name: 'audio', maxCount: 1 },
     { name: 'thumbnail', maxCount: 1 },
 ]), (0, validateRequest_1.default)(khutbah_validation_1.KhutbaValidation.createKhutbaZodSchema), khutbah_controller_1.KhutbaController.createKhutba);
-router.patch('/:khutbaId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, fileHandler_1.fileHandler)([
+router.patch('/:khutbaId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.ADMIN), (0, fileHandler_1.fileHandler)([
     { name: 'audio', maxCount: 1 },
     { name: 'thumbnail', maxCount: 1 },
 ]), (0, validateRequest_1.default)(khutbah_validation_1.KhutbaValidation.updateKhutbaZodSchema), khutbah_controller_1.KhutbaController.updateKhutba);
-router.delete('/:khutbaId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), khutbah_controller_1.KhutbaController.deleteKhutba);
+router.delete('/:khutbaId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.ADMIN), khutbah_controller_1.KhutbaController.deleteKhutba);
 exports.KhutbaRoutes = router;

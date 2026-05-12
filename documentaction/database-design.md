@@ -38,7 +38,7 @@ erDiagram
 
 ### 1. User Model (`users`)
 System er primary entity. Role-based access control (RBAC) eikhan theke managed hoy.
-- **Fields**: `fullName`, `email`, `password`, `role`, `status`, `isVerified`, `revertDuration`, `age`, `profileImage`, `verificationVideo`.
+- **Fields**: `name`, `email`, `password`, `role`, `status`, `isVerified`, `revertDate`, `age`, `profileImage`, `verificationVideo`.
 - **Logic**: `tokenVersion` use kora hoy token rotation ebong security-r jonno.
 - **Roles**: `BROTHER`, `SISTER`, `ADMIN`, `SUPER_ADMIN`.
 - **Default Role**: None (Must be selected during registration).
@@ -49,7 +49,7 @@ Surgery workflow optimize korar jonno main data entity.
   - `createdBy`: ObjectId — Reference to `User` (indexed).
   - `supplies[].name`: ObjectId — Reference to `Supply` (field name misleading — actually holds a Supply `_id`).
   - `sutures[].name`: ObjectId — Reference to `Suture` (same — holds a Suture `_id`).
-- **Embedded Data**: `surgeon` sub-schema with `fullName`, `handPreference`, `specialty`, `contactNumber`, `musicPreference` (all required, `_id: false`).
+- **Embedded Data**: `surgeon` sub-schema with `name`, `handPreference`, `specialty`, `contactNumber`, `musicPreference` (all required, `_id: false`).
 
 ### 3. Subscription Model (`subscriptions`)
 IAP (Apple/Google) based subscription + access control. **No Stripe** — in-app purchase only.
@@ -86,13 +86,13 @@ System er sob users (Admin ebong Reverts) er data eikhane thake.
 
 | Field | Type | Required | Description / Enum |
 | :--- | :--- | :---: | :--- |
-| `fullName` | String | ✅ | User er full name |
+| `name` | String | ✅ | User er Name |
 | `email` | String | ✅ | Unique, lowercase, indexed |
 | `password` | String | ⚠️ | Required for non-OAuth users only (hidden via `select: false`, min 8) |
 | `role` | String | ✅ | Enum `BROTHER`, `SISTER`, `ADMIN`, `SUPER_ADMIN` |
-| `status` | String | ❌ | Enum `ACTIVE`, `PENDING`, `RESTRICTED`, `REJECTED`, `SUSPENDED`, `DELETE` |
-| `isVerified` | Boolean | ❌ | Email verification status — default **`false`** |
-| `revertDuration` | String | ✅ | Time since becoming Muslim |
+| `status` | String | ❌ | Enum `ACTIVE`, `PENDING`, `RESTRICTED`, `REJECTED`, `SUSPENDED`, `DELETE` — Default **`PENDING`** for public registration. |
+| `isVerified` | Boolean | ❌ | Email verification status — default **`false`**. Flipped to **`true`** after OTP. |
+| `revertDate` | String | ✅ | Time since becoming Muslim |
 | `age` | Number | ✅ | User age (min 16) |
 | `profileImage` | String | ✅ | Public profile URL |
 | `verificationImage`| String | ✅ | Private verification image URL |
@@ -102,7 +102,7 @@ System er sob users (Admin ebong Reverts) er data eikhane thake.
 | `interests` | [String] | ❌ | Array of tags |
 | `location` | Object | ❌ | `{ country, city, coordinates: { lat, lng } }` |
 | `about` | String | ❌ | Bio text |
-| `isOnboardingCompleted` | Boolean | ❌ | Default `false` — manually set to `true` by user at end of onboarding |
+| `isOnboardingCompleted` | Boolean | ❌ | Default `false` — manually set to `true` by user at end of onboarding. `SUPER_ADMIN` er login response e eta exclude kora hoy. |
 | `deviceTokens` | Sub-doc[] | ❌ | Array of `{ token, platform, appVersion, lastSeenAt }` — upsert refreshes `lastSeenAt` instead of duplicating. *Favorites moved to a separate collection — see §7.* |
 | `googleId` | String | ❌ | OAuth ID (sparse index — allows multiple nulls) |
 | `authentication` | Object | ❌ | Hidden sub-doc: `{ isResetPassword, oneTimeCode, expireAt }` (select: false) |
@@ -122,7 +122,7 @@ Surgery-specific preference data.
 | :--- | :--- | :---: | :--- |
 | `createdBy` | ObjectId (ref `User`) | ✅ | Creator — indexed |
 | `cardTitle` | String | ✅ | Title of the card |
-| `surgeon` | Sub-doc | ✅ | Embedded `{ fullName, handPreference, specialty, contactNumber, musicPreference }` — all required, `_id: false` |
+| `surgeon` | Sub-doc | ✅ | Embedded `{ name, handPreference, specialty, contactNumber, musicPreference }` — all required, `_id: false` |
 | `medication` | String | ✅ | Required medication list |
 | `supplies` | `[{ supply: ObjectId(Supply), quantity: Number(min 1) }]` | ✅ | Embedded array, `_id: false` — FK field renamed from `name` → `supply` so the field name matches what it actually holds |
 | `sutures` | `[{ suture: ObjectId(Suture), quantity: Number(min 1) }]` | ✅ | Embedded array, `_id: false` — FK field renamed from `name` → `suture` |
@@ -140,7 +140,7 @@ Surgery-specific preference data.
 - `{ createdBy: 1, updatedAt: -1 }` — owner dashboard list sorted by most recent
 - `{ published: 1, verificationStatus: 1, createdAt: -1 }` — home / public list (ESR)
 - `{ 'surgeon.specialty': 1, published: 1 }` — Library screen specialty facet
-- **Text index** `card_text_idx` on `cardTitle (weight 10)`, `surgeon.fullName (5)`, `surgeon.specialty (3)`, `medication (2)` — replaces `$regex` search
+- **Text index** `card_text_idx` on `cardTitle (weight 10)`, `surgeon.name (5)`, `surgeon.specialty (3)`, `medication (2)` — replaces `$regex` search
 
 ---
 
@@ -717,7 +717,7 @@ Four indexes added to `preference-card.model.ts`:
 
 3. **`{ 'surgeon.specialty': 1, published: 1 }`** — Library screen specialty facet + published filter.
 
-4. **Weighted text index** on `cardTitle (10)`, `surgeon.fullName (5)`, `surgeon.specialty (3)`, `medication (2)` — search queries `$text: { $search }` use kore score-ranked results diye automatically relevance sort korte parbe. Named `card_text_idx` so ops can identify it in `db.preferencecards.getIndexes()`.
+4. **Weighted text index** on `cardTitle (10)`, `surgeon.name (5)`, `surgeon.specialty (3)`, `medication (2)` — search queries `$text: { $search }` use kore score-ranked results diye automatically relevance sort korte parbe. Named `card_text_idx` so ops can identify it in `db.preferencecards.getIndexes()`.
 
 **Important caveat**
 Text index **tokhon-i useful** jokhon QueryBuilder actually `$text` use kore. `QueryBuilder.search()` ekhono `$regex`-based — Priority 2 item #2 (QueryBuilder refactor) e ei kaj pending. Text index already built rakha hoyeche so refactor korar shathe shathe switchover free.
@@ -738,11 +738,11 @@ db.preferencecards.createIndex(
   {
     cardTitle: 'text',
     medication: 'text',
-    'surgeon.fullName': 'text',
+    'surgeon.name': 'text',
     'surgeon.specialty': 'text',
   },
   {
-    weights: { cardTitle: 10, 'surgeon.fullName': 5, 'surgeon.specialty': 3, medication: 2 },
+    weights: { cardTitle: 10, 'surgeon.name': 5, 'surgeon.specialty': 3, medication: 2 },
     name: 'card_text_idx',
   },
 );

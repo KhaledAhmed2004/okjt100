@@ -18,7 +18,7 @@ router.post(
   fileHandler([
     { name: 'audio', maxCount: 1 },
     { name: 'thumbnail', maxCount: 1 },
-  ]),
+  ], { maxFileSizeMB: 100 }),
   validateRequest(KhutbaValidation.createKhutbaZodSchema),
   KhutbaController.createKhutba,
 );
@@ -29,7 +29,7 @@ router.patch(
   fileHandler([
     { name: 'audio', maxCount: 1 },
     { name: 'thumbnail', maxCount: 1 },
-  ]),
+  ], { maxFileSizeMB: 100 }),
   validateRequest(KhutbaValidation.updateKhutbaZodSchema),
   KhutbaController.updateKhutba,
 );

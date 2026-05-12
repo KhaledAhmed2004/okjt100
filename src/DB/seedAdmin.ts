@@ -4,12 +4,12 @@ import { USER_ROLES, USER_STATUS } from '../enums/user';
 import { logger } from '../shared/logger';
 
 const payload = {
-  fullName: 'Administrator',
+  name: 'Administrator',
   email: config.super_admin.email,
   role: USER_ROLES.SUPER_ADMIN,
   password: config.super_admin.password,
-  revertDuration: 'N/A',
-  dateOfBirth: '1970-01-01',
+  revertDate: '1970-01-01T00:00:00.000Z',
+  dateOfBirth: '1970-01-01T00:00:00.000Z',
   verificationImage: 'https://i.ibb.co/z5YHLV9/profile.png',
   verificationVideo: 'https://i.ibb.co/z5YHLV9/profile.png',
   isVerified: true,

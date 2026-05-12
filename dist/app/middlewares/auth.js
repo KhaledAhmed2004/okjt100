@@ -53,11 +53,28 @@ const auth = (...allowedRoles) => (req, res, next) => __awaiter(void 0, void 0, 
         if (!dbUser) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.UNAUTHORIZED, 'User no longer exists');
         }
-        // Block access for deleted / restricted accounts at the middleware
-        // level so every protected route gets the guarantee for free.
+        // Block access for non-active accounts at the middleware level so
+        // every protected route gets the guarantee for free.
         if (dbUser.status === user_1.USER_STATUS.DELETED ||
-            dbUser.status === user_1.USER_STATUS.RESTRICTED) {
-            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Account is no longer active');
+            dbUser.status === user_1.USER_STATUS.RESTRICTED ||
+            dbUser.status === user_1.USER_STATUS.SUSPENDED ||
+            dbUser.status === user_1.USER_STATUS.REJECTED ||
+            dbUser.status === user_1.USER_STATUS.INACTIVE ||
+            dbUser.status === user_1.USER_STATUS.PENDING) {
+            let message;
+            if (dbUser.status === user_1.USER_STATUS.SUSPENDED) {
+                message = 'Account is suspended. Please contact support.';
+            }
+            else if (dbUser.status === user_1.USER_STATUS.REJECTED) {
+                message = 'Account verification was rejected. Please re-submit your documents.';
+            }
+            else if (dbUser.status === user_1.USER_STATUS.PENDING) {
+                message = 'Admin Verification Pending. Your account is currently under review.';
+            }
+            else {
+                message = 'Account is no longer active';
+            }
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, message);
         }
         const jwtTokenVersion = verifiedUser.tokenVersion;
         // Handle the case where tokenVersion might be missing in DB (legacy users)

@@ -64,7 +64,7 @@ Enforced by the service after the DB lookup.
 
 ### Returned (Limited Public Profile)
 The service selects exactly these fields from the User document:
-`_id`, `fullName`, `role`, `profileImage`, `location`, `isVerified`, `revertDuration`, `aboutMe`, `interests`, `specialty`, `hospital`, `createdAt`.
+`_id`, `name`, `role`, `profileImage`, `location`, `isVerified`, `revertDate`, `aboutMe`, `interests`, `specialty`, `hospital`, `createdAt`.
 
 The service then **flattens** `location` into top-level `country` and `city` and removes the nested `location` object before returning. Internal status flags (`status`, `deletedAt`) are stripped.
 
@@ -87,7 +87,7 @@ The service then **flattens** `location` into top-level `country` and `city` and
 **Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `rateLimitMiddleware({ windowMs: 60s, max: 60, routeName: 'public-user-details' })` -> `validateRequest(getUserDetailsZodSchema)` -> `UserController.getUserDetailsById`.
 
 ### Service business logic (`getUserDetailsByIdFromDB`)
-1. `User.findById(userId).select('_id fullName role profileImage location isVerified revertDuration aboutMe interests specialty hospital createdAt status deletedAt')` — projection includes `status` and `deletedAt` only for the visibility check.
+1. `User.findById(userId).select('_id name role profileImage location isVerified revertDate aboutMe interests specialty hospital createdAt status deletedAt')` — projection includes `status` and `deletedAt` only for the visibility check.
 2. If `!user || user.status !== ACTIVE || user.deletedAt` -> throw `ApiError(404, 'User not found')`.
 3. If `requester.role !== SUPER_ADMIN` and `requester.role !== user.role` -> throw `ApiError(403, "You don't have permission to view this profile")`.
 4. Flatten `location.country` / `location.city` to top-level fields, drop `location`.
@@ -113,13 +113,13 @@ The service then **flattens** `location` into top-level `country` and `city` and
   "message": "User details retrieved successfully",
   "data": {
     "_id": "664a1b2c3d4e5f6a7b8c9d0e",
-    "fullName": "Jane Doe",
+    "name": "Jane Doe",
     "role": "SISTER",
     "profileImage": "uploads/users/profiles/2026-pic.jpg",
     "country": "USA",
     "city": "New York",
     "isVerified": true,
-    "revertDuration": "3 years",
+    "revertDate": "2024-05-11T00:00:00.000Z",
     "aboutMe": "Short intro",
     "interests": ["Quran Study", "Fitness"],
     "specialty": "Cardiology",

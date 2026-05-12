@@ -24,7 +24,7 @@ Admin queue. Returns every ticket in the system with the opener's user data popu
 ## 3. Implementation
 - **Route**: `router.get('/admin/list', ...)` — declared **before** `/:ticketId` so Express doesn't match `admin` as a ticketId.
 - **Controller**: `SupportTicketController.getAllTickets`
-- **Service**: `SupportTicketService.getAllTickets` — uses `QueryBuilder(SupportTicket.find().populate('userId', 'fullName email profileImage'), query)`.
+- **Service**: `SupportTicketService.getAllTickets` — uses `QueryBuilder(SupportTicket.find().populate('userId', 'name email profileImage'), query)`.
 
 ## 4. Responses
 
@@ -52,7 +52,7 @@ Admin queue. Returns every ticket in the system with the opener's user data popu
       "category": "BILLING",
       "userId": {
         "id": "664a1b2c3d4e5f6a7b8c9d0a",
-        "fullName": "Jane Doe",
+        "name": "Jane Doe",
         "email": "jane@example.com"
       },
       "assignedAdminId": "664a1b2c3d4e5f6a7b8c9d10",

@@ -1,4 +1,8 @@
+import { StatusCodes } from 'http-status-codes';
+import ApiError from '../../../errors/ApiError';
 import AggregationBuilder from '../../builder/AggregationBuilder';
+import QueryBuilder from '../../builder/QueryBuilder';
+import { USER_STATUS } from '../../../enums/user';
 import { User } from '../user/user.model';
 // import { PreferenceCardModel } from '../preference-card/preference-card.model';
 import { Subscription } from '../subscription/subscription.model';
@@ -168,6 +172,7 @@ const getActiveSubscriptionMonthlyTrend = async (query: Record<string, any>) => 
     status: SUBSCRIPTION_STATUS.ACTIVE,
   });
 };
+
 
 export const AdminService = {
   getAdminDashboardStats,

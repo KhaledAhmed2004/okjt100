@@ -19,6 +19,20 @@ const createPostZodSchema = z.object({
 const addCommentZodSchema = z.object({
   body: z.object({
     comment: z.string({ required_error: 'Comment is required' }),
+    parentCommentId: z.string().optional(),
+  }),
+});
+
+const updatePostZodSchema = z.object({
+  body: z.object({
+    content: z.string().optional(),
+    attachments: z.array(z.string()).optional(),
+  }),
+});
+
+const updateCommentZodSchema = z.object({
+  body: z.object({
+    comment: z.string({ required_error: 'Comment is required' }),
   }),
 });
 
@@ -26,4 +40,6 @@ export const GroupValidation = {
   createGroupZodSchema,
   createPostZodSchema,
   addCommentZodSchema,
+  updatePostZodSchema,
+  updateCommentZodSchema,
 };

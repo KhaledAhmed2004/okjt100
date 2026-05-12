@@ -31,6 +31,8 @@ const GroupPostSchema = new Schema<IGroupPost>(
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     content: { type: String, required: true },
     attachments: { type: [String], default: [] },
+    likesCount: { type: Number, default: 0 },
+    commentsCount: { type: Number, default: 0 },
   },
   { timestamps: true },
 );
@@ -51,6 +53,11 @@ const PostCommentSchema = new Schema<IPostComment>(
     postId: { type: Schema.Types.ObjectId, ref: 'GroupPost', required: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     comment: { type: String, required: true },
+    parentCommentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'PostComment',
+      default: null,
+    },
   },
   { timestamps: true },
 );
@@ -58,6 +65,10 @@ const PostCommentSchema = new Schema<IPostComment>(
 // Compound indexes for efficiency
 GroupMemberSchema.index({ groupId: 1, userId: 1 }, { unique: true });
 PostLikeSchema.index({ postId: 1, userId: 1 }, { unique: true });
+PostCommentSchema.index({ postId: 1, createdAt: 1 });
+PostCommentSchema.index({ parentCommentId: 1 });
+GroupPostSchema.index({ userId: 1 });
+GroupPostSchema.index({ createdAt: -1 });
 
 export const Group = model<IGroup>('Group', GroupSchema);
 export const GroupMember = model<IGroupMember>('GroupMember', GroupMemberSchema);

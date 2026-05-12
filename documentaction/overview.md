@@ -89,7 +89,7 @@ Two parallel surfaces consume the same backend:
 | 03 | **Card Details** | Card CRUD | `GET/PATCH/DELETE /preference-cards/:cardId`, `POST /preference-cards`, `POST /preference-cards/:cardId/download` (counter-only), `GET /supplies`, `GET /sutures` |
 | 04 | **Library** | Global search (paid only) | `GET /preference-cards?visibility=public`, `GET /preference-cards/specialties`, favorite/unfavorite/download |
 | 05 | **Calendar** | Personal Events (paid only) | `GET/POST /events`, `GET/PATCH/DELETE /events/:eventId` |
-| 06 | **Profile** | Account + Sub + Legal | `GET/PATCH /users/profile`, `GET /subscriptions/me`, `POST /subscriptions/verify-receipt`, `GET /legal`, `GET /legal/:slug` |
+| 06 | **Profile** | Account + Sub + Legal | `GET/PATCH /users/me`, `GET /subscriptions/me`, `POST /subscriptions/verify-receipt`, `GET /legal`, `GET /legal/:slug` |
 | 07 | **Notifications** | Cross-cutting | `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`, `DELETE /notifications/:id` |
 
 ### Admin Dashboard (`dashboard-screens/`)
@@ -98,7 +98,7 @@ Two parallel surfaces consume the same backend:
 |---|---|---|---|
 | 01 | **Auth** | Admin Sessions | Same auth endpoints, scoped by role |
 | 02 | **Overview** | Analytics | `GET /admin/growth-metrics`, `/admin/preference-cards/monthly`, `/admin/subscriptions/active/monthly` |
-| 03 | **User Management** | Doctor CRUD | `GET /users/stats`, `GET /users`, `POST /users`, `PATCH /users/:userId`, `DELETE /users/:userId` |
+| 03 | **User Management** | Doctor CRUD | `GET /users/metrics`, `GET /users`, `POST /users`, `PATCH /users/:userId`, `DELETE /users/:userId` |
 | 04 | **Preference Card Management** | Verification | `GET /preference-cards?moderation=pending` (Enterprise creators only), `PATCH /preference-cards/:cardId` with `{ verificationStatus: "VERIFIED" \| "REJECTED" }`, `DELETE /preference-cards/:cardId` |
 | 05 | **Legal Management** | CMS | `GET/POST /legal`, `GET/PATCH/DELETE /legal/:slug` |
 | 06 | **Supplies Management** | Master Catalog | `GET/POST /supplies`, `POST /supplies/bulk`, `PATCH/DELETE /supplies/:supplyId` |
@@ -162,7 +162,7 @@ Login (SUPER_ADMIN) → Overview (Growth metrics + Trend charts)
 | Entity | Owner | Key Fields | Lifecycle |
 |---|---|---|---|
 | **User** | self / admin | `name`, `email`, `password` (optional for OAuth), `phone`, `country`, `role`, `status` (`ACTIVE` / `RESTRICTED`), `verified`, `favoriteCards[]`, `tokenVersion`, `deviceToken`, `subscriptionPlan`, `subscriptionExpiresAt` | Created → OTP-verified → Active → (optionally Restricted / Deleted) |
-| **PreferenceCard** | creator (USER) | `cardTitle`, `surgeon{ fullName, specialty, handPreference, contactNumber, musicPreference }`, `medication`, `supplies[]`, `sutures[]`, `instruments`, `positioningEquipment`, `prepping`, `workflow`, `keyNotes`, `photos[]`, `published`, `verificationStatus` (`UNVERIFIED` / `VERIFIED` / `REJECTED`), `visibility` (`public` / `private`), `downloadCount` | Created (always `UNVERIFIED`) → admin verifies (Enterprise creators only) → `VERIFIED` (visible in public library to paid users) |
+| **PreferenceCard** | creator (USER) | `cardTitle`, `surgeon{ name, specialty, handPreference, contactNumber, musicPreference }`, `medication`, `supplies[]`, `sutures[]`, `instruments`, `positioningEquipment`, `prepping`, `workflow`, `keyNotes`, `photos[]`, `published`, `verificationStatus` (`UNVERIFIED` / `VERIFIED` / `REJECTED`), `visibility` (`public` / `private`), `downloadCount` | Created (always `UNVERIFIED`) → admin verifies (Enterprise creators only) → `VERIFIED` (visible in public library to paid users) |
 | **Supply** / **Suture** | admin | `name` (unique) | Master catalog entries; auto-created when referenced by name in card payloads. |
 | **Event** | user | `title`, `date`, `time`, `duration` (minutes), `location`, `eventType` (`surgery` \| `meeting` \| `consultation` \| `other`), `linkedPreferenceCard` (optional), `personnel: Array<{ name, role }>` (optional), `notes` (optional) | Created → Reminders fire at T-24h and T-1h |
 | **Notification** | system | `userId`, `type` (`REMINDER` / card / event), `title`, `subtitle`, `read`, `icon`, `createdAt` | Persisted in DB + emitted over Socket + (optionally) FCM push |

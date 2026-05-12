@@ -17,14 +17,14 @@ const createChatToDB = async (payload: any): Promise<IChat> => {
   return chat;
 };
 
-const getChatFromDB = async (user: any, search: string): Promise<IChat[]> => {
+const getChatFromDB = async (user: any, searchTerm: string): Promise<IChat[]> => {
   const chats: any = await Chat.find({ participants: { $in: [user.id] } })
     .populate({
       path: 'participants',
       select: '_id name image role',
       match: {
         _id: { $ne: user.id },
-        ...(search && { name: { $regex: search, $options: 'i' } }),
+        ...(searchTerm && { name: { $regex: searchTerm, $options: 'i' } }),
       },
     })
     .populate({

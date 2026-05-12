@@ -1,7 +1,7 @@
 # 04. Update Own Profile
 
 ```http
-PATCH /users/profile
+PATCH /users/me
 Content-Type: multipart/form-data
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
@@ -48,7 +48,7 @@ All fields are **optional**. The schema is a plain Zod object (not `.strict()`) 
 
 | Field | Type | Notes |
 | :--- | :--- | :--- |
-| `fullName` | `string` | — |
+| `name` | `string` | — |
 | `aboutMe` | `string` | — |
 | `revertStory` | `string` | — |
 | `specialty` | `string` | — |
@@ -89,30 +89,28 @@ File upload is processed by `fileHandler` **before** validation, so the resultin
 - **DB write**: `User.findOneAndUpdate({ _id: id }, payload, { new: true })`. Returns the updated Mongoose document (not lean).
 - **No transaction is used** — the unlink + update sequence is not atomic. If the DB write fails after the unlink fires, the old file may still be deleted; the orphan cron handles the inverse case (DB succeeds, unlink fails) automatically.
 - **`location` is replaced wholesale, not merged.** `findOneAndUpdate` defaults to a top-level `$set`, so sending `{ "location": { "country": "X" } }` removes any previously-stored `city` and `coordinates`. Clients must include every sub-field they want to retain.
-- **Concurrent updates**: the endpoint is **last-write-wins**. Two simultaneous `PATCH /users/profile` requests with different `profileImage` files race: request A unlinks the old image and writes its new path; request B's `unlinkFile` may then delete A's freshly-written file, leaving B's path stored alongside a now-deleted file on disk. Mobile clients should serialize profile updates client-side (queue, don't fire two updates in parallel). There is no optimistic-lock token (`If-Match` / `ETag`) on this endpoint today.
+- **Concurrent updates**: the endpoint is **last-write-wins**. Two simultaneous `PATCH /users/me` requests with different `profileImage` files race: request A unlinks the old image and writes its new path; request B's `unlinkFile` may then delete A's freshly-written file, leaving B's path stored alongside a now-deleted file on disk. Mobile clients should serialize profile updates client-side (queue, don't fire two updates in parallel). There is no optimistic-lock token (`If-Match` / `ETag`) on this endpoint today.
 
 ---
 
 ## 3. Request Body (Multipart Form-Data)
 
-| Key | Value Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `fullName` | `text` | No | e.g., "John Updated" |
-| `aboutMe` | `text` | No | Short bio |
-| `revertStory` | `text` | No | Personal journey |
-| `specialty` | `text` | No | — |
-| `hospital` | `text` | No | — |
-| `interests` | `text` (JSON-stringified array) | No | Single key. Example: `interests='["Quran","Arabic"]'`. The validator pre-parses the JSON. Repeated-key (`interests=Quran&interests=Arabic`) and bracket (`interests[0]=…`) syntaxes are not supported. JSON requests may also send a real array. |
-| `location[country]` | `text` | No | Use bracket notation for nested fields |
-| `location[city]` | `text` | No | — |
-| `location[coordinates][lat]` | `text` (number) | No | Required if `coordinates` is present |
-| `location[coordinates][lng]` | `text` (number) | No | Required if `coordinates` is present |
-| `profileImage` | `file` | No | Single image file (JPG/PNG/WebP), max 10 MB |
+| Key | Value Type | Required | Description | Example |
+| :--- | :--- | :--- | :--- | :--- |
+| `name` | `text` | No | The user's full legal name. | `John Updated` |
+| `aboutMe` | `text` | No | A short biography or intro about the user. | `New bio` |
+| `revertStory` | `text` | No | The user's personal story of converting to Islam. | `My story...` |
+| `revertDate` | `text` | No | The date the user converted to Islam in Full ISO 8601 format. | `2024-05-11T00:00:00.000Z` |
+| `specialty` | `text` | No | Professional specialty or medical focus area. | `Cardiology` |
+| `hospital` | `text` | No | The hospital where the user works. | `Central Hospital` |
+| `interests` | `array` | No | Array of strings representing user interests. | `["Quran", "Cooking"]` |
+| `profileImage` | `file` | No | Profile photo upload (multipart). | — |
+| `location` | `JSON` | No | Nested object with `country`, `city`, and `coordinates`. | `{"country": "UK"}` |
 
 ---
 
 ## 4. Implementation
-- **Route**: [src/app/modules/user/user.route.ts](file:///src/app/modules/user/user.route.ts) — `router.patch('/profile', ...)`
+- **Route**: [src/app/modules/user/user.route.ts](file:///src/app/modules/user/user.route.ts) — `router.patch('/me', ...)`
 - **Controller**: [src/app/modules/user/user.controller.ts](file:///src/app/modules/user/user.controller.ts) — `updateProfile`
 - **Service**: [src/app/modules/user/user.service.ts](file:///src/app/modules/user/user.service.ts) — `updateProfileToDB`
 - **Validation**: [src/app/modules/user/user.validation.ts](file:///src/app/modules/user/user.validation.ts) — `UserValidation.updateUserZodSchema`
@@ -146,11 +144,9 @@ File upload is processed by `fileHandler` **before** validation, so the resultin
   "message": "Profile updated successfully",
   "data": {
     "id": "664a1b2c3d4e5f6a7b8c9d0e",
-    "fullName": "John Updated",
-    "email": "john@example.com",
-    "role": "BROTHER",
-    "profileImage": "uploads/users/profiles/1715000000000-abc-pic.png",
+    "name": "John Updated",
     "aboutMe": "Short bio",
+    "revertStory": "My story...",
     "interests": ["Quran", "Arabic"],
     "location": {
       "country": "USA",

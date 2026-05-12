@@ -16,15 +16,16 @@ Auth: Admin
 
 ## Request Body (Form Data)
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `title` | `string` | (Optional) Updated title |
-| `mosqueName` | `string` | (Optional) Updated mosque name |
-| `imam` | `string` | (Optional) Updated Imam name |
-| `date` | `string` | (Optional) Updated date (YYYY-MM-DD) |
-| `description` | `string` | (Optional) Updated description |
-| `audio` | `file` | (Optional) New audio file |
-| `thumbnail` | `file` | (Optional) New thumbnail image |
+| Field | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `title` | `string` | (Optional) Updated title | `New Khutba Title` |
+| `mosqueName` | `string` | (Optional) Updated mosque name | `Grand Mosque` |
+| `imam` | `string` | (Optional) Updated Imam name | `Sheikh Ahmad` |
+| `date` | `string` | (Optional) Updated date (ISO 8601) | `2026-05-10T00:00:00.000Z` |
+| `description` | `string` | (Optional) Updated description | `Revised description text.` |
+| `audio` | `file` | (Optional) New audio file | `updated_audio.mp3` |
+| `thumbnail` | `file` | (Optional) New thumbnail image | `new_thumb.jpg` |
+| `duration` | `string` | (Optional) Updated duration | `50:00` |
 
 ## Implementation
 
@@ -52,7 +53,7 @@ Auth: Admin
     "title": "Updated Title",
     "mosqueName": "Central Mosque",
     "imam": "Sheikh Khalid",
-    "date": "2026-05-08",
+    "date": "2026-05-08T00:00:00.000Z",
     "description": "Updated description.",
     "audioUrl": "https://storage.com/audio/new-audio.mp3",
     "thumbnailUrl": "https://storage.com/images/new-image.jpg",

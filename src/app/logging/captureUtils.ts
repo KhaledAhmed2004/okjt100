@@ -57,7 +57,7 @@ const PII_KEYS = new Set([
   'ssn', 'socialsecurity', 'nationalid',
   'address', 'street', 'city', 'zip', 'zipcode',
   'birthdate', 'dob', 'dateofbirth',
-  'firstname', 'lastname', 'fullname',
+  'firstname', 'lastname', 'name',
   'ip', 'ipaddress', 'ipv4', 'ipv6',
 ]);
 

@@ -167,13 +167,13 @@ Every JWT carries a `tokenVersion` claim. The auth middleware (`src/app/middlewa
 
 Any module that surfaces user-attributed content (group post author, ask-imam questioner, comment author) **MUST** populate the user via [User.findPublicById](../src/app/modules/user/user.model.ts) or [User.findPublicByIds](../src/app/modules/user/user.model.ts), not by joining the raw `User` collection.
 
-**Why**: a soft-deleted user (status `DELETED` or has `deletedAt`) is anonymized at this projection layer. Their content stays visible (preserves conversation context — what Reddit / Slack / Discord do), but `fullName` collapses to `"[Deleted User]"` and `profileImage` to the default avatar. Without this gate, soft-deleted users' real names and avatars would still appear in every thread they participated in for the 30 days before permanent purge — a privacy leak.
+**Why**: a soft-deleted user (status `DELETED` or has `deletedAt`) is anonymized at this projection layer. Their content stays visible (preserves conversation context — what Reddit / Slack / Discord do), but `name` collapses to `"[Deleted User]"` and `profileImage` to the default avatar. Without this gate, soft-deleted users' real names and avatars would still appear in every thread they participated in for the 30 days before permanent purge — a privacy leak.
 
 **Projection shape**:
 ```ts
 {
   _id: ObjectId,
-  fullName: string,        // "[Deleted User]" if isDeleted
+  name: string,        // "[Deleted User]" if isDeleted
   profileImage: string,    // "/default-avatar.svg" if isDeleted
   role: USER_ROLES,        // preserved either way
   isDeleted: boolean,
@@ -344,9 +344,9 @@ Several write endpoints accept an optional `Idempotency-Key` request header for 
 | `POST /auth/restore-account` | `auth:restore-account` |
 
 **Endpoints that DO NOT support it** are either:
-- naturally idempotent at the data level (`PATCH /users/profile`, `PATCH /users/complete-onboarding`, `DELETE /users/me/sessions/:tokenId`)
+- naturally idempotent at the data level (`PATCH /users/me`, `PATCH /users/complete-onboarding`, `DELETE /users/me/sessions/:tokenId`)
 - credential-validating where retry is its own meaningful operation (`POST /auth/login`, `POST /auth/social-login`)
-- read-only (`GET /users/profile`, `GET /users/:userId/user`, `GET /users/me/sessions`)
+- read-only (`GET /users/me`, `GET /users/:userId/user`, `GET /users/me/sessions`)
 - token rotation where idempotency would defeat reuse detection (`POST /auth/refresh-token`)
 - session-state changes where retry is harmless (`POST /auth/logout`, `POST /auth/verify-otp`, `POST /auth/change-password`).
 

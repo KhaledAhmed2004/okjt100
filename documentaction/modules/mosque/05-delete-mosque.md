@@ -29,6 +29,8 @@ Auth: Admin
   "success": true,
   "statusCode": 200,
   "message": "Mosque deleted successfully.",
-  "data": null
+  "data": {
+    "id": "60d5ecb86372ad46101f1929"
+  }
 }
 ```
