@@ -39,10 +39,10 @@ const googleAudience = [
 ].filter(Boolean);
 
 const loginUserFromDB = async (
-  payload: ILoginData & { deviceToken?: string },
+  payload: ILoginData,
   sessionMetadata?: { ip?: string; userAgent?: string },
 ) => {
-  const { email, password, deviceToken } = payload;
+  const { email, password, deviceToken, platform, appVersion } = payload;
   // `tokenVersion` is `select: false` on the schema — pull it explicitly
   // here so the issued JWT carries the current rotation counter.
   const isExistUser = await User.findOne({ email }).select('+password +tokenVersion');
@@ -143,8 +143,8 @@ const loginUserFromDB = async (
     await User.addDeviceToken(
       isExistUser._id.toString(),
       deviceToken,
-      undefined,
-      undefined,
+      platform,
+      appVersion,
       sessionMetadata,
     );
   }

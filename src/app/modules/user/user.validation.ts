@@ -70,8 +70,6 @@ const updateUserZodSchema = z.object({
     name: z.string().optional(),
     aboutMe: z.string().optional(),
     revertStory: z.string().optional(),
-    specialty: z.string().optional(),
-    hospital: z.string().optional(),
     revertDate: z.string().datetime().optional(),
     interests: z
       .preprocess((v: unknown) => {

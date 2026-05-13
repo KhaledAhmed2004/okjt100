@@ -16,7 +16,7 @@ Authorization: Bearer {{accessToken}} (SUPER_ADMIN)
 1. **Filtering**: Supports `searchTerm` (name/email), `email`, `role`, `status`, and `isVerified`.
 2. **Conditional Field Visibility & PENDING Restriction**:
     - **`status=PENDING` Response**: Includes only `_id`, `name`, `email`, `role`, `verificationImage`, `verificationVideo`, and `createdAt`. Optimized for the admin approval queue.
-    - **General Response**: Includes full details including `name`, `email`, `phone`, `specialty`, `hospital`, `status`, `isVerified`, `role`, `profileImage`, `createdAt`, and `updatedAt`.
+    - **General Response**: Includes full details including `name`, `email`, `phone`, `status`, `isVerified`, `role`, `profileImage`, `createdAt`, and `updatedAt`.
 3. **Pagination & Sorting**: Implements custom aggregation pipeline with `$facet` for data and total count.
 
 ## Query Parameters

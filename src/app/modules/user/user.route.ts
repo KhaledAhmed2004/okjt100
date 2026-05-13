@@ -191,7 +191,7 @@ router.get(
   UserController.getUserById,
 );
 
-// Admin: Update any user (Update fields including specialty, role, status)
+// Admin: Update any user (Update fields including role, status)
 router.patch(
   '/:userId',
   auth(USER_ROLES.SUPER_ADMIN),

@@ -35,8 +35,6 @@ Authorization: Bearer {{accessToken}} (SUPER_ADMIN)
       "status": "ACTIVE",
       "isVerified": true,
       "country": "USA",
-      "specialty": "Cardiology",
-      "hospital": "City Hospital",
       "profileImage": "uploads/users/profiles/profile.png",
       "createdAt": "2026-03-15T10:30:00.000Z",
       "updatedAt": "2026-03-15T10:30:00.000Z"

@@ -22,10 +22,9 @@ const getAllMosquesFromDB = async (query: Record<string, unknown>) => {
     latitude, 
     longitude, 
     searchTerm, 
+    filter, // 'nearby-me'
     page = 1, 
     limit = 10, 
-    sortBy = 'createdAt', 
-    sortOrder = 'desc', 
     ...filters 
   } = query;
 
@@ -41,7 +40,7 @@ const getAllMosquesFromDB = async (query: Record<string, unknown>) => {
   const skip = (Number(page) - 1) * Number(limit);
   const pipeline: PipelineStage[] = [];
 
-  // 1. Proximity Search
+  // 1. Proximity Search & Sorting Logic
   if (latitude && longitude) {
     const userLat = parseFloat(latitude as string);
     const userLng = parseFloat(longitude as string);
@@ -56,14 +55,18 @@ const getAllMosquesFromDB = async (query: Record<string, unknown>) => {
           query: match,
         },
       });
+
+      // If NOT explicitly nearby-me, sort by createdAt but keep distanceInKm
+      if (filter !== 'nearby-me') {
+        pipeline.push({ $sort: { createdAt: -1 } });
+      }
     } else {
       pipeline.push({ $match: match });
+      pipeline.push({ $sort: { createdAt: -1 } });
     }
   } else {
     pipeline.push({ $match: match });
-    const sortField = sortBy as string;
-    const sortDir = sortOrder === 'asc' ? 1 : -1;
-    pipeline.push({ $sort: { [sortField]: sortDir } });
+    pipeline.push({ $sort: { createdAt: -1 } });
   }
 
   // 2. Projection (Flatten for UI)
@@ -72,13 +75,8 @@ const getAllMosquesFromDB = async (query: Record<string, unknown>) => {
       mosqueName: 1,
       address: 1,
       area: 1,
-      phoneNumber: 1,
-      website: 1,
       prayerTimes: 1,
-      latitude: { $arrayElemAt: ['$location.coordinates', 1] },
-      longitude: { $arrayElemAt: ['$location.coordinates', 0] },
       distanceInKm: 1,
-      createdAt: 1,
       updatedAt: 1,
     },
   });

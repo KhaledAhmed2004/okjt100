@@ -130,12 +130,6 @@ const userSchema = new Schema<IUser>(
       type: String,
       required: true,
     },
-    specialty: {
-      type: String,
-    },
-    hospital: {
-      type: String,
-    },
     aboutMe: {
       type: String,
     },

@@ -49,8 +49,6 @@ export interface IUser {
   profileImage: string;
   verificationImage: string;
   verificationVideo: string;
-  specialty?: string;
-  hospital?: string;
   aboutMe?: string;
   revertStory?: string;
   interests: string[];

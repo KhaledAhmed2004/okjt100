@@ -36,8 +36,7 @@ Allows an admin or super admin to soft-delete a dua. The record remains in the d
   "statusCode": 200,
   "message": "Dua deleted successfully",
   "data": {
-    "_id": "664a1b2c3d4e5f6a7b8c9d0e",
-    "isDeleted": true
+    "id": "664a1b2c3d4e5f6a7b8c9d0e"
   }
 }
 ```

@@ -16,10 +16,9 @@ Auth: None
 | `limit` | `number` | Items per page (default: 10) |
 | `searchTerm`| `string` | Search by name, area, or address |
 | `area` | `string` | Filter by specific area |
-| `sortBy` | `string` | Sort field (default: `createdAt`) |
-| `sortOrder` | `string` | `asc` or `desc` (default: `desc`) |
 | `latitude` | `number` | User's latitude for distance calculation |
 | `longitude` | `number` | User's longitude for distance calculation |
+| `filter` | `string` | Use `nearby-me` to sort by distance. Otherwise, default sorting is by `createdAt`. |
 
 ## Implementation
 
@@ -28,11 +27,10 @@ Auth: None
 - **Service**: `mosque.service.ts` — `getAllMosquesFromDB`
 
 ### Business Logic
-1. **Dual-Purpose Logic**: Supports both Admin (dashboard sorting) and Public User (proximity search) in a single endpoint.
-2. **Proximity Search**: If `latitude` and `longitude` are provided, uses MongoDB's native `$geoNear` for distance-based sorting and injects `distanceInKm`.
-3. **Admin Sorting**: If coordinates are NOT provided, falls back to traditional sorting using `sortBy` and `sortOrder`.
-4. **Pagination**: Efficiently calculates metadata via `$facet`.
-5. **Flattened Response**: Automatically transforms nested GeoJSON into top-level `latitude`/`longitude` for frontend convenience.
+1. **Always-On Distance**: If `latitude` and `longitude` are provided, the system **always** calculates `distanceInKm` regardless of the filter.
+2. **Nearby Me Filter**: If `filter=nearby-me` is used with coordinates, the list is sorted by proximity (closest first).
+3. **Default Sorting**: If no filter is provided, the list defaults to sorting by `updatedAt` (newest first).
+4. **Clean Projection**: Returns only essential fields for the UI: `mosqueName`, `address`, `area`, `prayerTimes`, `distanceInKm`, and `updatedAt`.
 
 ## Responses
 
@@ -51,20 +49,20 @@ Auth: None
   },
   "data": [
     {
-      "_id": "60d5ecb86372ad46101f1929",
+      "id": "60d5ecb86372ad46101f1929",
       "mosqueName": "Baitul Mukarram",
-      "address": "Baitul Mukarram, Dhaka",
+      "address": "Topkhana Road, Dhaka",
       "area": "Motijheel",
-      "latitude": 23.7289,
-      "longitude": 90.4125,
-      "distanceInKm": 2.5,
       "prayerTimes": {
         "fajr": "04:30",
         "dhuhr": "12:15",
         "asr": "16:45",
         "maghrib": "18:30",
-        "isha": "20:00"
-      }
+        "isha": "20:00",
+        "jummah": "13:30"
+      },
+      "distanceInKm": 2.5,
+      "updatedAt": "2026-05-13T15:32:05.022Z"
     }
   ]
 }

@@ -57,7 +57,10 @@ const updateDua = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Dua updated successfully',
-    data: result,
+    data: {
+      id: result?._id,
+      updatedAt: result?.updatedAt,
+    },
   });
 });
 
@@ -69,7 +72,7 @@ const deleteDua = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Dua deleted successfully',
-    data: result,
+    data: { id: result?._id },
   });
 });
 

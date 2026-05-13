@@ -14,29 +14,17 @@ const getDashboardStats = catchAsync(async (_req: Request, res: Response) => {
   });
 });
 
-const getPreferenceCardMonthly = catchAsync(async (req: Request, res: Response) => {
-  const result = await AdminService.getPreferenceCardMonthlyTrend(req.query);
+const getRecentActivities = catchAsync(async (_req: Request, res: Response) => {
+  const result = await AdminService.getRecentActivities();
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: 'Preference card monthly trend',
+    message: 'Recent activities fetched successfully',
     data: result,
   });
 });
-
-const getActiveSubscriptionMonthly = catchAsync(async (req: Request, res: Response) => {
-  const result = await AdminService.getActiveSubscriptionMonthlyTrend(req.query);
-  sendResponse(res, {
-    success: true,
-    statusCode: StatusCodes.OK,
-    message: 'Active subscription monthly trend',
-    data: result,
-  });
-});
-
 
 export const AdminController = {
   getDashboardStats,
-  getPreferenceCardMonthly,
-  getActiveSubscriptionMonthly,
+  getRecentActivities,
 };

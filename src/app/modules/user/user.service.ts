@@ -242,8 +242,6 @@ const getAllUserRolesFromDB = async (query: Record<string, unknown>) => {
               name: 1,
               email: 1,
               phone: 1,
-              specialty: 1,
-              hospital: 1,
               status: 1,
               isVerified: 1,
               role: 1,
@@ -299,8 +297,7 @@ const getUserProfilesFromDB = async (
     limit = 10, 
     latitude, 
     longitude,
-    sortBy = 'createdAt',
-    sortOrder = 'desc'
+    filter, // 'new-reverts' or 'nearby-me'
   } = query;
 
   // Enforce same-role discovery and ACTIVE status only
@@ -314,15 +311,13 @@ const getUserProfilesFromDB = async (
   if (searchTerm) {
     match.$or = [
       { name: { $regex: searchTerm, $options: 'i' } },
-      { specialty: { $regex: searchTerm, $options: 'i' } },
-      { hospital: { $regex: searchTerm, $options: 'i' } }
     ];
   }
 
   const skip = (Number(page) - 1) * Number(limit);
   const pipeline: PipelineStage[] = [];
 
-  // 1. Proximity Search (Industry Standard MongoDB Design)
+  // 1. Proximity Search & Sorting Logic
   if (latitude && longitude) {
     const userLat = parseFloat(latitude as string);
     const userLng = parseFloat(longitude as string);
@@ -334,19 +329,21 @@ const getUserProfilesFromDB = async (
           distanceField: 'distanceInKm',
           spherical: true,
           distanceMultiplier: 0.001, // Convert meters to km
-          query: match, // Inject existing filters (role, status, self-exclusion)
+          query: match,
         },
       });
+
+      // If NOT explicitly nearby-me, sort by createdAt but keep distanceInKm
+      if (filter !== 'nearby-me') {
+        pipeline.push({ $sort: { createdAt: -1 } });
+      }
     } else {
       pipeline.push({ $match: match });
+      pipeline.push({ $sort: { createdAt: -1 } });
     }
   } else {
     pipeline.push({ $match: match });
-    
-    // Default sorting if no proximity search
-    const sortField = sortBy as string;
-    const sortDir = sortOrder === 'asc' ? 1 : -1;
-    pipeline.push({ $sort: { [sortField]: sortDir } });
+    pipeline.push({ $sort: { createdAt: -1 } });
   }
 
   // 2. Projection & Derived Fields
@@ -356,13 +353,6 @@ const getUserProfilesFromDB = async (
       name: 1,
       profileImage: 1,
       revertDate: 1,
-      specialty: 1,
-      hospital: 1,
-      // Flatten GeoJSON back for UI compatibility
-      country: '$location.country',
-      city: '$location.city',
-      latitude: { $arrayElemAt: ['$location.coordinates', 1] },
-      longitude: { $arrayElemAt: ['$location.coordinates', 0] },
       distanceInKm: 1,
       age: {
         $dateDiff: {
@@ -371,7 +361,6 @@ const getUserProfilesFromDB = async (
           unit: 'year',
         },
       },
-      createdAt: 1
     },
   });
 
@@ -529,8 +518,6 @@ const updateUserByAdminInDB = async (id: string, payload: Partial<IUser>) => {
   if (payload.name !== undefined) (user as any).name = payload.name;
   if (payload.aboutMe !== undefined) (user as any).aboutMe = payload.aboutMe;
   if (payload.revertStory !== undefined) (user as any).revertStory = payload.revertStory;
-  if (payload.specialty !== undefined) (user as any).specialty = payload.specialty;
-  if (payload.hospital !== undefined) (user as any).hospital = payload.hospital;
   if (payload.interests !== undefined) (user as any).interests = payload.interests;
   if (payload.email !== undefined) (user as any).email = payload.email;
   if (payload.dateOfBirth !== undefined) (user as any).dateOfBirth = payload.dateOfBirth;
@@ -606,7 +593,7 @@ const updateUserByAdminInDB = async (id: string, payload: Partial<IUser>) => {
 
 const getUserDetailsByIdFromDB = async (id: string, requester: JwtPayload) => {
   const user = await User.findById(id).select(
-    '_id name role profileImage location isVerified revertDate aboutMe revertStory interests specialty hospital createdAt status deletedAt'
+    '_id name role profileImage location isVerified revertDate aboutMe revertStory interests createdAt status deletedAt'
   );
 
   // 1. Check existence and visibility
@@ -1036,8 +1023,8 @@ const exportMyDataFromDB = async (user: JwtPayload) => {
   const { GroupMember, GroupPost, PostLike, PostComment } = await import(
     '../group/group.model'
   );
-  const AskImamModule = await import('../ask-imam/ask-imam.model');
-  const AskImam = AskImamModule.default;
+  const AskQuestionModule = await import('../ask-question/ask-question.model');
+  const AskQuestion = AskQuestionModule.default;
   const { Subscription } = await import('../subscription/subscription.model');
   const { SubscriptionEvent } = await import(
     '../subscription/subscription-event.model'
@@ -1075,7 +1062,7 @@ const exportMyDataFromDB = async (user: JwtPayload) => {
     groupPosts,
     postLikes,
     postComments,
-    askImamQuestions,
+    askQuestionData,
     subscriptions,
     subscriptionEvents,
   ] = await Promise.all([
@@ -1084,7 +1071,7 @@ const exportMyDataFromDB = async (user: JwtPayload) => {
     GroupPost.find({ userId: id }).lean(),
     PostLike.find({ userId: id }).lean(),
     PostComment.find({ userId: id }).lean(),
-    AskImam.find({ userId: id }).lean(),
+    AskQuestion.find({ userId: id }).lean(),
     Subscription.find({ userId: id }).lean(),
     SubscriptionEvent.find({ userId: id }).lean(),
   ]);
@@ -1100,7 +1087,7 @@ const exportMyDataFromDB = async (user: JwtPayload) => {
       likes: postLikes,
       comments: postComments,
     },
-    askImamQuestions,
+    askQuestionData,
     subscriptions: {
       current: subscriptions,
       events: subscriptionEvents,

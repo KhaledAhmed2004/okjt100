@@ -40,7 +40,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\", // Required: Yes\n  \"password\": \"P@ssw0rd!\", // Required: Yes\n  \"deviceToken\": \"fcm-or-apns-token-optional\", // Required: No (controller-level)\n}",
+              "raw": "{\n  \"email\": \"user@example.com\", // Required: Yes\n  \"password\": \"P@ssw0rd!\", // Required: Yes\n  \"deviceToken\": \"fcm-or-apns-token-optional\", // Required: No\n  \"platform\": \"ios\", // Required: No\n  \"appVersion\": \"1.0.0\", // Required: No\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -714,18 +714,6 @@
                   "value": "2024-05-11T00:00:00.000Z",
                   "type": "text",
                   "description": "The date the user converted to Islam in Full ISO 8601 format."
-                },
-                {
-                  "key": "specialty",
-                  "value": "Cardiology",
-                  "type": "text",
-                  "description": "Professional specialty or medical focus area."
-                },
-                {
-                  "key": "hospital",
-                  "value": "Central Hospital",
-                  "type": "text",
-                  "description": "The hospital where the user works."
                 },
                 {
                   "key": "interests",
@@ -1454,7 +1442,12 @@
                 {
                   "key": "searchTerm",
                   "value": "John",
-                  "description": "Name regex search"
+                  "description": "Search by name"
+                },
+                {
+                  "key": "filter",
+                  "value": "nearby-me",
+                  "description": "Use `new-reverts` for newest members or `nearby-me` for location-based sorting"
                 },
                 {
                   "key": "page",
@@ -2927,7 +2920,7 @@
           "response": []
         },
         {
-          "name": "9.2 Monthly Preference Cards Trend",
+          "name": "9.2 Recent Activities",
           "request": {
             "method": "GET",
             "header": [
@@ -2938,89 +2931,16 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/admin/preference-cards/trends/monthly",
+              "raw": "{{baseUrl}}/admin/recent-activities",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "admin",
-                "preference-cards",
-                "trends",
-                "monthly"
-              ],
-              "query": [
-                {
-                  "key": "year",
-                  "value": "2026",
-                  "description": "Filter data by a specific year"
-                },
-                {
-                  "key": "from",
-                  "value": "2026-01-01",
-                  "description": "Start date for custom range (YYYY-MM-DD)"
-                },
-                {
-                  "key": "to",
-                  "value": "2026-12-31",
-                  "description": "End date for custom range (YYYY-MM-DD)"
-                }
+                "recent-activities"
               ]
             },
-            "description": "Returns monthly analytics for preference cards — includes an inline YoY comparison (current year vs. last year), with `peak` and `slowest` months pre-computed server-side.",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "9.3 Monthly Active Subscriptions Trend",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/admin/subscriptions/trends/monthly",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "admin",
-                "subscriptions",
-                "trends",
-                "monthly"
-              ],
-              "query": [
-                {
-                  "key": "year",
-                  "value": "2026",
-                  "description": "Filter data by a specific year"
-                },
-                {
-                  "key": "from",
-                  "value": "2026-01-01",
-                  "description": "Start date for custom range (YYYY-MM-DD)"
-                },
-                {
-                  "key": "to",
-                  "value": "2026-12-31",
-                  "description": "End date for custom range (YYYY-MM-DD)"
-                }
-              ]
-            },
-            "description": "Returns monthly analytics for active subscriptions — includes an inline YoY comparison (current year vs. last year), with `peak` and `slowest` months pre-computed server-side.",
+            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -3340,6 +3260,278 @@
             "description": "User nijek comment delete korte pare, athoba Admin jekono comment delete korte pare.",
             "auth": {
               "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Dua Module",
+      "item": [
+        {
+          "name": "11.1 Create Dua",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/duas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "duas"
+              ]
+            },
+            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Dua for waking up",
+                  "type": "text",
+                  "description": "The title of the dua"
+                },
+                {
+                  "key": "waqt",
+                  "value": "Fajr",
+                  "type": "text",
+                  "description": "Prayer time category"
+                },
+                {
+                  "key": "details",
+                  "value": "Alhamdu lillahil-ladhi...",
+                  "type": "text",
+                  "description": "The content/details of the dua"
+                },
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": [],
+                  "description": "Audio file attachment"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11.2 Get All Duas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/duas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "duas"
+              ],
+              "query": [
+                {
+                  "key": "waqt",
+                  "value": "",
+                  "description": "Filter by prayer time (e.g., `Fajr`)"
+                },
+                {
+                  "key": "searchTerm",
+                  "value": "",
+                  "description": "Search in `title` and `details`"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Items per page (default: 10)"
+                },
+                {
+                  "key": "sort",
+                  "value": "",
+                  "description": "Sorting criteria (e.g., `-createdAt`)"
+                },
+                {
+                  "key": "fields",
+                  "value": "",
+                  "description": "Comma-separated list of fields to include"
+                }
+              ]
+            },
+            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11.3 Get Single Dua",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/duas/:duaId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "duas",
+                ":duaId"
+              ],
+              "variable": [
+                {
+                  "key": "duaId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11.4 Update Dua",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/duas/:duaId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "duas",
+                ":duaId"
+              ],
+              "variable": [
+                {
+                  "key": "duaId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "",
+                  "type": "text",
+                  "description": "Updated title"
+                },
+                {
+                  "key": "waqt",
+                  "value": "",
+                  "type": "text",
+                  "description": "Updated prayer time category"
+                },
+                {
+                  "key": "details",
+                  "value": "",
+                  "type": "text",
+                  "description": "Updated content"
+                },
+                {
+                  "key": "audio",
+                  "type": "file",
+                  "src": [],
+                  "description": "New audio file attachment"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "11.5 Delete Dua",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/duas/:duaId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "duas",
+                ":duaId"
+              ],
+              "variable": [
+                {
+                  "key": "duaId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "response": []

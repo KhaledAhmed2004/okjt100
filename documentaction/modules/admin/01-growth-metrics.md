@@ -22,17 +22,17 @@ Auth: Bearer {{accessToken}} (SUPER_ADMIN)
 - **Service**: `src/app/modules/admin/admin.service.ts` — `getAdminDashboardStats`
 
 ### Business Logic
-1. **Aggregation Engine**: Uses `AggregationBuilder` to run complex MongoDB aggregation pipelines across multiple collections (`User`, `PreferenceCardModel`, `Subscription`).
+1. **Aggregation Engine**: Uses `AggregationBuilder` to run complex MongoDB aggregation pipelines across multiple collections (`User`, `AskQuestion`, `Khutba`).
 2. **Growth Calculation**:
-   - Calculates metrics for the **current month** (e.g., May) and the **previous month** (e.g., April).
-   - `doctors`: Total users in the system.
-   - `preferenceCards`: Total cards created.
-   - `verifiedPreferenceCards`: Cards where `published: true`.
-   - `activeSubscriptions`: Subscriptions where `status: 'ACTIVE'`.
+   - Calculates metrics for the **current month** and the **previous month**.
+   - `totalUsers`: All users in the system.
+   - `activeUsers`: Users with `status: 'ACTIVE'`.
+   - `pendingVerification`: Users waiting for approval (`status: 'PENDING'`).
+   - `activeQuestions`: Questions waiting for answers (`status: 'pending'`).
+   - `uploadedKhutba`: Total khutbahs published.
 3. **Growth Logic**:
    - `changePct`: The percentage difference between current and last month.
    - `direction`: Maps the growth type to UI-friendly strings: `increase` → `"up"`, `decrease` → `"down"`, others → `"neutral"`.
-4. **Data Formatting**: Normalizes raw aggregation results into a consistent object structure for the frontend.
 
 ## Field Reference
 
@@ -56,25 +56,30 @@ Auth: Bearer {{accessToken}} (SUPER_ADMIN)
     "meta": {
       "comparisonPeriod": "month"
     },
-    "doctors": {
+    "totalUsers": {
       "value": 250,
       "changePct": 25,
       "direction": "up"
     },
-    "preferenceCards": {
-      "value": 4500,
-      "changePct": 7.14,
+    "activeUsers": {
+      "value": 200,
+      "changePct": 10,
       "direction": "up"
     },
-    "verifiedPreferenceCards": {
-      "value": 4200,
-      "changePct": 4,
-      "direction": "up"
-    },
-    "activeSubscriptions": {
-      "value": 120,
-      "changePct": 37.5,
+    "pendingVerification": {
+      "value": 15,
+      "changePct": 5,
       "direction": "down"
+    },
+    "activeQuestions": {
+      "value": 45,
+      "changePct": 20,
+      "direction": "up"
+    },
+    "uploadedKhutba": {
+      "value": 120,
+      "changePct": 15,
+      "direction": "up"
     }
   }
 }

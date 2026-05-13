@@ -63,7 +63,7 @@ All User document fields **except** the excluded list below. Notably included:
 - `_id`, `name`, `email`, `role`
 - `dateOfBirth`, `revertDate`
 - `profileImage`, `verificationImage`, `verificationVideo` (owner can review their own submission)
-- `aboutMe`, `revertStory`, `interests`, `specialty`, `hospital`
+- `aboutMe`, `revertStory`, `interests`
 - `location` (full nested object: `country`, `city`, `coordinates`)
 - `isVerified`
 - `status`
@@ -127,8 +127,6 @@ All User document fields **except** the excluded list below. Notably included:
     "aboutMe": "Short intro",
     "revertStory": "My journey…",
     "interests": ["Quran Study", "Fitness"],
-    "specialty": "Cardiology",
-    "hospital": "City Hospital",
     "location": {
       "country": "USA",
       "city": "New York",

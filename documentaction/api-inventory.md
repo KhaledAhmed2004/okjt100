@@ -112,8 +112,7 @@
 | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
 |---|---|---|---|:---:|---|---|
 | 9.1 | GET | `/admin/growth-metrics` | SUPER_ADMIN | ✅ | [Module 9.1](./modules/admin/01-growth-metrics.md) | — |
-| 9.2 | GET | `/admin/preference-cards/trends/monthly` | SUPER_ADMIN | ✅ | [Module 9.2](./modules/admin/02-monthly-preference-cards-trend.md) | — |
-| 9.3 | GET | `/admin/subscriptions/trends/monthly` | SUPER_ADMIN | ✅ | [Module 9.3](./modules/admin/03-monthly-active-subscriptions-trend.md) | — |
+| 9.2 | GET | `/admin/recent-activities` | SUPER_ADMIN | ✅ | [Module 9.2](./modules/admin/02-recent-activities.md) | — |
 
 ## Learning Content Module
 
@@ -128,3 +127,13 @@
 | 10.7 | POST | `/learning-contents/:contentId/comments` | BROTHER, SISTER | ✅ | [Module 10.7](./modules/learning-content/07-add-comment.md) | — |
 | 10.8 | GET | `/learning-contents/:contentId/comments` | Bearer | ✅ | [Module 10.8](./modules/learning-content/08-list-comments.md) | — |
 | 10.9 | DELETE | `/learning-contents/comments/:commentId` | Bearer | ✅ | [Module 10.9](./modules/learning-content/09-delete-comment.md) | — |
+
+## Dua Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 11.1 | POST | `/duas` | ADMIN, SUPER_ADMIN | ✅ | [Module 11.1](./modules/dua/01-create-dua.md) | — |
+| 11.2 | GET | `/duas` | None | ✅ | [Module 11.2](./modules/dua/02-get-all-duas.md) | — |
+| 11.3 | GET | `/duas/:duaId` | None | ✅ | [Module 11.3](./modules/dua/03-get-single-dua.md) | — |
+| 11.4 | PATCH | `/duas/:duaId` | ADMIN, SUPER_ADMIN | ✅ | [Module 11.4](./modules/dua/04-update-dua.md) | — |
+| 11.5 | DELETE | `/duas/:duaId` | ADMIN, SUPER_ADMIN | ✅ | [Module 11.5](./modules/dua/05-delete-dua.md) | — |

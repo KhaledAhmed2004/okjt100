@@ -35,8 +35,6 @@ Authorization: Bearer {{accessToken}} (SUPER_ADMIN)
 | `revertDate` | `string` | The date the user converted to Islam in Full ISO 8601 format. |
 | `status` | `string` | Account lifecycle state. Possible values: `PENDING`, `ACTIVE`, `REJECTED`, `SUSPENDED`, `INACTIVE`, `RESTRICTED`, `DELETED`. |
 | `role` | `string` | Access level. Possible values: `SUPER_ADMIN`, `ADMIN`, `BROTHER`, `SISTER`. |
-| `specialty` | `string` | Professional specialty or medical focus area. |
-| `hospital` | `string` | The hospital or institution where the user currently works. |
 | `rejectionReason` | `string` | Required if setting status to `REJECTED`. This reason is sent to the user via email. |
 | `aboutMe` | `string` | A short professional or personal biography. |
 | `revertStory` | `string` | The user's personal story of converting to Islam. |

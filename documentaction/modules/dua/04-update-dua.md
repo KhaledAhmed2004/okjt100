@@ -71,13 +71,7 @@ Optional audio upload is processed by `fileHandler`.
   "statusCode": 200,
   "message": "Dua updated successfully",
   "data": {
-    "_id": "664a1b2c3d4e5f6a7b8c9d0e",
-    "title": "Updated Title",
-    "waqt": "Fajr",
-    "details": "Updated details...",
-    "audioUrl": "http://localhost:5000/uploads/media/1715422000-new-dua.mp3",
-    "isDeleted": false,
-    "createdAt": "2026-05-13T10:30:00.000Z",
+    "id": "664a1b2c3d4e5f6a7b8c9d0e",
     "updatedAt": "2026-05-13T10:45:00.000Z"
   }
 }

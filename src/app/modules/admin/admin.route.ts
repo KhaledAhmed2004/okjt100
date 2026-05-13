@@ -14,18 +14,10 @@ router.get(
   AdminController.getDashboardStats,
 );
 
-// Preference cards monthly trend (each month’s count)
 router.get(
-  '/preference-cards/trends/monthly',
+  '/recent-activities',
   auth(USER_ROLES.SUPER_ADMIN),
-  AdminController.getPreferenceCardMonthly,
-);
-
-// Active subscriptions monthly trend (each month’s count)
-router.get(
-  '/subscriptions/trends/monthly',
-  auth(USER_ROLES.SUPER_ADMIN),
-  AdminController.getActiveSubscriptionMonthly,
+  AdminController.getRecentActivities,
 );
 
 export const AdminRoutes = router;

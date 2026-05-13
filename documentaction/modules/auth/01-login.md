@@ -40,7 +40,9 @@ Not applicable — login is public. Roles are read from the resolved user **afte
 | :--- | :--- | :--- | :--- |
 | `email` | `string` | Yes | Valid email format. |
 | `password` | `string` | Yes | Non-empty (`.min(1)`). The password-strength regex is **not** enforced on login — only on register/reset/change. |
-| `deviceToken` | `string` | No (controller-level) | If supplied, registered to the user via `User.addDeviceToken` for push delivery. |
+| `deviceToken` | `string` | No | If supplied, registered to the user via `User.addDeviceToken` for push delivery. |
+| `platform` | `enum` | No | `'ios'`, `'android'`, or `'web'`. Stored with `deviceToken`. |
+| `appVersion` | `string` | No | Stored with `deviceToken`. |
 
 Schema violations -> `400 Bad Request` from `validateRequest` with the Zod error details.
 
@@ -66,7 +68,9 @@ Schema violations -> `400 Bad Request` from `validateRequest` with the Zod error
 {
   "email": "user@example.com",
   "password": "P@ssw0rd!",
-  "deviceToken": "fcm-or-apns-token-optional"
+  "deviceToken": "fcm-or-apns-token-optional",
+  "platform": "ios",
+  "appVersion": "1.0.0"
 }
 ```
 

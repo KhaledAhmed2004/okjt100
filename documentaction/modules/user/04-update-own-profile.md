@@ -51,8 +51,6 @@ All fields are **optional**. The schema is a plain Zod object (not `.strict()`) 
 | `name` | `string` | — |
 | `aboutMe` | `string` | — |
 | `revertStory` | `string` | — |
-| `specialty` | `string` | — |
-| `hospital` | `string` | — |
 | `interests` | `string[]` | Array of strings |
 | `profileImage` | `string` | Set by `fileHandler` after upload — usually omitted in the form-data text fields |
 | `location.country` | `string` | — |
@@ -101,8 +99,6 @@ File upload is processed by `fileHandler` **before** validation, so the resultin
 | `aboutMe` | `text` | No | A short biography or intro about the user. | `New bio` |
 | `revertStory` | `text` | No | The user's personal story of converting to Islam. | `My story...` |
 | `revertDate` | `text` | No | The date the user converted to Islam in Full ISO 8601 format. | `2024-05-11T00:00:00.000Z` |
-| `specialty` | `text` | No | Professional specialty or medical focus area. | `Cardiology` |
-| `hospital` | `text` | No | The hospital where the user works. | `Central Hospital` |
 | `interests` | `array` | No | Array of strings representing user interests. | `["Quran", "Cooking"]` |
 | `profileImage` | `file` | No | Profile photo upload (multipart). | — |
 | `location[country]` | `text` | No | Country name. | `USA` |
