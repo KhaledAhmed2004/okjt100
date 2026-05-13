@@ -65,6 +65,13 @@ router.get(
   UserController.getUserDetailsById,
 );
 
+// Community Discovery (Lists active users of the same role)
+router.get(
+  '/profiles',
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
+  UserController.getUserProfiles,
+);
+
 // --- Self Management (User/Doctor) ---
 
 // Fetch own profile details

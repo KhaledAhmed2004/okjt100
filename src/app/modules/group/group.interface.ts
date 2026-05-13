@@ -1,11 +1,13 @@
 import { Schema, Document } from 'mongoose';
+import { USER_ROLES } from '../../../enums/user';
 
 export interface IGroup extends Document {
   name: string;
   description: string;
-  userType: 'Male' | 'Female';
-  categoryId: Schema.Types.ObjectId;
+  userType: USER_ROLES.BROTHER | USER_ROLES.SISTER;
+  category: string;
   memberCount: number;
+  coverImage?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,6 +26,7 @@ export interface IGroupPost extends Document {
   attachments: string[];
   likesCount: number;
   commentsCount: number;
+  isPinned: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

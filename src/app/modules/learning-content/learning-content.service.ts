@@ -4,7 +4,8 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import { ILearningContent, ILearningContentComment } from './learning-content.interface';
 import { LearningContent, LearningContentLike, LearningContentComment } from './learning-content.model';
 import { User } from '../user/user.model';
-import { USER_STATUS } from '../../../enums/user';
+import { USER_STATUS, USER_ROLES } from '../../../enums/user';
+import NotificationBuilder from '../../builder/NotificationBuilder/NotificationBuilder';
 
 const syncLikesCount = async (contentId: string) => {
   const count = await LearningContentLike.countDocuments({ contentId });
@@ -18,6 +19,28 @@ const syncCommentsCount = async (contentId: string) => {
 
 const createLearningContentIntoDB = async (payload: ILearningContent) => {
   const result = await LearningContent.create(payload);
+
+  // Broadcast to all users about new content
+  new NotificationBuilder()
+    .toRole(USER_ROLES.BROTHER)
+    .setTitle('New Learning Content')
+    .setText(`New content published: ${payload.title}`)
+    .setType('NEW_CONTENT')
+    .setResource('LearningContent', (result._id as any).toString())
+    .viaAll()
+    .send()
+    .catch(err => console.error('Notification Error:', err));
+
+  new NotificationBuilder()
+    .toRole(USER_ROLES.SISTER)
+    .setTitle('New Learning Content')
+    .setText(`New content published: ${payload.title}`)
+    .setType('NEW_CONTENT')
+    .setResource('LearningContent', (result._id as any).toString())
+    .viaAll()
+    .send()
+    .catch(err => console.error('Notification Error:', err));
+
   return result;
 };
 
@@ -103,6 +126,10 @@ const toggleLikeInDB = async (contentId: string, userId: string) => {
   try {
     await LearningContentLike.create({ contentId, userId });
     await syncLikesCount(contentId);
+
+    // Note: LearningContent usually doesn't have a single "owner" like a group post (it's admin-uploaded), 
+    // but if it did, we'd notify them here.
+    
     return { liked: true };
   } catch (err: any) {
     if (err.code === 11000) {
@@ -140,6 +167,24 @@ const addCommentInDB = async (
   });
 
   await syncCommentsCount(contentId);
+
+  // Notify parent comment owner (if reply)
+  if (parentCommentId) {
+    LearningContentComment.findById(parentCommentId).then(parent => {
+      if (parent && parent.userId.toString() !== userId) {
+        new NotificationBuilder()
+          .to(parent.userId.toString())
+          .setTitle('New Reply')
+          .setText('Someone replied to your comment.')
+          .setType('COMMENT_REPLIED')
+          .setResource('LearningContent', contentId)
+          .viaAll()
+          .send()
+          .catch(err => console.error('Notification Error:', err));
+      }
+    });
+  }
+
   return result;
 };
 

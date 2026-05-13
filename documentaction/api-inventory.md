@@ -2,11 +2,7 @@
 
 > **Tracker view** — every endpoint, its wiring status, and where it appears across screens. For full specs, follow the **Spec** column. For UX flows, follow the **On a screen?** column.
 
-> **Mount prefixes** (see `src/routes/index.ts`): `/users`, `/auth`, `/notifications`, `/subscriptions`, `/admin`, `/legal`, `/khutba`, `/mosques`, `/ask-imam`, `/groups`.
-> **Base URL:** `/api/v1`
-> **Documentation:** `/api/v1/docs` (Swagger UI)
-
-**Status legend**: ✅ Done · 🟡 Spec done, code pending · ❌ Not implemented · — Orphan / not used
+> **Mount prefixes** (see `src/routes/index.ts`): `/users`, `/auth`, `/notifications`, `/subscriptions`, `/admin`, `/legal`, `/khutba`, `/mosques`, `/ask-question`, `/groups`.
 
 ---
 
@@ -47,16 +43,17 @@
 | 2.17 | PATCH | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.17](./modules/user/17-update-user-admin.md) | — |
 | 2.18 | DELETE | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.18](./modules/user/18-delete-user-admin.md) | — |
 | 2.19 | PATCH | `/users/:userId/review` | SUPER_ADMIN | ✅ | [Module 2.19](./modules/user/21-review-user-admin.md) | — |
+| 2.20 | GET | `/users/profiles` | BROTHER / SISTER | ✅ | [Module 2.20](./modules/user/22-list-user-profiles.md) | — |
 
-## Ask Imam Module
+## Ask Question Module
 
 | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
 |---|---|---|---|:---:|---|---|
-| 3.1 | POST | `/ask-imam` | User | ✅ | [Module 3.1](./modules/ask-imam/01-submit-question.md) | — |
-| 3.2 | GET | `/ask-imam` | User / Imam | ✅ | [Module 3.2](./modules/ask-imam/02-get-all-questions.md) | — |
-| 3.3 | GET | `/ask-imam/my-questions` | User | ✅ | [Module 3.3](./modules/ask-imam/03-get-my-questions.md) | — |
-| 3.4 | PATCH | `/ask-imam/:questionId/answer` | Imam | ✅ | [Module 3.4](./modules/ask-imam/04-answer-question.md) | — |
-| 3.5 | GET | `/ask-imam/analytics` | Imam / Admin | ✅ | [Module 3.5](./modules/ask-imam/05-get-analytics.md) | — |
+| 3.1 | POST | `/ask-question` | User | ✅ | [Module 3.1](./modules/ask-question/01-submit-question.md) | — |
+| 3.2 | GET | `/ask-question` | User / Imam | ✅ | [Module 3.2](./modules/ask-question/02-get-all-questions.md) | — |
+| 3.3 | GET | `/ask-question/my-questions` | User | ✅ | [Module 3.3](./modules/ask-question/03-get-my-questions.md) | — |
+| 3.4 | PATCH | `/ask-question/:questionId/answer` | Imam | ✅ | [Module 3.4](./modules/ask-question/04-answer-question.md) | — |
+| 3.5 | GET | `/ask-question/metrics` | Imam / Admin | ✅ | [Module 3.5](./modules/ask-question/05-get-analytics.md) | — |
 
 ## Group Module
 
@@ -97,7 +94,8 @@
 | 7.1 | GET | `/notifications` | Bearer | ✅ | [Module 7.1](./modules/notification/01-get-my-notifications.md) | — |
 | 7.2 | PATCH | `/notifications/:notificationId/read` | Bearer | ✅ | [Module 7.2](./modules/notification/02-mark-as-read.md) | — |
 | 7.3 | PATCH | `/notifications/read-all` | Bearer | ✅ | [Module 7.3](./modules/notification/03-mark-all-as-read.md) | — |
-| 7.4 | DELETE | `/notifications/:notificationId` | Bearer | ✅ | [Module 7.4](./modules/notification/04-delete-notification.md) | — |
+| 7.4 | POST | `/notifications/broadcasts` | ADMIN | ✅ | [Module 7.4](./modules/notification/04-send-broadcast.md) | — |
+| 7.5 | GET | `/notifications/broadcasts` | ADMIN | ✅ | [Module 7.5](./modules/notification/05-get-sent-history.md) | — |
 
 ## Legal Module
 

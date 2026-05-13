@@ -73,7 +73,7 @@ router.post(
 
 // Get a single message by ID
 router.get(
-  '/:id',
+  '/:messageId',
   auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
   MessageController.getMessage
 );

@@ -41,6 +41,7 @@ Authorization: Bearer {{accessToken}} (SUPER_ADMIN)
 | `aboutMe` | `string` | A short professional or personal biography. |
 | `revertStory` | `string` | The user's personal story of converting to Islam. |
 | `interests` | `array` | Array of strings representing user interests (tags). |
+| `location` | `object` | Nested object with `country`, `city`, `latitude`, and `longitude`. |
 
 ## Side Effects on `status` Transitions
 The system applies status-flip side effects (e.g., bumping `tokenVersion` for lockouts, issuing re-verify tokens for `REJECTED`). See [system-concepts.md](../../system-concepts.md) for policy details.

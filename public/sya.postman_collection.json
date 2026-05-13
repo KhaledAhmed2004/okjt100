@@ -40,7 +40,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"P@ssw0rd!\",\n  \"deviceToken\": \"fcm-or-apns-token-optional\"\n}",
+              "raw": "{\n  \"email\": \"user@example.com\", // Required: Yes\n  \"password\": \"P@ssw0rd!\", // Required: Yes\n  \"deviceToken\": \"fcm-or-apns-token-optional\", // Required: No (controller-level)\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -150,7 +150,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "raw": "{\n  \"email\": \"user@example.com\", // Required: Yes\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -194,7 +194,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"newPassword\": \"NewP@ssw0rd123!\"\n}",
+              "raw": "{\n  \"newPassword\": \"NewP@ssw0rd123!\", // Required: Yes\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -330,7 +330,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\"\n}",
+              "raw": "{\n  \"email\": \"user@example.com\", // Required: Yes\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -367,7 +367,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"provider\": \"google\",\n  \"idToken\": \"eyJhbGciOiJSUzI1NiIs...\",\n  \"nonce\": \"aB3xK9mP2qR7sL4nT6vY8wXcZ1uV5oM0jE\",\n  \"deviceToken\": \"fcm-token-optional\",\n  \"platform\": \"ios\",\n  \"appVersion\": \"1.4.0\"\n}",
+              "raw": "{\n  \"provider\": \"google\", // Required: Yes\n  \"idToken\": \"eyJhbGciOiJSUzI1NiIs...\", // Required: Yes\n  \"nonce\": \"aB3xK9mP2qR7sL4nT6vY8wXcZ1uV5oM0jE\", // Required: Conditional\n  \"deviceToken\": \"fcm-token-optional\", // Required: No\n  \"platform\": \"ios\", // Required: No\n  \"appVersion\": \"1.4.0\", // Required: No\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -411,7 +411,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"OldP@ssw0rd!\",\n  \"newPassword\": \"NewP@ssw0rd123!\"\n}",
+              "raw": "{\n  \"currentPassword\": \"OldP@ssw0rd!\", // Required: Yes\n  \"newPassword\": \"NewP@ssw0rd123!\", // Required: Yes\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -448,7 +448,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"<the user's current password>\",\n  \"deviceToken\": \"fcm-or-apns-token-optional\"\n}",
+              "raw": "{\n  \"email\": \"user@example.com\", // Required: Yes\n  \"password\": \"<the user's current password>\", // Required: Yes\n  \"deviceToken\": \"fcm-or-apns-token-optional\", // Required: No\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -740,10 +740,28 @@
                   "description": "Profile photo upload (multipart)."
                 },
                 {
-                  "key": "location",
-                  "value": "{\"country\": \"UK\"}",
+                  "key": "location[country]",
+                  "value": "USA",
                   "type": "text",
-                  "description": "Nested object with `country`, `city`, and `coordinates`."
+                  "description": "Country name."
+                },
+                {
+                  "key": "location[city]",
+                  "value": "New York",
+                  "type": "text",
+                  "description": "City name."
+                },
+                {
+                  "key": "location[latitude]",
+                  "value": "40.7128",
+                  "type": "text",
+                  "description": "Latitude coordinate."
+                },
+                {
+                  "key": "location[longitude]",
+                  "value": "-74.0060",
+                  "type": "text",
+                  "description": "Longitude coordinate."
                 }
               ]
             }
@@ -784,7 +802,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"password\": \"<the user's current password>\"\n}",
+              "raw": "{\n  \"password\": \"<the user's current password>\", // Required: Yes\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -830,7 +848,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"newEmail\": \"new.address@example.com\",\n  \"password\": \"<the user's current password>\"\n}",
+              "raw": "{\n  \"newEmail\": \"new.address@example.com\", // Required: Yes\n  \"password\": \"<the user's current password>\", // Required: Yes\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -876,7 +894,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"otp\": \"123456\"\n}",
+              "raw": "{\n  \"otp\": \"123456\", // Required: Yes\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1401,11 +1419,73 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "2.20 List User Profiles (Community Discovery)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/profiles?latitude=23.8103&longitude=90.4125",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "users",
+                "profiles"
+              ],
+              "query": [
+                {
+                  "key": "latitude",
+                  "value": "23.8103"
+                },
+                {
+                  "key": "longitude",
+                  "value": "90.4125"
+                },
+                {
+                  "key": "searchTerm",
+                  "value": "John",
+                  "description": "Name regex search"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Pagination page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Pagination limit"
+                }
+              ]
+            },
+            "description": "Lists public profiles of users within the same community. Brothers see other Brothers, and Sisters see other Sisters. Only active users are listed. Includes distance calculation if coordinates are provided.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
     {
-      "name": "Ask Imam Module",
+      "name": "Ask Question Module",
       "item": [
         {
           "name": "3.1 Submit Question",
@@ -1419,12 +1499,12 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ask-imam",
+              "raw": "{{baseUrl}}/ask-question",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "ask-imam"
+                "ask-question"
               ]
             },
             "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
@@ -1470,15 +1550,15 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ask-imam",
+              "raw": "{{baseUrl}}/ask-question",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "ask-imam"
+                "ask-question"
               ]
             },
-            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "description": "",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1504,16 +1584,16 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ask-imam/my-questions",
+              "raw": "{{baseUrl}}/ask-question/my-questions",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "ask-imam",
+                "ask-question",
                 "my-questions"
               ]
             },
-            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "description": "",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1539,12 +1619,12 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ask-imam/:questionId/answer",
+              "raw": "{{baseUrl}}/ask-question/:questionId/answer",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "ask-imam",
+                "ask-question",
                 ":questionId",
                 "answer"
               ],
@@ -1555,7 +1635,7 @@
                 }
               ]
             },
-            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "description": "",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1568,7 +1648,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"answer\": \"Wudu is performed by washing the hands, mouth, nostrils, face, arms, head, and feet in the prescribed order.\"\n}",
+              "raw": "{\n  \"answer\": \"This is the formal answer to the question.\", // The formal answer text\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1579,7 +1659,7 @@
           "response": []
         },
         {
-          "name": "3.5 Get Analytics (Admin)",
+          "name": "3.5 Get Question Metrics (Admin)",
           "request": {
             "method": "GET",
             "header": [
@@ -1590,16 +1670,16 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ask-imam/analytics",
+              "raw": "{{baseUrl}}/ask-question/metrics",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "ask-imam",
-                "analytics"
+                "ask-question",
+                "metrics"
               ]
             },
-            "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "description": "",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1641,6 +1721,15 @@
             "description": "Admins can create new user groups with gender restrictions and categories.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Quran Study Circle\", // Name of the group\n  \"description\": \"A group for brothers to study Quran\", // Detailed description\n  \"userType\": \"BROTHER\", // `BROTHER` or `SISTER`\n  \"category\": \"Quran Studies\", // Category name (e.g., Quran Studies)\n  \"coverImage\": \"https://storage.com/group-cover.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -1676,17 +1765,19 @@
                 {
                   "key": "searchTerm",
                   "value": "Quran"
-                },
-                {
-                  "key": "categoryId",
-                  "value": "",
-                  "description": "Filter by category"
                 }
               ]
             },
-            "description": "Fetches a paginated list of groups. Results are automatically filtered based on the logged-in user's role (BROTHER users see Male groups, SISTER users see Female groups).",
+            "description": "Fetches a paginated list of groups. Results are automatically filtered based on the logged-in user's role.",
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "response": []
@@ -1721,7 +1812,14 @@
             },
             "description": "Allows a user to join a group.",
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "response": []
@@ -1756,7 +1854,23 @@
             },
             "description": "Members can create posts with text and optional attachments within a group.",
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Assalamu alaikum, looking forward to the next session!\", // Text content of the post\n  \"attachments\": [] // (Optional) List of image/file URLs\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -1773,7 +1887,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/:groupId/posts?page=1&limit=10",
+              "raw": "{{baseUrl}}/groups/:groupId/posts?page=1&limit=10&searchTerm=keyword",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -1790,6 +1904,10 @@
                 {
                   "key": "limit",
                   "value": "10"
+                },
+                {
+                  "key": "searchTerm",
+                  "value": "keyword"
                 }
               ],
               "variable": [
@@ -1801,7 +1919,14 @@
             },
             "description": "Fetches the paginated list of posts for a specific group.",
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "response": []
@@ -1837,7 +1962,14 @@
             },
             "description": "Toggles a like on a post. If already liked, it will be unliked.",
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "response": []
@@ -1873,7 +2005,23 @@
             },
             "description": "Members can add comments to a post.",
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comment\": \"Walaikum assalam!\", // Content of the comment\n  \"parentCommentId\": \"60d5ecb86372ad46101f1930\" // (Optional) ID of the comment being replied to\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -1981,43 +2129,6 @@
               ],
               "path": [
                 "khutba"
-              ],
-              "query": [
-                {
-                  "key": "searchTerm",
-                  "value": "",
-                  "description": "Search by title, imam, or mosqueName"
-                },
-                {
-                  "key": "page",
-                  "value": "",
-                  "description": "Page number for pagination (default: 1)"
-                },
-                {
-                  "key": "limit",
-                  "value": "",
-                  "description": "Number of items per page (default: 10)"
-                },
-                {
-                  "key": "sortBy",
-                  "value": "",
-                  "description": "Field to sort by (e.g., `date`, `createdAt`)"
-                },
-                {
-                  "key": "sortOrder",
-                  "value": "",
-                  "description": "`asc` or `desc` (default: `desc`)"
-                },
-                {
-                  "key": "startDate",
-                  "value": "",
-                  "description": "Filter by date range (YYYY-MM-DD)"
-                },
-                {
-                  "key": "endDate",
-                  "value": "",
-                  "description": "Filter by date range (YYYY-MM-DD)"
-                }
               ]
             },
             "description": "Retrieves a paginated list of all Khutbahs with search and filter options.",
@@ -2213,7 +2324,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"mosqueName\": \"Baitul Mukarram\",\n  \"address\": \"Topkhana Road, Dhaka\",\n  \"area\": \"Motijheel\",\n  \"phoneNumber\": \"+880123456789\",\n  \"website\": \"https://baitulmukarram.org\",\n  \"location\": {\n    \"latitude\": 23.7298,\n    \"longitude\": 90.4125\n  },\n  \"prayerTimes\": {\n    \"fajr\": \"04:30\",\n    \"dhuhr\": \"12:15\",\n    \"asr\": \"16:45\",\n    \"maghrib\": \"18:30\",\n    \"isha\": \"20:00\",\n    \"jummah\": \"13:30\"\n  }\n}",
+              "raw": "{\n  \"mosqueName\": \"Baitul Mukarram\", // Name of the mosque\n  \"address\": \"Topkhana Road, Dhaka\", // Full address\n  \"area\": \"Motijheel\", // Area/Neighborhood\n  \"phoneNumber\": \"+880123456789\", // Contact number\n  \"website\": \"https://baitulmukarram.org\",\n  \"location\": {, // Latitude and Longitude\n    \"type\": \"Point\",\n    \"coordinates\": [90.4125, 23.7298]\n  },\n  \"prayerTimes\": {, // 5 daily prayer times (HH:MM) and optional Jummah\n    \"fajr\": \"04:30\",\n    \"dhuhr\": \"12:15\",\n    \"asr\": \"16:45\",\n    \"maghrib\": \"18:30\",\n    \"isha\": \"20:00\",\n    \"jummah\": \"13:30\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2258,26 +2369,6 @@
                 {
                   "key": "area",
                   "value": "Motijheel"
-                },
-                {
-                  "key": "sortBy",
-                  "value": "mosqueName",
-                  "description": "Sort field (default: `mosqueName`)"
-                },
-                {
-                  "key": "sortOrder",
-                  "value": "asc",
-                  "description": "`asc` or `desc` (default: `asc`)"
-                },
-                {
-                  "key": "latitude",
-                  "value": "23.7298",
-                  "description": "User's latitude for distance calculation"
-                },
-                {
-                  "key": "longitude",
-                  "value": "90.4125",
-                  "description": "User's longitude for distance calculation"
                 }
               ]
             },
@@ -2355,7 +2446,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"prayerTimes\": {\n    \"fajr\": \"04:45\"\n  }\n}",
+              "raw": "{\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [90.4125, 23.7298]\n  },\n  \"prayerTimes\": {, // (Optional) Updated prayer times\n    \"fajr\": \"04:45\"\n  }\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2416,15 +2507,17 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/notifications",
+              "raw": "{{baseUrl}}/api/v1/notifications",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "notifications"
               ]
             },
-            "description": "0`).",
+            "description": "",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2450,11 +2543,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/notifications/:notificationId/read",
+              "raw": "{{baseUrl}}/api/v1/notifications/:notificationId/read",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "notifications",
                 ":notificationId",
                 "read"
@@ -2466,7 +2561,7 @@
                 }
               ]
             },
-            "description": "Single notification ke read mark kore. Tap-er shathe shathe (optimistic) call hoy background e.",
+            "description": "Marks a single notification as read. This is typically called immediately when a user taps on a notification.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2492,16 +2587,18 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/notifications/read-all",
+              "raw": "{{baseUrl}}/api/v1/notifications/read-all",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "notifications",
                 "read-all"
               ]
             },
-            "description": "User top-right \"Mark all as read\" button e tap korle shob notifications `isRead: true` hoy ebong red dot disappear kore.",
+            "description": "Marks all unread notifications for the logged-in user as read. Typically triggered when a user taps a \"Mark all as read\" button.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2516,9 +2613,9 @@
           "response": []
         },
         {
-          "name": "7.4 Delete Notification",
+          "name": "7.4 Send Broadcast",
           "request": {
-            "method": "DELETE",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -2527,22 +2624,64 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/notifications/:notificationId",
+              "raw": "{{baseUrl}}/api/v1/notifications/broadcasts",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "notifications",
-                ":notificationId"
-              ],
-              "variable": [
+                "broadcasts"
+              ]
+            },
+            "description": "Send a notification to a specific audience (All users, Brothers, Sisters, or Super Admins).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
                 {
-                  "key": "notificationId",
-                  "value": ""
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
                 }
               ]
             },
-            "description": "Swipe-to-delete ba long-press menu theke notification delete korar jonno. Optimistic UI: row immediately list theke remove hoy. Failure hole row restore hoy + error toast dekhay.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"System Update\", // Title of the notification.\n  \"text\": \"We have scheduled a maintenance window for tomorrow.\", // Main message content.\n  \"audience\": \"ALL\", // Targeted group (`ALL`, `BROTHER`, `SISTER`).\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7.5 Get Sent History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/notifications/broadcasts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "notifications",
+                "broadcasts"
+              ]
+            },
+            "description": "Retrieve a log of all broadcast notifications sent by admins.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -2891,6 +3030,316 @@
                   "type": "string"
                 }
               ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Learning Content Module",
+      "item": [
+        {
+          "name": "10.1 Create Learning Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents"
+              ]
+            },
+            "description": "Admin new learning content (video) create korar jonno ei endpoint use korbe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.2 List Learning Contents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents"
+              ]
+            },
+            "description": "Shob learning content browse korar jonno. Search ebong filter support kore.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.3 Get Single Learning Content",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents/:contentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents",
+                ":contentId"
+              ],
+              "variable": [
+                {
+                  "key": "contentId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Specific content details dekhar jonno.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.4 Update Learning Content",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents/:contentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents",
+                ":contentId"
+              ],
+              "variable": [
+                {
+                  "key": "contentId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Admin existing content update korar jonno use korbe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.5 Delete Learning Content",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents/:contentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents",
+                ":contentId"
+              ],
+              "variable": [
+                {
+                  "key": "contentId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Admin content delete korar jonno use korbe. Automatic likes ebong comments o delete hoye jabe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.6 Like Content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents/:contentId/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents",
+                ":contentId",
+                "like"
+              ],
+              "variable": [
+                {
+                  "key": "contentId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Toggles a like on learning content. Jodi age theke like thake, tobe unlike hoye jabe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.7 Add Comment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents/:contentId/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents",
+                ":contentId",
+                "comments"
+              ],
+              "variable": [
+                {
+                  "key": "contentId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Users can add comments or reply to existing comments.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comment\": \"Very informative, JazakAllah!\", // Content of the comment\n  \"parentCommentId\": \"60d5ecb86372ad46101f1940\", // Reply korar jonno parent comment ID\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.8 List Comments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents/:contentId/comments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents",
+                ":contentId",
+                "comments"
+              ],
+              "variable": [
+                {
+                  "key": "contentId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Specific content er shob comments dekhar jonno.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10.9 Delete Comment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/learning-contents/comments/:commentId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "learning-contents",
+                "comments",
+                ":commentId"
+              ],
+              "variable": [
+                {
+                  "key": "commentId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "User nijek comment delete korte pare, athoba Admin jekono comment delete korte pare.",
+            "auth": {
+              "type": "noauth"
             }
           },
           "response": []

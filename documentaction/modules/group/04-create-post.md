@@ -3,7 +3,7 @@
 ```http
 POST /groups/:groupId/posts
 Content-Type: application/json
-Auth: User
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 
 > Members can create posts with text and optional attachments within a group.
@@ -16,10 +16,19 @@ Auth: User
 
 ## Request Body
 
+```json
+{
+  "content": "Assalamu alaikum, looking forward to the next session!", // Text content of the post
+  "attachments": [] // (Optional) List of image/file URLs
+}
+```
+
+## Request Body Details
+
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `content` | `string` | Text content of the post |
-| `attachments` | `array` | (Optional) List of image/file URLs |
+| `attachments` | `array` | (Optional) List of image/file URLs (Max 5) |
 
 ## Implementation
 
@@ -29,6 +38,8 @@ Auth: User
 
 ### Business Logic
 1. **Membership Check**: Verifies that the user is a member of the group before allowing them to post.
+2. **`SUPER_ADMIN` Bypass**: The `SUPER_ADMIN` has implicit membership and can post in any group without joining.
+3. **Attachment Limit**: Maximum of 5 attachments are allowed per post.
 
 ## Responses
 
@@ -49,5 +60,14 @@ Auth: User
     "commentsCount": 0,
     "createdAt": "2026-05-09T10:45:00.000Z"
   }
+}
+```
+
+### Scenario: Forbidden (403)
+```json
+{
+  "success": false,
+  "statusCode": 403,
+  "message": "Only members can post"
 }
 ```

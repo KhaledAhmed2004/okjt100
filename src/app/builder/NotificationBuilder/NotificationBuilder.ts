@@ -38,13 +38,18 @@ import ScheduledNotification from './scheduler/ScheduledNotification.model';
 // enforced at the schema level, so any value here that isn't in the enum
 // will be rejected at insert time.
 export type NotificationType =
-  | 'PREFERENCE_CARD_CREATED'
-  | 'EVENT_SCHEDULED'
-  | 'GENERAL'
   | 'ADMIN'
   | 'SYSTEM'
-  | 'MESSAGE'
-  | 'REMINDER';
+  | 'QUESTION_ANSWERED'
+  | 'NEW_QUESTION'
+  | 'POST_LIKED'
+  | 'POST_COMMENTED'
+  | 'COMMENT_REPLIED'
+  | 'CONTENT_LIKED'
+  | 'CONTENT_COMMENTED'
+  | 'NEW_CONTENT'
+  | 'NEW_KHUTBAH'
+  | 'MOSQUE_UPDATE';
 
 export interface INotificationTemplate {
   name: string;

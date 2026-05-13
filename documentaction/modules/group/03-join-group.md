@@ -3,7 +3,7 @@
 ```http
 POST /groups/:groupId/join
 Content-Type: application/json
-Auth: User
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 
 > Allows a user to join a group.
@@ -23,6 +23,10 @@ Auth: User
 ### Business Logic
 1. **Transaction**: Uses a database session to atomically create the membership and increment the `memberCount` in the Group model.
 2. **Validation**: Checks if the user is already a member.
+3. **Role Restriction**:
+    - `BROTHER` can only join `BROTHER` groups.
+    - `SISTER` can only join `SISTER` groups.
+    - **`SUPER_ADMIN`**: Can join any group (bypasses role check).
 
 ## Responses
 
@@ -39,5 +43,14 @@ Auth: User
     "role": "member",
     "joinedAt": "2026-05-09T10:30:00.000Z"
   }
+}
+```
+
+### Scenario: Forbidden (403)
+```json
+{
+  "success": false,
+  "statusCode": 403,
+  "message": "This group is only for BROTHERs. You are a SISTER."
 }
 ```

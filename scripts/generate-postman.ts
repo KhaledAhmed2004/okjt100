@@ -100,9 +100,12 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
   let bodyRaw = null;
   if (requestBodySectionMatch) {
     const sectionContent = requestBodySectionMatch[1];
-    const jsonMatch = sectionContent.match(/```json\n([\s\S]*?)```/);
+    const jsonMatch = sectionContent.match(/```json\s*\n([\s\S]*?)```/);
     bodyRaw = jsonMatch ? jsonMatch[1].trim() : null;
   }
+
+  // Map to store field descriptions for comment injection
+  const fieldDescriptions: Record<string, string> = {};
 
   // Extract Request Body (Multipart Form-Data / Form Data)
   let isMultipart = headersAndAuth.toLowerCase().includes('multipart/form-data');
@@ -117,53 +120,58 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
 
   const formData: any[] = [];
   
-  if (isMultipart) {
-    // Look for all tables in sections that might contain request body info
-    const bodySections = content.split(/\n## /);
-    let bestTable: string[] | null = null;
-    let bestScore = -1;
+  // Look for all tables in sections that might contain request body info (for both JSON and Multipart)
+  const bodySections = content.split(/\n## /);
+  let bestTable: string[] | null = null;
+  let bestScore = -1;
 
-    for (const section of bodySections) {
-      if (section.toLowerCase().includes('request body') || section.toLowerCase().includes('input validation')) {
-        const tableMatch = section.match(/(\| (?:Key|Field) \| (?:Value Type|Type) \| [\s\S]*?\n\| :--- \|[\s\S]*?)(?:\n\n|\n#|$)/);
-        if (tableMatch) {
-          const lines = tableMatch[1].trim().split('\n');
-          const header = lines[0].toLowerCase();
-          let score = 0;
-          if (header.includes('example')) score += 10;
-          if (header.includes('description')) score += 5;
-          if (section.toLowerCase().includes('request body')) score += 20;
+  for (const section of bodySections) {
+    if (section.toLowerCase().includes('request body') || section.toLowerCase().includes('input validation')) {
+      const tableMatch = section.match(/(\| (?:Key|Field) \| (?:Value Type|Type|Description) \| [\s\S]*?\n\| :--- \|[\s\S]*?)(?:\n\n|\n#|$)/i);
+      if (tableMatch) {
+        const lines = tableMatch[1].trim().split('\n');
+        const header = lines[0].toLowerCase();
+        let score = 0;
+        if (header.includes('example')) score += 10;
+        if (header.includes('description')) score += 5;
+        if (section.toLowerCase().includes('request body')) score += 20;
 
-          if (score > bestScore) {
-            bestScore = score;
-            bestTable = lines;
-          }
+        if (score > bestScore) {
+          bestScore = score;
+          bestTable = lines;
         }
       }
     }
-    
-    if (bestTable) {
-      const sectionLines = bestTable;
-      const header = sectionLines[0].split('|').map(c => c.trim().toLowerCase()).filter(c => c !== '');
+  }
+  
+  if (bestTable) {
+    const sectionLines = bestTable;
+    const header = sectionLines[0].split('|').map(c => c.trim().toLowerCase()).filter(c => c !== '');
 
-      const keyIdx = header.findIndex(h => h.includes('field') || h.includes('key'));
-      const typeIdx = header.findIndex(h => h.includes('type'));
-      const descIdx = header.findIndex(h => h.includes('description'));
-      const exampleIdx = header.findIndex(h => h.includes('example'));
-      const requiredIdx = header.findIndex(h => h.includes('required'));
+    const keyIdx = header.findIndex(h => h.includes('field') || h.includes('key'));
+    const typeIdx = header.findIndex(h => h.includes('type'));
+    const descIdx = header.findIndex(h => h.includes('description'));
+    const exampleIdx = header.findIndex(h => h.includes('example'));
+    const requiredIdx = header.findIndex(h => h.includes('required'));
 
-      for (let i = 2; i < sectionLines.length; i++) {
-        const columns = sectionLines[i].split('|').map(c => c.trim());
-        if (sectionLines[i].trim().startsWith('|')) columns.shift();
-        if (sectionLines[i].trim().endsWith('|')) columns.pop();
+    for (let i = 2; i < sectionLines.length; i++) {
+      const columns = sectionLines[i].split('|').map(c => c.trim());
+      if (sectionLines[i].trim().startsWith('|')) columns.shift();
+      if (sectionLines[i].trim().endsWith('|')) columns.pop();
 
-        if (columns.length > 0 && keyIdx !== -1) {
-          let key = columns[keyIdx]?.replace(/`/g, '') || '';
-          let type = typeIdx !== -1 ? columns[typeIdx].toLowerCase() : 'string';
-          let description = descIdx !== -1 ? columns[descIdx] : (requiredIdx !== -1 ? `Required: ${columns[requiredIdx]}` : '');
-          let exampleValue = exampleIdx !== -1 ? columns[exampleIdx]?.replace(/`/g, '') : '';
+      if (columns.length > 0 && keyIdx !== -1) {
+        let key = columns[keyIdx]?.replace(/`/g, '') || '';
+        let type = typeIdx !== -1 ? columns[typeIdx].toLowerCase() : 'string';
+        let description = descIdx !== -1 ? columns[descIdx] : (requiredIdx !== -1 ? `Required: ${columns[requiredIdx]}` : '');
+        let exampleValue = exampleIdx !== -1 ? columns[exampleIdx]?.replace(/`/g, '') : '';
 
-          if (key) {
+        if (key) {
+          // Store description for JSON comment injection
+          if (description && description !== '—') {
+            fieldDescriptions[key] = description;
+          }
+
+          if (isMultipart) {
             const isFile = type.includes('file') || key.toLowerCase().includes('image') || key.toLowerCase().includes('video');
             
             if (!exampleValue && description) {
@@ -196,6 +204,25 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
         }
       }
     }
+  }
+
+  // Inject comments into bodyRaw if descriptions are available
+  if (bodyRaw && Object.keys(fieldDescriptions).length > 0) {
+    const lines = bodyRaw.split('\n');
+    const updatedLines = lines.map(line => {
+      // Look for lines like "key": "value", or "key": value,
+      const keyMatch = line.match(/^\s*"(.*?)"\s*:/);
+      if (keyMatch) {
+        const key = keyMatch[1];
+        if (fieldDescriptions[key] && !line.includes('//')) {
+          // Append comment to the end of the line
+          const comma = line.trim().endsWith(',') ? '' : '';
+          return `${line.replace(/,?\s*$/, '')}, // ${fieldDescriptions[key]}`;
+        }
+      }
+      return line;
+    });
+    bodyRaw = updatedLines.join('\n');
   }
 
   // Parse path and query params
@@ -586,8 +613,8 @@ ${socketDocs}
     };
 
     // Regex for table rows: | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
-    // Example: | 1.1 | POST | `/auth/login` | Public | ✅ | [Module 1.1](./modules/auth/01-login.md) |
-    const rowRegex = /\| ([\d.]+) \| (GET|POST|PUT|PATCH|DELETE) \| `(.*?)` \| .*? \| .*? \| \[(.*?)\]\((.*?)\) \|/;
+    // Flexible regex that handles optional backticks around the endpoint
+    const rowRegex = /\| ([\d.]+) \| (GET|POST|PUT|PATCH|DELETE) \| `?(.*?)`? \| .*? \| .*? \| \[(.*?)\]\((.*?)\) \|/;
     
     for (const line of lines) {
       const match = rowRegex.exec(line);

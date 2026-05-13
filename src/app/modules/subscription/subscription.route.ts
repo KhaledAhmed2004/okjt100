@@ -95,7 +95,7 @@ router.get(
 );
 
 router.get(
-  '/admin/:id',
+  '/admin/:subscriptionId',
   auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
   SubscriptionController.getSubscriptionByIdController
 );

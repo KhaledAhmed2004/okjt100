@@ -112,7 +112,11 @@ const updateUserReview = catchAsync(async (req: Request, res: Response) => {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'User review status updated',
-    data: result,
+    data: {
+      id: result?._id,
+      status: result?.status,
+      updatedAt: result?.updatedAt,
+    },
   });
 });
 
@@ -196,6 +200,19 @@ const getUserMetrics = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'User metrics retrieved',
     data: result,
+  });
+});
+
+const getUserProfiles = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user as JwtPayload;
+  const result = await UserService.getUserProfilesFromDB(user, req.query);
+
+  sendResponse(res, {
+    success: true,
+    statusCode: StatusCodes.OK,
+    message: 'User profiles fetched successfully',
+    meta: result.meta,
+    data: result.data,
   });
 });
 
@@ -368,4 +385,5 @@ export const UserController = {
   revokeMySession,
   revokeAllMySessions,
   reverifyAccount,
+  getUserProfiles,
 };

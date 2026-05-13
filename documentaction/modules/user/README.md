@@ -33,8 +33,7 @@
 | 16 | GET | `/users/:userId` | SUPER_ADMIN | [16-get-user-admin.md](./16-get-user-admin.md) |
 | 17 | PATCH | `/users/:userId` | SUPER_ADMIN | [17-update-user-admin.md](./17-update-user-admin.md) |
 | 18 | DELETE | `/users/:userId` | SUPER_ADMIN | [18-delete-user-admin.md](./18-delete-user-admin.md) |
-| 19 | PATCH | `/users/approve/:id` | SUPER_ADMIN | [19-approve-user-admin.md](./19-approve-user-admin.md) |
-| 20 | PATCH | `/users/reject/:id` | SUPER_ADMIN | [20-reject-user-admin.md](./20-reject-user-admin.md) |
+| 19 | PATCH | `/users/:userId/review` | SUPER_ADMIN | [21-review-user-admin.md](./21-review-user-admin.md) |
 
 > Admin-side user-management endpoints (list, stats, update, delete, approve/reject) have been consolidated into this module under `/api/v1/users/*`.
 

@@ -82,14 +82,20 @@ const updateUserZodSchema = z.object({
       }, z.array(z.string()))
       .optional(),
     profileImage: z.string().optional(),
-    location: z.object({
-      country: z.string().optional(),
-      city: z.string().optional(),
-      coordinates: z.object({
-        lat: z.number().min(-90).max(90),
-        lng: z.number().min(-180).max(180)
-      }).optional()
-    }).optional()
+    location: z.union([
+      z.object({
+        country: z.string().optional(),
+        city: z.string().optional(),
+        latitude: z.preprocess((v) => (v === '' ? undefined : Number(v)), z.number().min(-90).max(90)),
+        longitude: z.preprocess((v) => (v === '' ? undefined : Number(v)), z.number().min(-180).max(180))
+      }),
+      z.object({
+        country: z.string().optional(),
+        city: z.string().optional(),
+        type: z.literal('Point'),
+        coordinates: z.tuple([z.number(), z.number()])
+      })
+    ]).optional()
   }),
 });
 
@@ -161,6 +167,20 @@ export const UserValidation = {
           return v;
         }, z.array(z.string()))
         .optional(),
+      location: z.union([
+        z.object({
+          country: z.string().optional(),
+          city: z.string().optional(),
+          latitude: z.preprocess((v) => (v === '' ? undefined : Number(v)), z.number().min(-90).max(90)).optional(),
+          longitude: z.preprocess((v) => (v === '' ? undefined : Number(v)), z.number().min(-180).max(180)).optional()
+        }),
+        z.object({
+          country: z.string().optional(),
+          city: z.string().optional(),
+          type: z.literal('Point'),
+          coordinates: z.tuple([z.number(), z.number()])
+        })
+      ]).optional()
     }),
   }),
   getUserDetailsZodSchema: z.object({

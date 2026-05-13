@@ -1,47 +1,50 @@
 import express from 'express';
-import auth from '../../middlewares/auth';
 import { USER_ROLES } from '../../../enums/user';
-import { NotificationController } from './notification.controller';
+import auth from '../../middlewares/auth';
 import validateRequest from '../../middlewares/validateRequest';
-import {
-  listNotificationsSchema,
-  markReadSchema,
-  paramIdSchema,
-} from './notification.validation';
+import { NotificationController } from './notification.controller';
+import { NotificationValidation } from './notification.validation';
 
 const router = express.Router();
 
-// Notification list + unread count
+// ==================== NOTIFICATIONS (unified for all roles) ====================
+
+// Fetch notifications + unread count
 router.get(
   '/',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(listNotificationsSchema),
-  NotificationController.listMyNotifications
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
+  NotificationController.getNotificationFromDB
 );
 
-// Mark specific notification as read
-router.patch(
-  '/:notificationId/read',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(markReadSchema),
-  NotificationController.markRead
-);
-
-// Mark all notifications as read
+// Mark all notifications as read (fixed path BEFORE param path)
 router.patch(
   '/read-all',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  NotificationController.markAllRead
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
+  NotificationController.readAllNotifications
 );
 
-// Delete notification
-router.delete(
-  '/:notificationId',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(paramIdSchema),
-  NotificationController.deleteNotification
+// Mark a notification as read
+router.patch(
+  '/:notificationId/read',
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
+  NotificationController.readNotification
+);
+
+// ==================== ADMIN BROADCAST TOOLS ====================
+
+// Sent notification history
+router.get(
+  '/broadcasts',
+  auth(USER_ROLES.SUPER_ADMIN),
+  NotificationController.getSentHistory,
+);
+
+// Send notification to students
+router.post(
+  '/broadcasts',
+  auth(USER_ROLES.SUPER_ADMIN),
+  validateRequest(NotificationValidation.sendNotification),
+  NotificationController.sendNotification,
 );
 
 export const NotificationRoutes = router;
-
-

@@ -3,7 +3,7 @@
 ```http
 POST /groups/posts/:postId/comments
 Content-Type: application/json
-Auth: User
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 
 > Members can add comments to a post.
@@ -16,6 +16,15 @@ Auth: User
 
 ## Request Body
 
+```json
+{
+  "comment": "Walaikum assalam!", // Content of the comment
+  "parentCommentId": "60d5ecb86372ad46101f1930" // (Optional) ID of the comment being replied to
+}
+```
+
+## Request Body Details
+
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `comment` | `string` | Content of the comment |
@@ -26,6 +35,12 @@ Auth: User
 - **Route**: `group.route.ts`
 - **Controller**: `group.controller.ts` — `addComment`
 - **Service**: `group.service.ts` — `addCommentInDB`
+
+### Business Logic
+- **Threading**: Supports one level of nesting (replies).
+- **Notifications**: 
+    - Notifies the post owner of a new comment.
+    - Notifies the parent comment owner of a new reply.
 
 ## Responses
 

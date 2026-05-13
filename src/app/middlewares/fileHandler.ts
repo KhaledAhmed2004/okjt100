@@ -233,13 +233,26 @@ const optimizeFile = async (
   let buffer = storageMode === 'memory' ? file.buffer : undefined;
 
   if (isImage) {
-    let sharpInstance = storageMode === 'local' ? sharp(file.path).resize(800) : sharp(buffer!).resize(800);
-    if (file.mimetype === 'image/png') sharpInstance = sharpInstance.png({ compressionLevel: 8, palette: true });
-    else if (file.mimetype === 'image/webp') sharpInstance = sharpInstance.webp({ quality: 80 });
+    let sharpInstance;
+    if (storageMode === 'local') {
+      // Read file into buffer first to avoid locking issues on Windows when writing back to same path
+      const inputBuffer = await fs.promises.readFile(file.path);
+      sharpInstance = sharp(inputBuffer).resize(800);
+    } else {
+      sharpInstance = sharp(buffer!).resize(800);
+    }
+
+    if (file.mimetype === 'image/png')
+      sharpInstance = sharpInstance.png({ compressionLevel: 8, palette: true });
+    else if (file.mimetype === 'image/webp')
+      sharpInstance = sharpInstance.webp({ quality: 80 });
     else sharpInstance = sharpInstance.jpeg({ quality: 80 });
 
-    if (storageMode === 'memory') buffer = await sharpInstance.toBuffer();
-    else await sharpInstance.toFile(file.path);
+    if (storageMode === 'memory') {
+      buffer = await sharpInstance.toBuffer();
+    } else {
+      await sharpInstance.toFile(file.path);
+    }
   }
 
   if (isVideo && storageMode === 'memory') {
@@ -253,17 +266,27 @@ const generateFileUrl = async (
   file: Express.Multer.File,
   storageMode: 'local' | 'memory',
   provider: CloudProvider,
-  baseUrl: string
+  baseUrl: string,
+  folder: string
 ) => {
-  const canonicalFolder = getFolderByMime(file.mimetype);
-  if (storageMode === 'local') {
-    // Generate relative URL path
-    const relativePath = file.path.split('uploads')[1].replace(/\\/g, '/');
-    return `${baseUrl}/uploads${relativePath}`;
-  }
+  // 1. Optimize/Process file (resize images, etc.)
   const buffer = await optimizeFile(file, storageMode);
+
+  if (storageMode === 'local') {
+    // 2. Generate relative URL path safely
+    const normalizedPath = file.path.replace(/\\/g, '/');
+    const parts = normalizedPath.split('/uploads/');
+    const relativePart = parts[parts.length - 1];
+
+    // Ensure baseUrl doesn't have trailing slash and relativePart doesn't have leading slash
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+    return `${cleanBaseUrl}/uploads/${relativePart}`;
+  }
+
+  // 3. Cloud Storage path
   const ext = file.mimetype.split('/')[1];
   const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+
   return provider.upload(buffer!, fileName, folder, file.mimetype);
 };
 
@@ -322,12 +345,14 @@ const processFilesToUrls = async (
   filesByField: Record<string, Express.Multer.File[]>,
   storageMode: 'local' | 'memory',
   provider: CloudProvider,
-  baseUrl: string
+  baseUrl: string,
+  opts: FileHandlerOptions
 ): Promise<ProcessedFiles> => {
   const processed: ProcessedFiles = {};
   for (const [fieldName, fileArray] of Object.entries(filesByField)) {
+    const folder = opts.perFieldSubfolder?.[fieldName] || getFolderByMime(fileArray[0].mimetype);
     const urls = await Promise.all(
-      fileArray.map(file => generateFileUrl(file, storageMode, provider, baseUrl))
+      fileArray.map(file => generateFileUrl(file, storageMode, provider, baseUrl, folder))
     );
     processed[fieldName] = fileArray.length > 1 ? urls : urls[0];
   }
@@ -415,7 +440,8 @@ export const fileHandler = (
             filesByField,
             resolved.storageMode!,
             provider,
-            effectiveBaseUrl
+            effectiveBaseUrl,
+            resolved
           );
           req.body = { ...req.body, ...processedFiles };
         }

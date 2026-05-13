@@ -88,6 +88,17 @@ const getUserProfileFromDB = async (
     throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
   }
 
+  // Flatten location for consistency with list API
+  if (isExistUser.location) {
+    (isExistUser as any).country = isExistUser.location.country;
+    (isExistUser as any).city = isExistUser.location.city;
+    if (isExistUser.location.coordinates) {
+      (isExistUser as any).latitude = isExistUser.location.coordinates[1];
+      (isExistUser as any).longitude = isExistUser.location.coordinates[0];
+    }
+    delete isExistUser.location;
+  }
+
   return isExistUser as Partial<IUser>;
 };
 
@@ -109,6 +120,18 @@ const updateProfileToDB = async (
   //unlink file here
   if (payload.profileImage) {
     unlinkFile(isExistUser.profileImage);
+  }
+
+  // Transform legacy location format {latitude, longitude} to GeoJSON [longitude, latitude]
+  if (payload.location) {
+    const { latitude, longitude, ...remainingLocation } = payload.location as any;
+    if (latitude !== undefined && longitude !== undefined) {
+      payload.location = {
+        ...remainingLocation,
+        type: 'Point',
+        coordinates: [longitude, latitude],
+      } as any;
+    }
   }
 
   const updateDoc = await User.findOneAndUpdate({ _id: id }, payload, {
@@ -232,7 +255,7 @@ const getAllUserRolesFromDB = async (query: Record<string, unknown>) => {
   ];
 
   const sortStage: PipelineStage = {
-    $sort: { [sortBy as string]: sortOrder === 'desc' ? -1 : 1 },
+    $sort: { [sortBy as string]: sortOrder === -1 ? -1 : 1 },
   };
 
   const paginatedPipeline: PipelineStage[] = [
@@ -252,19 +275,138 @@ const getAllUserRolesFromDB = async (query: Record<string, unknown>) => {
     User.aggregate(countPipeline),
   ]);
 
-  const total = countResult[0]?.total || 0;
+  const total = countResult.length > 0 ? countResult[0].total : 0;
   const totalPages = Math.ceil(total / Number(limit));
+
   return {
     meta: {
       page: Number(page),
       limit: Number(limit),
       total,
       totalPages,
-      hasNext: Number(page) < totalPages,
-      hasPrev: Number(page) > 1,
     },
     data,
   };
+};
+
+const getUserProfilesFromDB = async (
+  user: JwtPayload,
+  query: Record<string, unknown>,
+) => {
+  const { 
+    searchTerm, 
+    page = 1, 
+    limit = 10, 
+    latitude, 
+    longitude,
+    sortBy = 'createdAt',
+    sortOrder = 'desc'
+  } = query;
+
+  // Enforce same-role discovery and ACTIVE status only
+  const match: Record<string, any> = {
+    role: user.role,
+    status: USER_STATUS.ACTIVE,
+    _id: { $ne: new Types.ObjectId(user.id) }, // Exclude self
+    deletedAt: { $exists: false }
+  };
+
+  if (searchTerm) {
+    match.$or = [
+      { name: { $regex: searchTerm, $options: 'i' } },
+      { specialty: { $regex: searchTerm, $options: 'i' } },
+      { hospital: { $regex: searchTerm, $options: 'i' } }
+    ];
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+  const pipeline: PipelineStage[] = [];
+
+  // 1. Proximity Search (Industry Standard MongoDB Design)
+  if (latitude && longitude) {
+    const userLat = parseFloat(latitude as string);
+    const userLng = parseFloat(longitude as string);
+
+    if (!isNaN(userLat) && !isNaN(userLng)) {
+      pipeline.push({
+        $geoNear: {
+          near: { type: 'Point', coordinates: [userLng, userLat] },
+          distanceField: 'distanceInKm',
+          spherical: true,
+          distanceMultiplier: 0.001, // Convert meters to km
+          query: match, // Inject existing filters (role, status, self-exclusion)
+        },
+      });
+    } else {
+      pipeline.push({ $match: match });
+    }
+  } else {
+    pipeline.push({ $match: match });
+    
+    // Default sorting if no proximity search
+    const sortField = sortBy as string;
+    const sortDir = sortOrder === 'asc' ? 1 : -1;
+    pipeline.push({ $sort: { [sortField]: sortDir } });
+  }
+
+  // 2. Projection & Derived Fields
+  pipeline.push({
+    $project: {
+      _id: 1,
+      name: 1,
+      profileImage: 1,
+      revertDate: 1,
+      specialty: 1,
+      hospital: 1,
+      // Flatten GeoJSON back for UI compatibility
+      country: '$location.country',
+      city: '$location.city',
+      latitude: { $arrayElemAt: ['$location.coordinates', 1] },
+      longitude: { $arrayElemAt: ['$location.coordinates', 0] },
+      distanceInKm: 1,
+      age: {
+        $dateDiff: {
+          startDate: '$dateOfBirth',
+          endDate: '$$NOW',
+          unit: 'year',
+        },
+      },
+      createdAt: 1
+    },
+  });
+
+  // 3. Pagination Facet
+  pipeline.push({
+    $facet: {
+      data: [{ $skip: skip }, { $limit: Number(limit) }],
+      totalCount: [{ $count: 'total' }],
+    },
+  });
+
+  const result = await User.aggregate(pipeline);
+  const data = result[0].data;
+  const total = result[0].totalCount[0]?.total || 0;
+  const totalPages = Math.ceil(total / Number(limit));
+
+  return {
+    data,
+    meta: {
+      page: Number(page),
+      limit: Number(limit),
+      total,
+      totalPages,
+    },
+  };
+};
+
+const getUserByIdFromDB = async (id: string): Promise<IUser | null> => {
+  const isExistUser = await User.findById(id).select(
+    '-password -authentication -tokenVersion -deviceTokens -deletedAt',
+  );
+  if (!isExistUser) {
+    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
+  }
+  return isExistUser;
 };
 
 // Statuses that should make every live JWT for the user stop working
@@ -393,7 +535,20 @@ const updateUserByAdminInDB = async (id: string, payload: Partial<IUser>) => {
   if (payload.email !== undefined) (user as any).email = payload.email;
   if (payload.dateOfBirth !== undefined) (user as any).dateOfBirth = payload.dateOfBirth;
   if (payload.revertDate !== undefined) (user as any).revertDate = payload.revertDate;
-  if (payload.location !== undefined) (user as any).location = payload.location;
+  
+  if (payload.location !== undefined) {
+    const { latitude, longitude, ...remainingLocation } = payload.location as any;
+    if (latitude !== undefined && longitude !== undefined) {
+      (user as any).location = {
+        ...remainingLocation,
+        type: 'Point',
+        coordinates: [longitude, latitude],
+      };
+    } else {
+      (user as any).location = payload.location;
+    }
+  }
+
   if (payload.gender !== undefined) (user as any).gender = payload.gender;
   if (payload.profileImage !== undefined) (user as any).profileImage = payload.profileImage;
   if (payload.status !== undefined) (user as any).status = payload.status;
@@ -449,16 +604,6 @@ const updateUserByAdminInDB = async (id: string, payload: Partial<IUser>) => {
   return plain as IUser;
 };
 
-// Approve user
-const getUserByIdFromDB = async (id: string) => {
-  // Only return user info; remove task/bid side data
-  const user = await User.findById(id).select('-password -authentication');
-  if (!user) {
-    throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
-  }
-  return { user };
-};
-
 const getUserDetailsByIdFromDB = async (id: string, requester: JwtPayload) => {
   const user = await User.findById(id).select(
     '_id name role profileImage location isVerified revertDate aboutMe revertStory interests specialty hospital createdAt status deletedAt'
@@ -485,6 +630,10 @@ const getUserDetailsByIdFromDB = async (id: string, requester: JwtPayload) => {
   if (result.location) {
     (result as any).country = result.location.country;
     (result as any).city = result.location.city;
+    if (result.location.coordinates) {
+      (result as any).latitude = result.location.coordinates[1];
+      (result as any).longitude = result.location.coordinates[0];
+    }
     delete result.location;
   }
 
@@ -995,4 +1144,5 @@ export const UserService = {
   revokeMySessionFromDB,
   revokeAllMySessionsFromDB,
   reverifyAccountFromDB,
+  getUserProfilesFromDB,
 };

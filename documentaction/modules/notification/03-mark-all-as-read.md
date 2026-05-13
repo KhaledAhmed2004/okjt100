@@ -1,12 +1,31 @@
 # 03. Mark All as Read
 
 ```http
-PATCH /notifications/read-all
+PATCH /api/v1/notifications/read-all
 Auth: Bearer {{accessToken}}
 ```
 
-> User top-right "Mark all as read" button e tap korle shob notifications `isRead: true` hoy ebong red dot disappear kore.
+> Marks all unread notifications for the logged-in user as read. Typically triggered when a user taps a "Mark all as read" button.
 
-**Business Logic (`markAllRead`):**
-- **Bulk Update**: `updateMany` use kore ek-i call-e user-er shob unread notifications read mark kora hoy.
-- **Idempotency**: Jodi kono unread notification na thake, tobeo request successful hobe (0 documents updated).
+## Implementation
+- **Route**: [notification.routes.ts](file:///src/app/modules/notification/notification.routes.ts)
+- **Controller**: [notification.controller.ts](file:///src/app/modules/notification/notification.controller.ts) — `readAllNotifications`
+- **Service**: [notification.service.ts](file:///src/app/modules/notification/notification.service.ts) — `markAllNotificationsAsRead`
+
+**Business Logic (`readAllNotifications`):**
+- **Bulk Update**: Uses `updateMany` to efficiently mark all of the user's unread notifications as read in a single database operation.
+- **Idempotency**: If there are no unread notifications, the request will still succeed, reporting 0 documents updated.
+
+## Responses
+
+### Scenario: Success (200)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "All notifications marked as read",
+  "data": {
+    "updated": 5
+  }
+}
+```

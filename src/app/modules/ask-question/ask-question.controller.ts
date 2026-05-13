@@ -63,13 +63,13 @@ const answerQuestion = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getAnalytics = catchAsync(async (req: Request, res: Response) => {
-  const result = await AskQuestionService.getAnalyticsFromDB();
+const getQuestionMetrics = catchAsync(async (req: Request, res: Response) => {
+  const result = await AskQuestionService.getQuestionMetricsFromDB();
 
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
-    message: 'Analytics fetched successfully',
+    message: 'Question metrics retrieved',
     data: result,
   });
 });
@@ -79,5 +79,5 @@ export const AskQuestionController = {
   getAllQuestions,
   getMyQuestions,
   answerQuestion,
-  getAnalytics,
+  getQuestionMetrics,
 };

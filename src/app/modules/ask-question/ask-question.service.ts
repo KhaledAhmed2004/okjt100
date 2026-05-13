@@ -3,6 +3,9 @@ import ApiError from '../../../errors/ApiError';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { IAskQuestion } from './ask-question.interface';
 import AskQuestion from './ask-question.model';
+import NotificationBuilder from '../../builder/NotificationBuilder/NotificationBuilder';
+
+import AggregationBuilder from '../../builder/AggregationBuilder';
 
 const submitQuestionIntoDB = async (payload: Partial<IAskQuestion>) => {
   const result = await AskQuestion.create(payload);
@@ -56,18 +59,61 @@ const answerQuestionInDB = async (id: string, answer: string) => {
   if (!result) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Question not found');
   }
+
+  // Notify the user
+  if (result.userId) {
+    new NotificationBuilder()
+      .to(result.userId.toString())
+      .setTitle('Question Answered')
+      .setText('An Imam has answered your question.')
+      .setType('QUESTION_ANSWERED')
+      .setResource('AskQuestion', id)
+      .viaAll()
+      .send()
+      .catch(err => console.error('Notification Error:', err));
+  }
+
   return result;
 };
 
-const getAnalyticsFromDB = async () => {
-  const total = await AskQuestion.countDocuments();
-  const pending = await AskQuestion.countDocuments({ status: 'pending' });
-  const answered = await AskQuestion.countDocuments({ status: 'answered' });
+const getQuestionMetricsFromDB = async () => {
+  const aggregationBuilder = new AggregationBuilder(AskQuestion);
+
+  // Total questions growth
+  const totalStats = await aggregationBuilder.calculateGrowth({ period: 'month' });
+
+  // Answered questions growth
+  aggregationBuilder.reset();
+  const answeredStats = await aggregationBuilder.calculateGrowth({
+    filter: { status: 'answered' },
+    period: 'month',
+  });
+
+  // Pending questions growth
+  aggregationBuilder.reset();
+  const pendingStats = await aggregationBuilder.calculateGrowth({
+    filter: { status: 'pending' },
+    period: 'month',
+  });
+
+  const formatMetric = (stat: any) => ({
+    value: stat.total,
+    changePct: stat.growth,
+    direction:
+      stat.growthType === 'increase'
+        ? 'up'
+        : stat.growthType === 'decrease'
+          ? 'down'
+          : 'neutral',
+  });
 
   return {
-    total,
-    pending,
-    answered,
+    meta: {
+      comparisonPeriod: 'month',
+    },
+    totalQuestions: formatMetric(totalStats),
+    answeredQuestions: formatMetric(answeredStats),
+    pendingQuestions: formatMetric(pendingStats),
   };
 };
 
@@ -76,5 +122,5 @@ export const AskQuestionService = {
   getAllQuestionsFromDB,
   getMyQuestionsFromDB,
   answerQuestionInDB,
-  getAnalyticsFromDB,
+  getQuestionMetricsFromDB,
 };

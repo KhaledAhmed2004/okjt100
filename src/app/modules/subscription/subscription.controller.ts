@@ -162,7 +162,7 @@ export const getPendingWebhooksController = catchAsync(
 
 export const getSubscriptionByIdController = catchAsync(
   async (req: Request, res: Response) => {
-    const result = await SubscriptionService.getSubscriptionById(req.params.id);
+    const result = await SubscriptionService.getSubscriptionById(req.params.subscriptionId);
     sendResponse(res, {
       success: true,
       statusCode: httpStatus.OK,

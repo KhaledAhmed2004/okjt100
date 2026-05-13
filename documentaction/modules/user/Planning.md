@@ -119,10 +119,8 @@ Users can update their About Me, Revert Story, Interests, Profile Image, and Loc
   "location": {
     "country": "string",
     "city": "string",
-    "coordinates": {
-      "lat": "number",
-      "lng": "number"
-    }
+    "latitude": "number",
+    "longitude": "number"
   },
   "status": "pending | approved | rejected | suspended | deleted",
   "rejectionReason": "string",

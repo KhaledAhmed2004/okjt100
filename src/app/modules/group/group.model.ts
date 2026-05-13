@@ -1,14 +1,16 @@
 import { Schema, model } from 'mongoose';
 import { IGroup, IGroupMember, IGroupPost, IPostLike, IPostComment } from './group.interface';
+import { USER_ROLES } from '../../../enums/user';
 
 // 1. Group Schema
 const GroupSchema = new Schema<IGroup>(
   {
     name: { type: String, required: true, trim: true },
     description: { type: String, required: true },
-    userType: { type: String, enum: ['Male', 'Female'], required: true },
-    categoryId: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
+    userType: { type: String, enum: [USER_ROLES.BROTHER, USER_ROLES.SISTER], required: true },
+    category: { type: String, required: true, index: true },
     memberCount: { type: Number, default: 0 },
+    coverImage: { type: String, default: '' },
   },
   { timestamps: true },
 );
@@ -33,6 +35,7 @@ const GroupPostSchema = new Schema<IGroupPost>(
     attachments: { type: [String], default: [] },
     likesCount: { type: Number, default: 0 },
     commentsCount: { type: Number, default: 0 },
+    isPinned: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
@@ -68,6 +71,7 @@ PostLikeSchema.index({ postId: 1, userId: 1 }, { unique: true });
 PostCommentSchema.index({ postId: 1, createdAt: 1 });
 PostCommentSchema.index({ parentCommentId: 1 });
 GroupPostSchema.index({ userId: 1 });
+GroupPostSchema.index({ isPinned: -1, createdAt: -1 });
 GroupPostSchema.index({ createdAt: -1 });
 
 export const Group = model<IGroup>('Group', GroupSchema);

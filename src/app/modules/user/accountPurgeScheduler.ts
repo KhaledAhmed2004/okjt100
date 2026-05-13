@@ -20,13 +20,8 @@ import { USER_STATUS } from '../../../enums/user';
 import { errorLogger, logger } from '../../../shared/logger';
 import { User } from './user.model';
 import { Notification } from '../notification/notification.model';
-import {
-  GroupMember,
-  GroupPost,
-  PostLike,
-  PostComment,
-} from '../group/group.model';
-import AskImam from '../ask-imam/ask-imam.model';
+import { Group, GroupMember, GroupPost, PostLike, PostComment } from '../group/group.model';
+import { AskQuestion } from '../ask-question/ask-question.model';
 import { ResetToken } from '../auth/resetToken/resetToken.model';
 import { PendingEmail } from '../pending-email/pending-email.model';
 
@@ -170,6 +165,17 @@ export class AccountPurgeScheduler {
     userId: unknown,
     email: string | undefined,
   ): Promise<void> {
+    // 1. Decrement memberCount for groups this user belongs to
+    const memberships = await GroupMember.find({ userId }).select('groupId').lean();
+    const groupIds = memberships.map(m => m.groupId);
+    
+    if (groupIds.length > 0) {
+      await Group.updateMany(
+        { _id: { $in: groupIds } },
+        { $inc: { memberCount: -1 } }
+      );
+    }
+
     // GDPR cascade — anything that stores the user's data must go.
     // PendingEmail is keyed by `to: email`, not userId, so it gets its
     // own delete clause when we know the address. If `email` is
@@ -181,7 +187,7 @@ export class AccountPurgeScheduler {
       GroupPost.deleteMany({ userId }),
       PostLike.deleteMany({ userId }),
       PostComment.deleteMany({ userId }),
-      AskImam.deleteMany({ userId }),
+      AskQuestion.deleteMany({ userId }),
       ResetToken.deleteMany({ user: userId }),
     ];
     if (email) {

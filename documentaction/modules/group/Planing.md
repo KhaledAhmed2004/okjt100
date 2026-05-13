@@ -142,12 +142,32 @@ Users can create posts with:
 * Only members can post/comment
 * Group member count updates automatically
 * Posts are visible only inside their group
+* **Moderation:** Only `SUPER_ADMIN` and post owners can delete posts/comments. `SUPER_ADMIN` has global power to pin posts and kick members.
+* **Pinned Posts:** Handled via double-sorting in the feed (`isPinned: -1, createdAt: -1`) to ensure relevance while maintaining a single API.
 
 ---
 
-## 6. Optional Enhancements (Recommended)
-* Real-time updates (WebSocket)
-* Post reporting system
-* Pinned posts (Admin feature)
-* Group analytics dashboard
-* Notification system
+## 6. Phase 2 Enhancements (Implemented)
+* **Pinned Posts:** `SUPER_ADMIN` can pin important posts to the top of the feed.
+* **Member Management:** `SUPER_ADMIN` can kick members from a group.
+* **Visual Identity:** Added `coverImage` support for groups.
+* **Comment Discovery:** Added a dedicated API to fetch comments for a post.
+
+---
+
+## 7. API Workflow & Lifecycle
+
+1. **Group Setup**: `SUPER_ADMIN` creates a group. They set the `userType` (Brother/Sister) and upload a `coverImage`.
+2. **Joining**: Users join if their gender matches the group's `userType`. `memberCount` increases automatically.
+3. **Posting**: Members create posts with text and up to 5 attachments.
+4. **Browsing (The Feed)**: When users view the feed:
+    - **Pinned posts** (selected by Admin) appear at the very top.
+    - Regular posts follow in newest-first order.
+    - Search can be used to find specific content within the feed.
+5. **Engagement**:
+    - Members can **Like** posts. A 15-minute "suppression" window prevents notification spam to the post owner.
+    - Members can **Comment** on posts. All comments can be fetched using a dedicated GET API.
+6. **Moderation**: `SUPER_ADMIN` can **Pin** important posts, **Delete** any post/comment, or **Kick** members who break rules.
+7. **Auto-Cleanup**: If a user is deleted from the system, they are automatically removed from their groups, and the `memberCount` is decremented.
+
+

@@ -57,8 +57,8 @@ All fields are **optional**. The schema is a plain Zod object (not `.strict()`) 
 | `profileImage` | `string` | Set by `fileHandler` after upload — usually omitted in the form-data text fields |
 | `location.country` | `string` | — |
 | `location.city` | `string` | — |
-| `location.coordinates.lat` | `number` | Required if `coordinates` is provided. Bounds: `-90 <= lat <= 90`. Out-of-range -> `400 Validation Error`. |
-| `location.coordinates.lng` | `number` | Required if `coordinates` is provided. Bounds: `-180 <= lng <= 180`. Out-of-range -> `400 Validation Error`. |
+| `location.latitude` | `number` | Bounds: `-90 <= lat <= 90`. Out-of-range -> `400 Validation Error`. |
+| `location.longitude` | `number` | Bounds: `-180 <= lng <= 180`. Out-of-range -> `400 Validation Error`. |
 
 Schema violations -> `400 Bad Request` from `validateRequest` with the Zod error details.
 
@@ -105,7 +105,10 @@ File upload is processed by `fileHandler` **before** validation, so the resultin
 | `hospital` | `text` | No | The hospital where the user works. | `Central Hospital` |
 | `interests` | `array` | No | Array of strings representing user interests. | `["Quran", "Cooking"]` |
 | `profileImage` | `file` | No | Profile photo upload (multipart). | — |
-| `location` | `JSON` | No | Nested object with `country`, `city`, and `coordinates`. | `{"country": "UK"}` |
+| `location[country]` | `text` | No | Country name. | `USA` |
+| `location[city]` | `text` | No | City name. | `New York` |
+| `location[latitude]` | `text` | No | Latitude coordinate. | `40.7128` |
+| `location[longitude]` | `text` | No | Longitude coordinate. | `-74.0060` |
 
 ---
 
@@ -148,11 +151,10 @@ File upload is processed by `fileHandler` **before** validation, so the resultin
     "aboutMe": "Short bio",
     "revertStory": "My story...",
     "interests": ["Quran", "Arabic"],
-    "location": {
-      "country": "USA",
-      "city": "New York",
-      "coordinates": { "lat": 40.7128, "lng": -74.006 }
-    },
+    "country": "USA",
+    "city": "New York",
+    "latitude": 40.7128,
+    "longitude": -74.006,
     "updatedAt": "2026-05-09T13:00:00.000Z"
   }
 }
@@ -176,7 +178,7 @@ File upload is processed by `fileHandler` **before** validation, so the resultin
   "statusCode": 400,
   "message": "Validation Error",
   "errorMessages": [
-    { "path": "body.location.coordinates.lat", "message": "Required" }
+    { "path": "body.location.latitude", "message": "Required" }
   ]
 }
 ```

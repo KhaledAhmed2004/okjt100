@@ -16,6 +16,15 @@ Auth: BROTHER, SISTER
 
 ## Request Body
 
+```json
+{
+  "comment": "Very informative, JazakAllah!",
+  "parentCommentId": "60d5ecb86372ad46101f1940"
+}
+```
+
+## Request Body Details
+
 | Field | Type | Required | Description |
 | :--- | :--- | :---: | :--- |
 | `comment` | `string` | ✅ | Content of the comment |

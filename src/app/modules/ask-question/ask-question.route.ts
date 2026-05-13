@@ -31,9 +31,9 @@ router.get(
 );
 
 router.get(
-  '/analytics',
+  '/metrics',
   auth(USER_ROLES.SUPER_ADMIN),
-  AskQuestionController.getAnalytics,
+  AskQuestionController.getQuestionMetrics,
 );
 
 router.patch(

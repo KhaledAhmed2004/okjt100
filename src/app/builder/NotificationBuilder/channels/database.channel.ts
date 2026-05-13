@@ -48,8 +48,8 @@ export const saveToDatabase = async (
   // Prepare notification documents
   const notifications = users.map(user => ({
     title: content.title,
-    subtitle: content.text,
-    userId: user._id,
+    text: content.text,
+    receiver: user._id,
     type: content.type || 'SYSTEM',
     resourceType: content.resourceType,
     resourceId: resolvedResourceId,
@@ -68,7 +68,7 @@ export const saveToDatabase = async (
       result.sent = error.insertedDocs.length;
       // Remaining are failed
       const insertedIds = new Set(
-        error.insertedDocs.map((d: any) => d.userId.toString()),
+        error.insertedDocs.map((d: any) => d.receiver.toString()),
       );
       result.failed = users
         .filter(u => !insertedIds.has(u._id.toString()))

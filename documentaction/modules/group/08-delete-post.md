@@ -2,7 +2,7 @@
 
 ```http
 DELETE /groups/posts/:postId
-Auth: User/Admin
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 
 > Deletes a post and all its associated likes and comments. Also cleans up any attached files.
@@ -22,7 +22,7 @@ Auth: User/Admin
 ## Permissions
 
 - **Author**: Can delete their own post.
-- **Super Admin**: Can delete any post.
+- **Super Admin**: Can delete any post in any group.
 
 ## Responses
 

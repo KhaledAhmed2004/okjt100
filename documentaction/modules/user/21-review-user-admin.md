@@ -24,11 +24,7 @@ Authorization: Bearer {{accessToken}} (SUPER_ADMIN)
     - Generates a one-time `reverification.token`.
     - Sends an email to the user with the rejection reason and a link/token to re-submit documents.
 
-## Request Body (multipart/form-data)
-| Field | Type | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `status` | `string` | Yes | Either `ACTIVE` or `REJECTED`. |
-| `reason` | `string` | Conditional | Required if `status` is `REJECTED`. |
+## Request Body
 
 ```json
 {
@@ -36,6 +32,12 @@ Authorization: Bearer {{accessToken}} (SUPER_ADMIN)
   "reason": "Profile image is not a clear photo of a person."
 }
 ```
+
+## Request Body Details (multipart/form-data)
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `status` | `string` | Yes | Either `ACTIVE` or `REJECTED`. |
+| `reason` | `string` | Conditional | Required if `status` is `REJECTED`. |
 
 ## Responses
 

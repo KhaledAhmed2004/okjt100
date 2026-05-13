@@ -1,12 +1,12 @@
-# 05. Get Analytics (Admin)
+# 05. Get Question Metrics (Admin)
 
 ```http
-GET /ask-question/analytics
+GET /ask-question/metrics
 Auth: Bearer {{accessToken}} (SUPER_ADMIN)
 ```
 
 ## 1. Overview
-Allows the `SUPER_ADMIN` to retrieve module-wide analytics for the "Ask Question" system.
+Allows the `SUPER_ADMIN` to retrieve module-wide metrics for the "Ask Question" system, including growth percentages compared to the previous month.
 
 ---
 
@@ -14,19 +14,20 @@ Allows the `SUPER_ADMIN` to retrieve module-wide analytics for the "Ask Question
 
 ### 2.1 Authentication & Account Status
 - **Protected route** — requires a valid `Bearer` token.
-- **Role restriction**: Only the `SUPER_ADMIN` can access analytics.
+- **Role restriction**: Only the `SUPER_ADMIN` can access metrics.
 
 ### 2.2 Data Calculation Logic
-- **`total`**: Total number of questions.
-- **`pending`**: Questions awaiting an answer.
-- **`answered`**: Questions that have been responded to.
+- **`totalQuestions`**: Total count and growth of all questions.
+- **`answeredQuestions`**: Count and growth of questions with `answered` status.
+- **`pendingQuestions`**: Count and growth of questions with `pending` status.
+- **Comparison**: Calculations are based on the current month vs. the previous month.
 
 ---
 
 ## 3. Implementation
-- **Route**: [src/app/modules/ask-question/ask-question.route.ts](../../../src/app/modules/ask-question/ask-question.route.ts) — `router.get('/analytics', ...)`
-- **Controller**: [src/app/modules/ask-question/ask-question.controller.ts](../../../src/app/modules/ask-question/ask-question.controller.ts) — `getAnalytics`
-- **Service**: [src/app/modules/ask-question/ask-question.service.ts](../../../src/app/modules/ask-question/ask-question.service.ts) — `getAnalyticsFromDB`
+- **Route**: [src/app/modules/ask-question/ask-question.route.ts](../../../src/app/modules/ask-question/ask-question.route.ts) — `router.get('/metrics', ...)`
+- **Controller**: [src/app/modules/ask-question/ask-question.controller.ts](../../../src/app/modules/ask-question/ask-question.controller.ts) — `getQuestionMetrics`
+- **Service**: [src/app/modules/ask-question/ask-question.service.ts](../../../src/app/modules/ask-question/ask-question.service.ts) — `getQuestionMetricsFromDB`
 
 ---
 
@@ -37,11 +38,26 @@ Allows the `SUPER_ADMIN` to retrieve module-wide analytics for the "Ask Question
 {
   "success": true,
   "statusCode": 200,
-  "message": "Analytics fetched successfully",
+  "message": "Question metrics retrieved",
   "data": {
-    "total": 50,
-    "pending": 10,
-    "answered": 40
+    "meta": {
+      "comparisonPeriod": "month"
+    },
+    "totalQuestions": {
+      "value": 50,
+      "changePct": 10,
+      "direction": "up"
+    },
+    "answeredQuestions": {
+      "value": 40,
+      "changePct": 15,
+      "direction": "up"
+    },
+    "pendingQuestions": {
+      "value": 10,
+      "changePct": 5,
+      "direction": "down"
+    }
   }
 }
 ```

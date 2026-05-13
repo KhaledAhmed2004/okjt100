@@ -1,25 +1,21 @@
 import { z } from 'zod';
+import { USER_ROLES } from '../../../enums/user';
 
-export const listNotificationsSchema = z.object({
-  query: z
-    .object({
-      cursor: z.string().min(1).optional(),
-      limit: z
-        .string()
-        .regex(/^\d+$/)
-        .optional(),
-      unread: z.enum(['true', 'false']).optional(),
-    })
-    .optional(),
-});
-
-export const paramIdSchema = z.object({
-  params: z.object({ notificationId: z.string().min(1) }),
-});
-
-export const markReadSchema = z.object({
-  params: z.object({ notificationId: z.string().min(1) }),
+const sendNotification = z.object({
   body: z
-    .object({ read: z.boolean().default(true) })
-    .optional(),
+    .object({
+      title: z
+        .string({ required_error: 'Title is required' })
+        .min(1)
+        .max(200),
+      text: z
+        .string({ required_error: 'Message is required' })
+        .min(1)
+        .max(5000),
+      audience: z.enum(['ALL', USER_ROLES.BROTHER, USER_ROLES.SISTER], {
+        required_error: 'Audience is required',
+      }),
+    }),
 });
+
+export const NotificationValidation = { sendNotification };

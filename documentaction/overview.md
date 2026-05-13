@@ -89,8 +89,8 @@ Two parallel surfaces consume the same backend:
 | 03 | **Card Details** | Card CRUD | `GET/PATCH/DELETE /preference-cards/:cardId`, `POST /preference-cards`, `POST /preference-cards/:cardId/download` (counter-only), `GET /supplies`, `GET /sutures` |
 | 04 | **Library** | Global search (paid only) | `GET /preference-cards?visibility=public`, `GET /preference-cards/specialties`, favorite/unfavorite/download |
 | 05 | **Calendar** | Personal Events (paid only) | `GET/POST /events`, `GET/PATCH/DELETE /events/:eventId` |
-| 06 | **Profile** | Account + Sub + Legal | `GET/PATCH /users/me`, `GET /subscriptions/me`, `POST /subscriptions/verify-receipt`, `GET /legal`, `GET /legal/:slug` |
-| 07 | **Notifications** | Cross-cutting | `GET /notifications`, `PATCH /notifications/:id/read`, `PATCH /notifications/read-all`, `DELETE /notifications/:id` |
+| 06 | **Profile** | Account + Sub + Legal | `GET/PATCH /users/me`, `GET /users/profiles`, `GET /subscriptions/me`, `POST /subscriptions/verify-receipt`, `GET /legal`, `GET /legal/:slug` |
+| 07 | **Notifications** | Cross-cutting | `GET /notifications`, `PATCH /notifications/:notificationId/read`, `PATCH /notifications/read-all`, `DELETE /notifications/:notificationId` |
 
 ### Admin Dashboard (`dashboard-screens/`)
 

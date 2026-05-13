@@ -1,9 +1,9 @@
 # 05. Get Group Feed
 
 ```http
-GET /groups/:groupId/posts?page=1&limit=10
+GET /groups/:groupId/posts?page=1&limit=10&searchTerm=keyword
 Content-Type: application/json
-Auth: User
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 
 > Fetches the paginated list of posts for a specific group.
@@ -19,6 +19,11 @@ Auth: User
 - **Route**: `group.route.ts`
 - **Controller**: `group.controller.ts` — `getGroupFeed`
 - **Service**: `group.service.ts` — `getGroupFeedFromDB`
+
+### Business Logic
+- **`isLiked`**: Returns `true` if the current user has liked the post.
+- **Deleted Users**: Automatically filters out posts from users who have been deleted.
+- **Search**: Supports content-based search via the `searchTerm` query parameter.
 
 ## Responses
 

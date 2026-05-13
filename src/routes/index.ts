@@ -12,6 +12,7 @@ import { GroupRoutes } from '../app/modules/group/group.route';
 import { PendingEmailRoutes } from '../app/modules/pending-email/pending-email.route';
 import { SupportTicketRoutes } from '../app/modules/support-ticket/support-ticket.route';
 import { LearningContentRoutes } from '../app/modules/learning-content/learning-content.route';
+import { DuaRoutes } from '../app/modules/dua/dua.route';
 
 const router = express.Router();
 
@@ -67,6 +68,10 @@ const apiRoutes = [
   {
     path: '/learning-contents',
     route: LearningContentRoutes,
+  },
+  {
+    path: '/duas',
+    route: DuaRoutes,
   },
 ];
 

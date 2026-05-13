@@ -2,7 +2,7 @@
 
 ```http
 DELETE /groups/comments/:commentId
-Auth: User/Admin
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 
 > Deletes a comment. If it's a top-level comment, all nested replies will also be deleted.
@@ -22,7 +22,7 @@ Auth: User/Admin
 ## Permissions
 
 - **Author**: Can delete their own comment.
-- **Super Admin**: Can delete any comment.
+- **Super Admin**: Can delete any comment in any group.
 
 ## Responses
 

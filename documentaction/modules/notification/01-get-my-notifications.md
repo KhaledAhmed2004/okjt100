@@ -1,36 +1,34 @@
 # 01. Get My Notifications
 
 ```http
-GET /notifications
+GET /api/v1/notifications
 Auth: Bearer {{accessToken}}
 ```
 
-**Business Logic (`listForUser`):**
-- **Query Strategy**: Notifications list ebong **unreadCount** alada query-te fetch kora hoy. Efficiency-er jonno database indexes optimized kora ache.
-- **Index Optimization**: `{ userId: 1, deletedAt: 1, createdAt: -1 }` compound index use kora hoy query performance fast korar jonno.
-- **Visibility**: Shudhu `deletedAt: null` records return kora hoy (Soft Delete implementation).
-- **Unread Count**: `meta.unreadCount` is computed as `count({ userId, isRead: false, deletedAt: null })` — the user's total unread notifications across all pages. The mobile bell-icon red dot is rendered from this single field (`meta.unreadCount > 0`).
-- **Pagination**: Cursor-based pagination use kora hoy (`nextCursor`) infinite scroll support korar jonno.
+**Business Logic (`getNotificationFromDB`):**
+- **Query Strategy**: Fetches the notification list and **unreadCount** in separate queries for accuracy.
+- **Index Optimization**: Uses `{ receiver: 1, createdAt: -1 }` and `{ receiver: 1, isRead: 1 }` compound indexes to ensure fast query performance.
+- **Unread Count**: The `unreadCount` represents the total number of unread notifications for the user across all pages. This is typically used to render the red dot on the notification bell icon in mobile/web apps.
+- **Pagination**: Supports page-based pagination (`page`, `limit`) using the `QueryBuilder`.
 
-### Notification Triggers (When are they created?)
+### Notification Types
 
-System-e nicher event-gulo ghotle notification generate hoy:
+The system can generate notifications for the following events:
 
-| Trigger | Type | Timing | Channels |
-|---|---|---|---|
-| **Event Reminder (24h)** | `REMINDER` | 24 hours before event | DB, Push |
-| **Event Reminder (1h)** | `REMINDER` | 1 hour before event | DB, Push |
-
-> **Note**: Event reminders alada collection-e schedule kora hoy ebong thik shomoy moto trigger hoy.
-
-### Meta Object Explanation
-
-| Field | Type | Description |
-|---|---|---|
-| `limit` | Number | Protiti request-e koiti notification ashbe (Default: 20). |
-| `nextCursor` | String/Null | Poroborti page fetch korar jonno encoded string. Data na thakle `null`. |
-| `hasMore` | Boolean | Aro notification ache kina ta bujhay (`true` hole infinite scroll continue hobe). |
-| `unreadCount` | Number | User-er total unread notifications (not just this page). |
+| Type | Description |
+|---|---|
+| `ADMIN` | Broadcast notifications sent by admins. |
+| `SYSTEM` | System-generated alerts. |
+| `QUESTION_ANSWERED` | When an Imam answers a user's question. |
+| `NEW_QUESTION` | When a new question is submitted (Admin/Imam notification). |
+| `POST_LIKED` | When someone likes a group post. |
+| `POST_COMMENTED` | When someone comments on a group post. |
+| `COMMENT_REPLIED` | When someone replies to a comment. |
+| `CONTENT_LIKED` | When someone likes learning content. |
+| `CONTENT_COMMENTED` | When someone comments on learning content. |
+| `NEW_CONTENT` | When new learning content is published. |
+| `NEW_KHUTBAH` | When a new Khutbah is uploaded. |
+| `MOSQUE_UPDATE` | When a mosque profile is updated. |
 
 ## Responses
 
@@ -39,26 +37,28 @@ System-e nicher event-gulo ghotle notification generate hoy:
 {
   "success": true,
   "statusCode": 200,
-  "message": "OK",
-  "meta": {
-    "limit": 20,
-    "nextCursor": "eyJjcmVhdGVkQXQiOiIyMDI2LTA0LTA5VDA4OjAwOjAwLjAwMFoiLCJf...",
-    "hasMore": true,
-    "unreadCount": 7
-  },
-  "data": [
-    {
-      "_id": "664a1b2c3d4e5f6a7b8c9d11",
-      "userId": "664a1b2c3d4e5f6a7b8c9d00",
-      "title": "Event Reminder",
-      "subtitle": "Surgery on 2026-04-10 at 08:00",
-      "type": "REMINDER",
-      "isRead": false,
-      "icon": "calendar",
-      "createdAt": "2026-04-09T08:00:00.000Z",
-      "updatedAt": "2026-04-09T08:00:00.000Z"
-    }
-  ]
+  "message": "Notifications retrieved successfully",
+  "data": {
+    "data": [
+      {
+        "_id": "664a1b2c3d4e5f6a7b8c9d11",
+        "receiver": "664a1b2c3d4e5f6a7b8c9d00",
+        "type": "ADMIN",
+        "title": "System Update",
+        "text": "Maintenance scheduled for tomorrow.",
+        "isRead": false,
+        "createdAt": "2026-04-09T08:00:00.000Z",
+        "updatedAt": "2026-04-09T08:00:00.000Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 1,
+      "totalPage": 1
+    },
+    "unreadCount": 1
+  }
 }
 ```
 
@@ -67,15 +67,16 @@ System-e nicher event-gulo ghotle notification generate hoy:
 {
   "success": true,
   "statusCode": 200,
-  "message": "OK",
-  "meta": {
-    "limit": 20,
-    "nextCursor": null,
-    "hasMore": false,
+  "message": "Notifications retrieved successfully",
+  "data": {
+    "data": [],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 0,
+      "totalPage": 0
+    },
     "unreadCount": 0
-  },
-  "data": []
+  }
 }
 ```
-
-> `meta.unreadCount` returns the user's total unread notification count across all pages, not just this page.

@@ -3,9 +3,33 @@ import ApiError from '../../../errors/ApiError';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { IKhutba } from './khutbah.interface';
 import KhutbaModel from './khutbah.model';
+import NotificationBuilder from '../../builder/NotificationBuilder/NotificationBuilder';
+import { USER_ROLES } from '../../../enums/user';
 
 const createKhutbaIntoDB = async (payload: Partial<IKhutba>) => {
   const result = await KhutbaModel.create(payload);
+
+  // Notify all users about new Khutbah
+  new NotificationBuilder()
+    .toRole(USER_ROLES.BROTHER)
+    .setTitle('New Khutbah')
+    .setText(`New Khutbah published: ${payload.title}`)
+    .setType('NEW_KHUTBAH')
+    .setResource('Khutbah', (result._id as any).toString())
+    .viaAll()
+    .send()
+    .catch(err => console.error('Notification Error:', err));
+
+  new NotificationBuilder()
+    .toRole(USER_ROLES.SISTER)
+    .setTitle('New Khutbah')
+    .setText(`New Khutbah published: ${payload.title}`)
+    .setType('NEW_KHUTBAH')
+    .setResource('Khutbah', (result._id as any).toString())
+    .viaAll()
+    .send()
+    .catch(err => console.error('Notification Error:', err));
+
   return result;
 };
 

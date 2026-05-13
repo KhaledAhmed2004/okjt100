@@ -35,10 +35,8 @@ export type DeviceSessionMetadata = {
 export interface ILocation {
   country: string;
   city: string;
-  coordinates: {
-    lat: number;
-    lng: number;
-  };
+  type: 'Point';
+  coordinates: [number, number]; // [longitude, latitude]
 }
 
 export interface IUser {

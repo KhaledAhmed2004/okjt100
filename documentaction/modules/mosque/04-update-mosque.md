@@ -25,6 +25,10 @@ Auth: Admin
 ### Example Body
 ```json
 {
+  "location": {
+    "type": "Point",
+    "coordinates": [90.4125, 23.7298]
+  },
   "prayerTimes": {
     "fajr": "04:45"
   }

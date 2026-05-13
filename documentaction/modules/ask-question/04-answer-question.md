@@ -18,9 +18,9 @@ Allows the `SUPER_ADMIN` to provide a formal answer to a specific user question.
 - **Role restriction**: Only the `SUPER_ADMIN` can provide answers.
 
 ### 2.2 Input Validation (Zod — `answerQuestionZodSchema`)
-| Field | Type | Required | Constraint |
-| :--- | :--- | :--- | :--- |
-| `answer` | `string` | Yes | Minimum 1 character after trimming. |
+| Field | Type | Required | Description | Constraint |
+| :--- | :--- | :--- | :--- | :--- |
+| `answer` | `string` | Yes | The formal answer text | Minimum 1 character after trimming. |
 
 ### 2.3 Database State Transitions
 - **`status`**: Forced to `answered`.
@@ -29,7 +29,17 @@ Allows the `SUPER_ADMIN` to provide a formal answer to a specific user question.
 
 ---
 
-## 3. Implementation
+## 3. Request Body
+
+```json
+{
+  "answer": "This is the formal answer to the question."
+}
+```
+
+---
+
+## 4. Implementation
 - **Route**: [src/app/modules/ask-question/ask-question.route.ts](../../../src/app/modules/ask-question/ask-question.route.ts) — `router.patch('/:questionId/answer', ...)`
 - **Controller**: [src/app/modules/ask-question/ask-question.controller.ts](../../../src/app/modules/ask-question/ask-question.controller.ts) — `answerQuestion`
 - **Service**: [src/app/modules/ask-question/ask-question.service.ts](../../../src/app/modules/ask-question/ask-question.service.ts) — `answerQuestionInDB`
@@ -37,7 +47,7 @@ Allows the `SUPER_ADMIN` to provide a formal answer to a specific user question.
 
 ---
 
-## 4. Responses
+## 5. Responses
 
 ### Success (200)
 ```json

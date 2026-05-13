@@ -37,8 +37,8 @@ Auth: None
     "phoneNumber": "+880123456789",
     "website": "https://baitulmukarram.org",
     "location": {
-      "latitude": 23.7298,
-      "longitude": 90.4125
+      "type": "Point",
+      "coordinates": [90.4125, 23.7298]
     },
     "prayerTimes": {
       "fajr": "04:30",

@@ -16,7 +16,7 @@ const sendMessage = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getMessage = catchAsync(async (req: Request, res: Response) => {
-  const id = req.params.id;
+  const id = req.params.messageId;
   const messages = await MessageService.getMessageFromDB(
     req.user as JwtPayload,
     id,

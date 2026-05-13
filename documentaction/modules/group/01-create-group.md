@@ -10,12 +10,25 @@ Auth: Admin
 
 ## Request Body
 
+```json
+{
+  "name": "Quran Study Circle",
+  "description": "A group for brothers to study Quran",
+  "userType": "BROTHER",
+  "category": "Quran Studies",
+  "coverImage": "https://storage.com/group-cover.jpg"
+}
+```
+
+## Request Body Details
+
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `name` | `string` | Name of the group |
 | `description` | `string` | Detailed description |
-| `userType` | `string` | `Male` or `Female` |
-| `categoryId` | `string` | ID of the assigned category |
+| `userType` | `string` | `BROTHER` or `SISTER` |
+| `category` | `string` | Category name (e.g., Quran Studies) |
+| `coverImage` | `string` | (Optional) URL for the group cover image |
 
 ## Implementation
 
@@ -36,8 +49,8 @@ Auth: Admin
     "id": "60d5ecb86372ad46101f1929",
     "name": "Quran Study Circle",
     "description": "A group for brothers to study Quran",
-    "userType": "Male",
-    "categoryId": "60d5ecb86372ad46101f1920",
+    "userType": "BROTHER",
+    "category": "Quran Studies",
     "memberCount": 0,
     "createdAt": "2026-05-09T10:00:00.000Z"
   }

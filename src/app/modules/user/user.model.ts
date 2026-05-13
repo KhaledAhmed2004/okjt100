@@ -149,10 +149,8 @@ const userSchema = new Schema<IUser>(
     location: {
       country: { type: String },
       city: { type: String },
-      coordinates: {
-        lat: { type: Number },
-        lng: { type: Number },
-      },
+      type: { type: String, enum: ['Point'], default: 'Point' },
+      coordinates: { type: [Number] }, // [longitude, latitude]
     },
     status: {
       type: String,
@@ -258,6 +256,9 @@ userSchema.index({ 'deviceTokens.token': 1 });
 // Cron purge query: find users whose recovery window has expired.
 // Compound index speeds up `find({ status: DELETED, recoveryDeadline: { $lt: now } })`.
 userSchema.index({ status: 1, recoveryDeadline: 1 });
+
+// Geospatial index for nearby users
+userSchema.index({ 'location.coordinates': '2dsphere' });
 
 userSchema.statics.isExistUserById = async (id: string) => {
   return await User.findById(id);

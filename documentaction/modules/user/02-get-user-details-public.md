@@ -118,6 +118,8 @@ The service then **flattens** `location` into top-level `country` and `city` and
     "profileImage": "uploads/users/profiles/2026-pic.jpg",
     "country": "USA",
     "city": "New York",
+    "latitude": 40.7128,
+    "longitude": -74.006,
     "isVerified": true,
     "revertDate": "2024-05-11T00:00:00.000Z",
     "aboutMe": "Short intro",

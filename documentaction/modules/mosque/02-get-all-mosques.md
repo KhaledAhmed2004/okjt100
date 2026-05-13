@@ -16,8 +16,8 @@ Auth: None
 | `limit` | `number` | Items per page (default: 10) |
 | `searchTerm`| `string` | Search by name, area, or address |
 | `area` | `string` | Filter by specific area |
-| `sortBy` | `string` | Sort field (default: `mosqueName`) |
-| `sortOrder` | `string` | `asc` or `desc` (default: `asc`) |
+| `sortBy` | `string` | Sort field (default: `createdAt`) |
+| `sortOrder` | `string` | `asc` or `desc` (default: `desc`) |
 | `latitude` | `number` | User's latitude for distance calculation |
 | `longitude` | `number` | User's longitude for distance calculation |
 
@@ -28,9 +28,11 @@ Auth: None
 - **Service**: `mosque.service.ts` — `getAllMosquesFromDB`
 
 ### Business Logic
-1. **Query Building**: Applies filters and search terms to the database query.
-2. **Distance Calculation**: If `latitude` and `longitude` are provided, calculates distance (in Km) for each mosque.
-3. **Pagination**: Calculates skip and limit for results.
+1. **Dual-Purpose Logic**: Supports both Admin (dashboard sorting) and Public User (proximity search) in a single endpoint.
+2. **Proximity Search**: If `latitude` and `longitude` are provided, uses MongoDB's native `$geoNear` for distance-based sorting and injects `distanceInKm`.
+3. **Admin Sorting**: If coordinates are NOT provided, falls back to traditional sorting using `sortBy` and `sortOrder`.
+4. **Pagination**: Efficiently calculates metadata via `$facet`.
+5. **Flattened Response**: Automatically transforms nested GeoJSON into top-level `latitude`/`longitude` for frontend convenience.
 
 ## Responses
 
@@ -41,17 +43,20 @@ Auth: None
   "success": true,
   "statusCode": 200,
   "message": "Mosques fetched successfully.",
-  "meta": {
+  "pagination": {
     "page": 1,
     "limit": 10,
-    "total": 1
+    "total": 15,
+    "totalPages": 2
   },
   "data": [
     {
-      "id": "60d5ecb86372ad46101f1929",
+      "_id": "60d5ecb86372ad46101f1929",
       "mosqueName": "Baitul Mukarram",
       "address": "Baitul Mukarram, Dhaka",
       "area": "Motijheel",
+      "latitude": 23.7289,
+      "longitude": 90.4125,
       "distanceInKm": 2.5,
       "prayerTimes": {
         "fajr": "04:30",
