@@ -13,6 +13,9 @@ import { PendingEmailRoutes } from '../app/modules/pending-email/pending-email.r
 import { SupportTicketRoutes } from '../app/modules/support-ticket/support-ticket.route';
 import { LearningContentRoutes } from '../app/modules/learning-content/learning-content.route';
 import { DuaRoutes } from '../app/modules/dua/dua.route';
+import { ConnectionRoutes } from '../app/modules/connection/connection.route';
+import { ChatRoutes } from '../app/modules/chat/chat.route';
+import { MessageRoutes } from '../app/modules/message/message.route';
 
 const router = express.Router();
 
@@ -72,6 +75,18 @@ const apiRoutes = [
   {
     path: '/duas',
     route: DuaRoutes,
+  },
+  {
+    path: '/connections',
+    route: ConnectionRoutes,
+  },
+  {
+    path: '/chats',
+    route: ChatRoutes,
+  },
+  {
+    path: '/messages',
+    route: MessageRoutes,
   },
 ];
 

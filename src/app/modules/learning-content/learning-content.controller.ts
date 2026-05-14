@@ -5,12 +5,20 @@ import sendResponse from '../../../shared/sendResponse';
 import { LearningContentService } from './learning-content.service';
 
 const createLearningContent = catchAsync(async (req: Request, res: Response) => {
-  const result = await LearningContentService.createLearningContentIntoDB(req.body);
+  const payload = { ...req.body };
+  if (payload.video) {
+    payload.videoUrl = payload.video;
+    delete payload.video;
+  }
+  const result = await LearningContentService.createLearningContentIntoDB(payload);
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.CREATED,
     message: 'Learning content created successfully',
-    data: result,
+    data: {
+      id: result?._id,
+      createdAt: result?.createdAt,
+    },
   });
 });
 
@@ -40,12 +48,20 @@ const getSingleLearningContent = catchAsync(async (req: Request, res: Response) 
 
 const updateLearningContent = catchAsync(async (req: Request, res: Response) => {
   const { contentId } = req.params;
-  const result = await LearningContentService.updateLearningContentInDB(contentId, req.body);
+  const payload = { ...req.body };
+  if (payload.video) {
+    payload.videoUrl = payload.video;
+    delete payload.video;
+  }
+  const result = await LearningContentService.updateLearningContentInDB(contentId, payload);
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,
     message: 'Learning content updated successfully',
-    data: result,
+    data: {
+      id: result?._id,
+      updatedAt: result?.updatedAt,
+    },
   });
 });
 

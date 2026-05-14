@@ -6,6 +6,7 @@ export type ILearningContent = {
   description: string;
   videoUrl: string;
   category: string;
+  durationInSeconds?: number;
   likesCount: number;
   commentsCount: number;
   createdAt?: Date;

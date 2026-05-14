@@ -34,6 +34,7 @@ Auth: SUPER_ADMIN, BROTHER, SISTER
     "description": "Introduction to Islamic jurisprudence",
     "videoUrl": "https://example.com/video1.mp4",
     "category": "Fiqh",
+    "durationInSeconds": 300,
     "likesCount": 10,
     "commentsCount": 5,
     "isLiked": false,

@@ -13,14 +13,6 @@ const chatSchema = new Schema<IChat, ChatModel>(
       type: Boolean,
       default: true,
     },
-    trialRequestId: {
-      type: Schema.Types.ObjectId,
-      ref: 'TrialRequest',
-    },
-    sessionRequestId: {
-      type: Schema.Types.ObjectId,
-      ref: 'SessionRequest',
-    },
   },
   {
     timestamps: true,

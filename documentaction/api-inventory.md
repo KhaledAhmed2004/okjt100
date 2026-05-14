@@ -91,7 +91,7 @@
 
 | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
 |---|---|---|---|:---:|---|---|
-| 7.1 | GET | `/notifications` | Bearer | ✅ | [Module 7.1](./modules/notification/01-get-my-notifications.md) | — |
+| 7.1 | GET | `/notifications/me` | Bearer | ✅ | [Module 7.1](./modules/notification/01-get-my-notifications.md) | — |
 | 7.2 | PATCH | `/notifications/:notificationId/read` | Bearer | ✅ | [Module 7.2](./modules/notification/02-mark-as-read.md) | — |
 | 7.3 | PATCH | `/notifications/read-all` | Bearer | ✅ | [Module 7.3](./modules/notification/03-mark-all-as-read.md) | — |
 | 7.4 | POST | `/notifications/broadcasts` | ADMIN | ✅ | [Module 7.4](./modules/notification/04-send-broadcast.md) | — |
@@ -137,3 +137,64 @@
 | 11.3 | GET | `/duas/:duaId` | None | ✅ | [Module 11.3](./modules/dua/03-get-single-dua.md) | — |
 | 11.4 | PATCH | `/duas/:duaId` | ADMIN, SUPER_ADMIN | ✅ | [Module 11.4](./modules/dua/04-update-dua.md) | — |
 | 11.5 | DELETE | `/duas/:duaId` | ADMIN, SUPER_ADMIN | ✅ | [Module 11.5](./modules/dua/05-delete-dua.md) | — |
+
+## Support Ticket Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 12.1 | POST | `/support-tickets` | BROTHER, SISTER | ✅ | [Module 12.1](./modules/support-ticket/01-create-ticket.md) | — |
+| 12.2 | GET | `/support-tickets/my` | BROTHER, SISTER | ✅ | [Module 12.2](./modules/support-ticket/02-list-my-tickets.md) | — |
+| 12.3 | GET | `/support-tickets/:ticketId` | BROTHER, SISTER, SUPER_ADMIN | ✅ | [Module 12.3](./modules/support-ticket/03-get-ticket-detail.md) | — |
+| 12.4 | GET | `/support-tickets/:ticketId/messages` | BROTHER, SISTER, SUPER_ADMIN | ✅ | [Module 12.4](./modules/support-ticket/04-list-ticket-messages.md) | — |
+| 12.5 | POST | `/support-tickets/:ticketId/reply` | BROTHER, SISTER, SUPER_ADMIN | ✅ | [Module 12.5](./modules/support-ticket/05-reply-to-ticket.md) | — |
+| 12.6 | GET | `/support-tickets/admin/list` | SUPER_ADMIN | ✅ | [Module 12.6](./modules/support-ticket/06-admin-list-tickets.md) | — |
+| 12.7 | GET | `/support-tickets/admin/stats` | SUPER_ADMIN | ✅ | [Module 12.7](./modules/support-ticket/07-admin-ticket-stats.md) | — |
+| 12.8 | PATCH | `/support-tickets/admin/:ticketId/status` | SUPER_ADMIN | ✅ | [Module 12.8](./modules/support-ticket/08-admin-update-status.md) | — |
+| 12.9 | PATCH | `/support-tickets/admin/:ticketId/priority` | SUPER_ADMIN | ✅ | [Module 12.9](./modules/support-ticket/09-admin-update-priority.md) | — |
+| 12.10 | PATCH | `/support-tickets/admin/:ticketId/assign` | SUPER_ADMIN | ✅ | [Module 12.10](./modules/support-ticket/10-admin-assign-ticket.md) | — |
+
+## Pending Email Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 13.1 | GET | `/admin/pending-emails` | SUPER_ADMIN | ✅ | [Module 13.1](./modules/pending-email/01-list-pending-emails.md) | — |
+| 13.2 | POST | `/admin/pending-emails/:pendingEmailId/requeue` | SUPER_ADMIN | ✅ | [Module 13.2](./modules/pending-email/02-requeue-pending-email.md) | — |
+| 13.3 | GET | `/admin/pending-emails/stats` | SUPER_ADMIN | ✅ | [Module 13.3](./modules/pending-email/03-pending-email-stats.md) | — |
+
+## Connection Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 14.1 | POST | `/connections/request/:userId` | BROTHER, SISTER | ✅ | [Module 14.1](./modules/connection/01-send-connection-request.md) | — |
+| 14.2 | PATCH | `/connections/:connectionId/respond` | BROTHER, SISTER | ✅ | [Module 14.2](./modules/connection/02-respond-to-request.md) | — |
+| 14.3 | DELETE | `/connections/:connectionId/request` | BROTHER, SISTER | ✅ | [Module 14.3](./modules/connection/03-cancel-request.md) | — |
+| 14.4 | DELETE | `/connections/:connectionId` | BROTHER, SISTER | ✅ | [Module 14.4](./modules/connection/04-remove-connection.md) | — |
+| 14.5 | GET | `/connections` | BROTHER, SISTER | ✅ | [Module 14.5](./modules/connection/05-list-my-connections.md) | — |
+| 14.6 | GET | `/connections/pending` | BROTHER, SISTER | ✅ | [Module 14.6](./modules/connection/06-list-pending-requests.md) | — |
+| 14.7 | GET | `/connections/status/:userId` | BROTHER, SISTER | ✅ | [Module 14.7](./modules/connection/07-check-connection-status.md) | — |
+
+## Chat Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 15.1 | POST | `/chats/:otherUserId` | BROTHER, SISTER | ✅ | [Module 15.1](./modules/chat/01-create-get-chat.md) | — |
+| 15.2 | GET | `/chats` | BROTHER, SISTER | ✅ | [Module 15.2](./modules/chat/02-list-my-chats.md) | — |
+
+## Message Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 16.1 | POST | `/messages` | BROTHER, SISTER | ✅ | [Module 16.1](./modules/message/01-send-message.md) | — |
+| 16.2 | GET | `/messages/chat/:chatId` | BROTHER, SISTER | ✅ | [Module 16.2](./modules/message/02-get-chat-messages.md) | — |
+| 16.3 | POST | `/messages/chat/:chatId/read` | BROTHER, SISTER | ✅ | [Module 16.3](./modules/message/03-mark-chat-as-read.md) | — |
+
+## Subscription Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 17.1 | GET | `/subscriptions/me` | Bearer | ✅ | [Module 17.1](./modules/subscription/01-get-my-subscription.md) | — |
+| 17.2 | POST | `/subscriptions/apple/verify` | Bearer | ✅ | [Module 17.2](./modules/subscription/02-verify-apple.md) | — |
+| 17.3 | POST | `/subscriptions/apple/webhook` | None | ✅ | [Module 17.3](./modules/subscription/03-apple-webhook.md) | — |
+| 17.4 | POST | `/subscriptions/google/verify` | Bearer | ✅ | [Module 17.4](./modules/subscription/04-verify-google.md) | — |
+| 17.5 | POST | `/subscriptions/google/webhook` | None | ✅ | [Module 17.5](./modules/subscription/05-google-webhook.md) | — |
+| 17.6 | POST | `/subscriptions/choose/free` | Bearer | ✅ | [Module 17.6](./modules/subscription/06-choose-free.md) | — |

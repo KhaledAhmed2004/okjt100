@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import crypto from 'crypto';
 import { model, Schema } from 'mongoose';
 import config from '../../../config';
-import { USER_ROLES, USER_STATUS } from '../../../enums/user';
+import { USER_ROLES, USER_STATUS, SUBSCRIPTION_STATUS, SUBSCRIPTION_TIER } from '../../../enums/user';
 import { IDeviceToken, IUser, UserModal } from './user.interface';
 
 // HMAC-SHA256 of the raw FCM/APNs token, keyed by the JWT secret (it's
@@ -173,6 +173,29 @@ const userSchema = new Schema<IUser>(
       unique: true,
     },
     appleId: {
+      type: String,
+      sparse: true,
+      unique: true,
+    },
+    subscriptionTier: {
+      type: String,
+      enum: Object.values(SUBSCRIPTION_TIER),
+      default: SUBSCRIPTION_TIER.FREE,
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: Object.values(SUBSCRIPTION_STATUS),
+      default: SUBSCRIPTION_STATUS.NONE,
+    },
+    subscriptionExpiryDate: {
+      type: Date,
+    },
+    appleOriginalTransactionId: {
+      type: String,
+      sparse: true,
+      unique: true,
+    },
+    googlePurchaseToken: {
       type: String,
       sparse: true,
       unique: true,

@@ -1,5 +1,5 @@
 import { Model, Schema } from 'mongoose';
-import { USER_ROLES, USER_STATUS } from '../../../enums/user';
+import { USER_ROLES, USER_STATUS, SUBSCRIPTION_STATUS, SUBSCRIPTION_TIER } from '../../../enums/user';
 
 export type DevicePlatform = 'ios' | 'android' | 'web';
 
@@ -59,6 +59,11 @@ export interface IUser {
   deviceTokens?: IDeviceToken[];
   googleId?: string;
   appleId?: string;
+  subscriptionTier: SUBSCRIPTION_TIER;
+  subscriptionStatus: SUBSCRIPTION_STATUS;
+  subscriptionExpiryDate?: Date;
+  appleOriginalTransactionId?: string;
+  googlePurchaseToken?: string;
   authentication?: {
     isResetPassword: boolean;
     oneTimeCode: string;

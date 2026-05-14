@@ -6,14 +6,18 @@ import { isOnline, getLastActive } from '../../helpers/presenceHelper';
 import { getUnreadCountCached, setUnreadCount } from '../../helpers/unreadHelper';
 
 const createChatToDB = async (payload: any): Promise<IChat> => {
-  const isExistChat: IChat | null = await Chat.findOne({
+  let isExistChat: any = await Chat.findOne({
     participants: { $all: payload },
   });
 
   if (isExistChat) {
+    if (!isExistChat.status) {
+      isExistChat.status = true;
+      await isExistChat.save();
+    }
     return isExistChat;
   }
-  const chat: IChat = await Chat.create({ participants: payload });
+  const chat: any = await Chat.create({ participants: payload, status: true });
   return chat;
 };
 
@@ -27,23 +31,7 @@ const getChatFromDB = async (user: any, searchTerm: string): Promise<IChat[]> =>
         ...(searchTerm && { name: { $regex: searchTerm, $options: 'i' } }),
       },
     })
-    .populate({
-      path: 'trialRequestId',
-      select: 'subject',
-      populate: {
-        path: 'subject',
-        select: 'name',
-      },
-    })
-    .populate({
-      path: 'sessionRequestId',
-      select: 'subject',
-      populate: {
-        path: 'subject',
-        select: 'name',
-      },
-    })
-    .select('participants status updatedAt trialRequestId sessionRequestId');
+    .select('participants status updatedAt');
 
   // Filter out chats where no participants match the search (empty participants)
   const filteredChats = chats?.filter(
@@ -59,7 +47,7 @@ const getChatFromDB = async (user: any, searchTerm: string): Promise<IChat[]> =>
         chatId: chat?._id,
       })
         .sort({ createdAt: -1 })
-        .select('text offer createdAt sender');
+        .select('text createdAt sender');
 
       // Compute unread count for current user with Redis cache fallback
       const cachedUnread = await getUnreadCountCached(String(chat?._id), String(user.id));
@@ -94,17 +82,11 @@ const getChatFromDB = async (user: any, searchTerm: string): Promise<IChat[]> =>
         presence = { isOnline: online, lastActive: last };
       }
 
-
-      // Extract subject from sessionRequest first (latest), then trialRequest as fallback
-      // Session request takes priority because it comes after trial in user flow
-      const subject = data?.sessionRequestId?.subject?.name || data?.trialRequestId?.subject?.name || null;
-
       return {
         ...data,
         lastMessage: lastMessage || null,
         unreadCount,
         presence,
-        subject,
       };
     })
   );

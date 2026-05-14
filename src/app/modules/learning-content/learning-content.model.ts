@@ -14,6 +14,7 @@ const learningContentSchema = new Schema<ILearningContent>(
     description: { type: String, required: true },
     videoUrl: { type: String, required: true },
     category: { type: String, required: true, index: true },
+    durationInSeconds: { type: Number },
     likesCount: { type: Number, default: 0 },
     commentsCount: { type: Number, default: 0 },
   },

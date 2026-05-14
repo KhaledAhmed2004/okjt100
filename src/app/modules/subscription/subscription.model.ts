@@ -185,6 +185,21 @@ subscriptionSchema.statics.upsertForUser = async function (
     }
   }
 
+  // Synchronize the core subscription state onto the User model directly.
+  try {
+    await model('User').findByIdAndUpdate(userId, {
+      $set: {
+        subscriptionTier: next.plan,
+        subscriptionStatus: next.status,
+        subscriptionExpiryDate: next.currentPeriodEnd,
+        appleOriginalTransactionId: next.appleOriginalTransactionId,
+        googlePurchaseToken: next.googlePurchaseToken,
+      },
+    });
+  } catch (err) {
+    console.error('Failed to sync subscription to User model:', err);
+  }
+
   return next;
 };
 

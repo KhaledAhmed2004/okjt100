@@ -5,7 +5,7 @@ GET /api/v1/users/profiles?latitude=23.8103&longitude=90.4125
 Auth: Bearer {{accessToken}} (BROTHER, SISTER)
 ```
 
-> Lists public profiles of users within the same community. Brothers see other Brothers, and Sisters see other Sisters. Only active users are listed. Includes distance calculation if coordinates are provided.
+> Lists public profiles of users within the same community. Brothers see other Brothers, and Sisters see other Sisters. Only active users are listed. Includes distance calculation if coordinates are provided. **Each profile item includes a `connectionStatus` flag so the frontend can conditionally render the Connect button.**
 
 ## Implementation
 - **Route**: [user.route.ts](file:///src/app/modules/user/user.route.ts)
@@ -13,13 +13,26 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER)
 - **Service**: [user.service.ts](file:///src/app/modules/user/user.service.ts) — `getUserProfilesFromDB`
 
 ### Business Logic (`getUserProfilesFromDB`)
-1.  **Server-Side Scoping**: Automatically filters users by the requesting user's `role` (BROTHER/SISTER) and ensures only `ACTIVE` profiles are visible.
-2.  **High-Performance Proximity**: Uses MongoDB's native `$geoNear` aggregation for industry-standard proximity sorting.
-3.  **Injected Distance**: If `latitude` and `longitude` are provided, the system **always** calculates and injects `distanceInKm` directly at the database level, regardless of the `filter` used.
-4.  **Flexible Sorting**: 
+1. **Server-Side Scoping**: Automatically filters users by the requesting user's `role` (BROTHER/SISTER) and ensures only `ACTIVE` profiles are visible. Self is excluded.
+2. **High-Performance Proximity**: Uses MongoDB's native `$geoNear` aggregation for industry-standard proximity sorting.
+3. **Injected Distance**: If `latitude` and `longitude` are provided, the system **always** calculates and injects `distanceInKm` directly at the database level, regardless of the `filter` used.
+4. **Flexible Sorting**:
     - If `filter=nearby-me` (and coordinates provided), users are sorted by distance (closest first).
     - Otherwise (default or `filter=new-reverts`), users are sorted by `createdAt` (newest first), even if distance was calculated.
-5.  **Field Projection (Privacy)**: Returns specific public fields: `_id`, `name`, `profileImage`, `age`, `revertDate`, `distanceInKm`. (Note: Internal coordinates and country/city are removed for UI simplicity).
+5. **Field Projection (Privacy)**: Returns specific public fields: `_id`, `name`, `profileImage`, `age`, `revertDate`, `distanceInKm`.
+6. **Connection Status Enrichment (Single-Pass `$lookup`)**: For every profile returned, the pipeline performs a server-side `$lookup` against the `connections` collection to embed `connectionStatus` and `connectionId` — **no N+1 queries, one aggregation round-trip**.
+
+### `connectionStatus` Values
+
+These values mirror the **exact enum values** used in the `Connection` model (`PENDING` | `ACCEPTED`), plus `NONE` when no document exists.
+
+| `connectionStatus` | Meaning | Suggested Frontend Action |
+| :--- | :--- | :--- |
+| `NONE` | No connection relationship exists | Show **Connect** button → `POST /connections/request/:userId` |
+| `PENDING` | A connection request exists (sent or received) | Show **Pending** or **Accept/Reject** depending on app context |
+| `ACCEPTED` | Both users are connected | Show **Message** or hide connect button |
+
+> `connectionId` is `null` when `connectionStatus` is `NONE`, otherwise it is the `_id` of the `Connection` document.
 
 ## Query Parameters
 | Parameter | Description | Default | Example |
@@ -47,13 +60,44 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER)
   },
   "data": [
     {
-      "id": "664a1b2c3d4e5f6a7b8c9d0e",
+      "_id": "664a1b2c3d4e5f6a7b8c9d0e",
       "name": "Dr. Sarah Smith",
       "age": 28,
       "revertDate": "2020-05-15T00:00:00.000Z",
       "distanceInKm": 12.45,
-      "profileImage": "/uploads/users/profiles/sarah.png"
+      "profileImage": "/uploads/users/profiles/sarah.png",
+      "connectionStatus": "NONE",
+      "connectionId": null
+    },
+    {
+      "_id": "664a1b2c3d4e5f6a7b8c9d1f",
+      "name": "Fatima Al-Rashid",
+      "age": 32,
+      "revertDate": "2018-11-03T00:00:00.000Z",
+      "distanceInKm": 3.87,
+      "profileImage": "/uploads/users/profiles/fatima.png",
+      "connectionStatus": "PENDING",
+      "connectionId": "665aaa111bbb222ccc333ddd"
+    },
+    {
+      "_id": "664a1b2c3d4e5f6a7b8c9d2g",
+      "name": "Amina Yusuf",
+      "age": 25,
+      "revertDate": "2022-03-20T00:00:00.000Z",
+      "distanceInKm": 8.10,
+      "profileImage": "/uploads/users/profiles/amina.png",
+      "connectionStatus": "ACCEPTED",
+      "connectionId": "665bbb444ccc555ddd666eee"
     }
   ]
+}
+```
+
+### Scenario: Unauthorized (401)
+```json
+{
+  "success": false,
+  "statusCode": 401,
+  "message": "You are not authorized"
 }
 ```

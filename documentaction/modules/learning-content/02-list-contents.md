@@ -9,12 +9,12 @@ Auth: SUPER_ADMIN, BROTHER, SISTER
 
 ## Query Parameters
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `searchTerm` | `string` | Title ba category diye search |
-| `category` | `string` | Specific category filter |
-| `page` | `number` | Page number |
-| `limit` | `number` | Items per page |
+| Field | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `searchTerm` | `string` | Title ba category diye search | `Fiqh` |
+| `category` | `string` | Specific category filter | `Hadith` |
+| `page` | `number` | Page number | `1` |
+| `limit` | `number` | Items per page | `10` |
 
 ## Implementation
 
@@ -44,6 +44,7 @@ Auth: SUPER_ADMIN, BROTHER, SISTER
       "description": "Introduction to Islamic jurisprudence",
       "videoUrl": "https://example.com/video1.mp4",
       "category": "Fiqh",
+      "durationInSeconds": 300,
       "likesCount": 10,
       "commentsCount": 5,
       "isLiked": true,

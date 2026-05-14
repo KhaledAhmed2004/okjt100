@@ -17,14 +17,18 @@ const getNotificationFromDB = catchAsync(
       statusCode: StatusCodes.OK,
       success: true,
       message: 'Notifications retrieved successfully',
-      data: result,
+      meta: {
+        pagination: result.pagination,
+        unreadCount: result.unreadCount,
+      },
+      data: result.data,
     });
   }
 );
 
 const readNotification = catchAsync(async (req: Request, res: Response) => {
   const user = req.user as JwtPayload;
-  const notification = await NotificationService.markNotificationAsReadIntoDB(
+  await NotificationService.markNotificationAsReadIntoDB(
     req.params.notificationId,
     user.id
   );
@@ -33,7 +37,7 @@ const readNotification = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     success: true,
     message: 'Notification marked as read successfully',
-    data: notification,
+    data: null,
   });
 });
 

@@ -3,6 +3,7 @@ import { logger, errorLogger } from '../../shared/logger';
 // Allowed origins for CORS
 export const allowedOrigins: string[] = [
   'http://localhost:3000',
+  'https://sya-muslim-community.vercel.app',
   'https://smrtscrub-medical-app.vercel.app',
   'http://localhost:3001',
   'http://localhost:5174',

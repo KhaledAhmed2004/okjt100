@@ -591,13 +591,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/:userId/user",
+              "raw": "{{baseUrl}}/users/{{userId}}/user",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "users",
-                ":userId",
+                "{{userId}}",
                 "user"
               ],
               "variable": [
@@ -976,7 +976,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/me/sessions/:tokenId",
+              "raw": "{{baseUrl}}/users/me/sessions/{{tokenId}}",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -984,7 +984,7 @@
                 "users",
                 "me",
                 "sessions",
-                ":tokenId"
+                "{{tokenId}}"
               ],
               "variable": [
                 {
@@ -1229,13 +1229,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/:userId",
+              "raw": "{{baseUrl}}/users/{{userId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "users",
-                ":userId"
+                "{{userId}}"
               ],
               "variable": [
                 {
@@ -1270,13 +1270,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/:userId",
+              "raw": "{{baseUrl}}/users/{{userId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "users",
-                ":userId"
+                "{{userId}}"
               ],
               "variable": [
                 {
@@ -1320,13 +1320,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/:userId",
+              "raw": "{{baseUrl}}/users/{{userId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "users",
-                ":userId"
+                "{{userId}}"
               ],
               "variable": [
                 {
@@ -1361,13 +1361,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/:userId/review",
+              "raw": "{{baseUrl}}/users/{{userId}}/review",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "users",
-                ":userId",
+                "{{userId}}",
                 "review"
               ],
               "variable": [
@@ -1461,7 +1461,7 @@
                 }
               ]
             },
-            "description": "Lists public profiles of users within the same community. Brothers see other Brothers, and Sisters see other Sisters. Only active users are listed. Includes distance calculation if coordinates are provided.",
+            "description": "Lists public profiles of users within the same community. Brothers see other Brothers, and Sisters see other Sisters. Only active users are listed. Includes distance calculation if coordinates are provided. **Each profile item includes a `connectionStatus` flag so the frontend can conditionally render the Connect button.**",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1612,13 +1612,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/ask-question/:questionId/answer",
+              "raw": "{{baseUrl}}/ask-question/{{questionId}}/answer",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "ask-question",
-                ":questionId",
+                "{{questionId}}",
                 "answer"
               ],
               "variable": [
@@ -1787,13 +1787,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/:groupId/join",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/join",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "groups",
-                ":groupId",
+                "{{groupId}}",
                 "join"
               ],
               "variable": [
@@ -1829,13 +1829,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/:groupId/posts",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/posts",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "groups",
-                ":groupId",
+                "{{groupId}}",
                 "posts"
               ],
               "variable": [
@@ -1880,13 +1880,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/:groupId/posts?page=1&limit=10&searchTerm=keyword",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/posts?page=1&limit=10&searchTerm=keyword",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "groups",
-                ":groupId",
+                "{{groupId}}",
                 "posts"
               ],
               "query": [
@@ -1936,14 +1936,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/posts/:postId/like",
+              "raw": "{{baseUrl}}/groups/posts/{{postId}}/like",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "groups",
                 "posts",
-                ":postId",
+                "{{postId}}",
                 "like"
               ],
               "variable": [
@@ -1979,14 +1979,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/posts/:postId/comments",
+              "raw": "{{baseUrl}}/groups/posts/{{postId}}/comments",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "groups",
                 "posts",
-                ":postId",
+                "{{postId}}",
                 "comments"
               ],
               "variable": [
@@ -2122,6 +2122,43 @@
               ],
               "path": [
                 "khutba"
+              ],
+              "query": [
+                {
+                  "key": "searchTerm",
+                  "value": "",
+                  "description": "Search by title, imam, or mosqueName"
+                },
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number for pagination (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Number of items per page (default: 10)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "",
+                  "description": "Field to sort by (e.g., `date`, `createdAt`)"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "",
+                  "description": "`asc` or `desc` (default: `desc`)"
+                },
+                {
+                  "key": "startDate",
+                  "value": "",
+                  "description": "Filter by date range (YYYY-MM-DD)"
+                },
+                {
+                  "key": "endDate",
+                  "value": "",
+                  "description": "Filter by date range (YYYY-MM-DD)"
+                }
               ]
             },
             "description": "Retrieves a paginated list of all Khutbahs with search and filter options.",
@@ -2143,13 +2180,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/khutba/:khutbaId",
+              "raw": "{{baseUrl}}/khutba/{{khutbaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "khutba",
-                ":khutbaId"
+                "{{khutbaId}}"
               ],
               "variable": [
                 {
@@ -2177,13 +2214,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/khutba/:khutbaId",
+              "raw": "{{baseUrl}}/khutba/{{khutbaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "khutba",
-                ":khutbaId"
+                "{{khutbaId}}"
               ],
               "variable": [
                 {
@@ -2264,13 +2301,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/khutba/:khutbaId",
+              "raw": "{{baseUrl}}/khutba/{{khutbaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "khutba",
-                ":khutbaId"
+                "{{khutbaId}}"
               ],
               "variable": [
                 {
@@ -2362,6 +2399,21 @@
                 {
                   "key": "area",
                   "value": "Motijheel"
+                },
+                {
+                  "key": "latitude",
+                  "value": "",
+                  "description": "User's latitude for distance calculation"
+                },
+                {
+                  "key": "longitude",
+                  "value": "",
+                  "description": "User's longitude for distance calculation"
+                },
+                {
+                  "key": "filter",
+                  "value": "",
+                  "description": "Use `nearby-me` to sort by distance. Otherwise, default sorting is by `createdAt`."
                 }
               ]
             },
@@ -2384,13 +2436,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/mosques/:mosqueId",
+              "raw": "{{baseUrl}}/mosques/{{mosqueId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "mosques",
-                ":mosqueId"
+                "{{mosqueId}}"
               ],
               "variable": [
                 {
@@ -2418,13 +2470,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/mosques/:mosqueId",
+              "raw": "{{baseUrl}}/mosques/{{mosqueId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "mosques",
-                ":mosqueId"
+                "{{mosqueId}}"
               ],
               "variable": [
                 {
@@ -2461,13 +2513,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/mosques/:mosqueId",
+              "raw": "{{baseUrl}}/mosques/{{mosqueId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "mosques",
-                ":mosqueId"
+                "{{mosqueId}}"
               ],
               "variable": [
                 {
@@ -2500,14 +2552,15 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/notifications",
+              "raw": "{{baseUrl}}/api/v1/notifications/me",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "v1",
-                "notifications"
+                "notifications",
+                "me"
               ]
             },
             "description": "",
@@ -2536,7 +2589,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/notifications/:notificationId/read",
+              "raw": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/read",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2544,7 +2597,7 @@
                 "api",
                 "v1",
                 "notifications",
-                ":notificationId",
+                "{{notificationId}}",
                 "read"
               ],
               "variable": [
@@ -2732,13 +2785,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/legal/:slug",
+              "raw": "{{baseUrl}}/legal/{{slug}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "legal",
-                ":slug"
+                "{{slug}}"
               ],
               "variable": [
                 {
@@ -2809,13 +2862,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/legal/:slug",
+              "raw": "{{baseUrl}}/legal/{{slug}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "legal",
-                ":slug"
+                "{{slug}}"
               ],
               "variable": [
                 {
@@ -2850,13 +2903,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/legal/:slug",
+              "raw": "{{baseUrl}}/legal/{{slug}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "legal",
-                ":slug"
+                "{{slug}}"
               ],
               "variable": [
                 {
@@ -2966,7 +3019,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
+                "value": "multipart/form-data",
                 "type": "text"
               }
             ],
@@ -2982,6 +3035,41 @@
             "description": "Admin new learning content (video) create korar jonno ei endpoint use korbe.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Basic Fiqh",
+                  "type": "text",
+                  "description": "Video title"
+                },
+                {
+                  "key": "description",
+                  "value": "Introduction to Islamic jurisprudence",
+                  "type": "text",
+                  "description": "Video description"
+                },
+                {
+                  "key": "category",
+                  "value": "Fiqh",
+                  "type": "text",
+                  "description": "Content category"
+                },
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": [],
+                  "description": "The video file (mp4, etc.)"
+                },
+                {
+                  "key": "duration",
+                  "value": "120",
+                  "type": "text",
+                  "description": "Video duration in seconds"
+                }
+              ]
             }
           },
           "response": []
@@ -3004,6 +3092,28 @@
               ],
               "path": [
                 "learning-contents"
+              ],
+              "query": [
+                {
+                  "key": "searchTerm",
+                  "value": "Fiqh",
+                  "description": "Title ba category diye search"
+                },
+                {
+                  "key": "category",
+                  "value": "Hadith",
+                  "description": "Specific category filter"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                }
               ]
             },
             "description": "Shob learning content browse korar jonno. Search ebong filter support kore.",
@@ -3025,13 +3135,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/learning-contents/:contentId",
+              "raw": "{{baseUrl}}/learning-contents/{{contentId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "learning-contents",
-                ":contentId"
+                "{{contentId}}"
               ],
               "variable": [
                 {
@@ -3054,18 +3164,18 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
+                "value": "multipart/form-data",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/learning-contents/:contentId",
+              "raw": "{{baseUrl}}/learning-contents/{{contentId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "learning-contents",
-                ":contentId"
+                "{{contentId}}"
               ],
               "variable": [
                 {
@@ -3077,6 +3187,41 @@
             "description": "Admin existing content update korar jonno use korbe.",
             "auth": {
               "type": "noauth"
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Advanced Fiqh",
+                  "type": "text",
+                  "description": "Updated title"
+                },
+                {
+                  "key": "description",
+                  "value": "Deeper dive into Islamic jurisprudence",
+                  "type": "text",
+                  "description": "Updated description"
+                },
+                {
+                  "key": "category",
+                  "value": "Fiqh",
+                  "type": "text",
+                  "description": "Updated category"
+                },
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": [],
+                  "description": "Updated video file (mp4, etc.)"
+                },
+                {
+                  "key": "duration",
+                  "value": "150",
+                  "type": "text",
+                  "description": "Updated duration of the video in seconds"
+                }
+              ]
             }
           },
           "response": []
@@ -3093,13 +3238,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/learning-contents/:contentId",
+              "raw": "{{baseUrl}}/learning-contents/{{contentId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "learning-contents",
-                ":contentId"
+                "{{contentId}}"
               ],
               "variable": [
                 {
@@ -3127,13 +3272,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/learning-contents/:contentId/like",
+              "raw": "{{baseUrl}}/learning-contents/{{contentId}}/like",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "learning-contents",
-                ":contentId",
+                "{{contentId}}",
                 "like"
               ],
               "variable": [
@@ -3162,13 +3307,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/learning-contents/:contentId/comments",
+              "raw": "{{baseUrl}}/learning-contents/{{contentId}}/comments",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "learning-contents",
-                ":contentId",
+                "{{contentId}}",
                 "comments"
               ],
               "variable": [
@@ -3206,14 +3351,26 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/learning-contents/:contentId/comments",
+              "raw": "{{baseUrl}}/learning-contents/{{contentId}}/comments",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "learning-contents",
-                ":contentId",
+                "{{contentId}}",
                 "comments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "",
+                  "description": "Items per page"
+                }
               ],
               "variable": [
                 {
@@ -3241,14 +3398,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/learning-contents/comments/:commentId",
+              "raw": "{{baseUrl}}/learning-contents/comments/{{commentId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "learning-contents",
                 "comments",
-                ":commentId"
+                "{{commentId}}"
               ],
               "variable": [
                 {
@@ -3403,13 +3560,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/duas/:duaId",
+              "raw": "{{baseUrl}}/duas/{{duaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "duas",
-                ":duaId"
+                "{{duaId}}"
               ],
               "variable": [
                 {
@@ -3437,13 +3594,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/duas/:duaId",
+              "raw": "{{baseUrl}}/duas/{{duaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "duas",
-                ":duaId"
+                "{{duaId}}"
               ],
               "variable": [
                 {
@@ -3507,13 +3664,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/duas/:duaId",
+              "raw": "{{baseUrl}}/duas/{{duaId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "duas",
-                ":duaId"
+                "{{duaId}}"
               ],
               "variable": [
                 {
@@ -3523,6 +3680,1124 @@
               ]
             },
             "description": "**Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Support Ticket Module",
+      "item": [
+        {
+          "name": "12.1 Create Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.2 List My Tickets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/my",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "my"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.3 Get Ticket Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/{{ticketId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "{{ticketId}}"
+              ],
+              "variable": [
+                {
+                  "key": "ticketId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.4 List Ticket Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/{{ticketId}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "{{ticketId}}",
+                "messages"
+              ],
+              "variable": [
+                {
+                  "key": "ticketId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.5 Reply To Ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/{{ticketId}}/reply",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "{{ticketId}}",
+                "reply"
+              ],
+              "variable": [
+                {
+                  "key": "ticketId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.6 Admin — List Tickets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/admin/list",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "admin",
+                "list"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.7 Admin — Ticket Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/admin/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "admin",
+                "stats"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.8 Admin — Update Ticket Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/admin/{{ticketId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "admin",
+                "{{ticketId}}",
+                "status"
+              ],
+              "variable": [
+                {
+                  "key": "ticketId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.9 Admin — Update Ticket Priority",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/admin/{{ticketId}}/priority",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "admin",
+                "{{ticketId}}",
+                "priority"
+              ],
+              "variable": [
+                {
+                  "key": "ticketId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "12.10 Admin — Assign Ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/support-tickets/admin/{{ticketId}}/assign",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "support-tickets",
+                "admin",
+                "{{ticketId}}",
+                "assign"
+              ],
+              "variable": [
+                {
+                  "key": "ticketId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Note: the service does **not** verify that the provided `adminId` actually corresponds to a `SUPER_ADMIN` user — that check could be added later if assignment to non-admins becomes a concern.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Pending Email Module",
+      "item": [
+        {
+          "name": "13.1 List Pending Emails",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/pending-emails",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "pending-emails"
+              ]
+            },
+            "description": "`403 Forbidden` (`\"message\": \"You don't have permission to access this API\"`).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13.2 Requeue Dead Pending Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/pending-emails/{{pendingEmailId}}/requeue",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "pending-emails",
+                "{{pendingEmailId}}",
+                "requeue"
+              ],
+              "variable": [
+                {
+                  "key": "pendingEmailId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "`403 Forbidden` (`\"message\": \"You don't have permission to access this API\"`).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "13.3 Pending Email Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/admin/pending-emails/stats",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "admin",
+                "pending-emails",
+                "stats"
+              ]
+            },
+            "description": "`403 Forbidden` (`\"message\": \"You don't have permission to access this API\"`).",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Connection Module",
+      "item": [
+        {
+          "name": "14.1 Send Connection Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections/request/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections",
+                "request",
+                "{{userId}}"
+              ],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14.2 Respond to Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections/{{connectionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections",
+                "{{connectionId}}"
+              ],
+              "variable": [
+                {
+                  "key": "connectionId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"action\": \"ACCEPT\", // Either `ACCEPT` or `REJECT`\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14.3 Cancel Pending Request",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections/{{connectionId}}/request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections",
+                "{{connectionId}}",
+                "request"
+              ],
+              "variable": [
+                {
+                  "key": "connectionId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Allows the **sender** of a pending connection request to cancel (undo) it before the receiver responds. Uses `DELETE` because the pending request document is permanently removed.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14.4 Remove Connection",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections/{{connectionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections",
+                "{{connectionId}}"
+              ],
+              "variable": [
+                {
+                  "key": "connectionId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Allows either user in an **accepted** connection to permanently remove it. Both the connection record and the associated chat session are invalidated.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14.5 List My Connections",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Pagination page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Pagination limit"
+                },
+                {
+                  "key": "sort",
+                  "value": "-createdAt",
+                  "description": "Sort field (prefix with `-` for descending)"
+                },
+                {
+                  "key": "fields",
+                  "value": "status,createdAt",
+                  "description": "Comma-separated fields to select"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14.6 List Pending Requests",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections/pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections",
+                "pending"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "sent",
+                  "description": "Whether to fetch requests you `sent` or `received`"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Pagination page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Pagination limit"
+                },
+                {
+                  "key": "sort",
+                  "value": "-createdAt",
+                  "description": "Sort field (prefix with `-` for descending)"
+                },
+                {
+                  "key": "fields",
+                  "value": "status,createdAt",
+                  "description": "Comma-separated fields to select"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14.7 Check Connection Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections/status/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections",
+                "status",
+                "{{userId}}"
+              ],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Chat Module",
+      "item": [
+        {
+          "name": "15.1 Create or Get Chat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chats/{{otherUserId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chats",
+                "{{otherUserId}}"
+              ],
+              "variable": [
+                {
+                  "key": "otherUserId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "15.2 List My Chats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/chats?searchTerm=John",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "chats"
+              ],
+              "query": [
+                {
+                  "key": "searchTerm",
+                  "value": "John"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Message Module",
+      "item": [
+        {
+          "name": "16.1 Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "chatId",
+                  "value": "",
+                  "type": "text",
+                  "description": "Target Chat ID"
+                },
+                {
+                  "key": "text",
+                  "value": "",
+                  "type": "text",
+                  "description": "Message text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Image files"
+                },
+                {
+                  "key": "media",
+                  "type": "file",
+                  "src": [],
+                  "description": "Audio/Video files"
+                },
+                {
+                  "key": "doc",
+                  "type": "file",
+                  "src": [],
+                  "description": "Document files"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "16.2 Get Chat Messages",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/chat/{{chatId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages",
+                "chat",
+                "{{chatId}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": ""
+                },
+                {
+                  "key": "limit",
+                  "value": ""
+                },
+                {
+                  "key": "searchTerm",
+                  "value": ""
+                }
+              ],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "16.3 Mark Chat as Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/messages/chat/{{chatId}}/read",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "messages",
+                "chat",
+                "{{chatId}}",
+                "read"
+              ],
+              "variable": [
+                {
+                  "key": "chatId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "",
             "auth": {
               "type": "bearer",
               "bearer": [

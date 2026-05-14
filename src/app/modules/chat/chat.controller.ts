@@ -10,7 +10,6 @@ const createChat = catchAsync(async (req: Request, res: Response) => {
   const otherUser = req.params.otherUserId;
 
   const participants = [user?.id, otherUser];
-  console.log('participants', participants);
   const chat = await ChatService.createChatToDB(participants);
 
   sendResponse(res, {

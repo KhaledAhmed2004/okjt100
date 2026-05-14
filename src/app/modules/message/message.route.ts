@@ -13,7 +13,7 @@ const router = express.Router();
 // Send a message with optional file attachments
 router.post(
   '/',
-  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
   fileUploadHandler(),
   async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -74,7 +74,7 @@ router.post(
 // Get a single message by ID
 router.get(
   '/:messageId',
-  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
   MessageController.getMessage
 );
 
@@ -83,14 +83,14 @@ router.get(
 // Get all messages in a chat (alias route for frontend compatibility)
 router.get(
   '/chat/:chatId',
-  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
   MessageController.getChatMessages
 );
 
 // Mark all messages in a chat as read
 router.post(
   '/chat/:chatId/read',
-  auth(USER_ROLES.STUDENT, USER_ROLES.TUTOR, USER_ROLES.SUPER_ADMIN),
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
   MessageController.markChatRead
 );
 

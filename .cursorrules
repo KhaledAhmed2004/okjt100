@@ -10,6 +10,7 @@
 - **ONLY** document endpoints that currently exist in the codebase (routes/controllers).
 - **NEVER** add "missing", "future", or "imaginary" APIs to the `api-inventory.md` or UX flow docs unless they are already implemented in code.
 - If an API is missing but needed, suggest it in the conversation instead of adding it to the documentation tracker.
+- **MANDATORY**: When creating or updating API documentation `.md` files, any tables for `Query Parameters`, `Path Parameters`, or `Request Body` MUST include an `Example` or `Default` column. This is critical for the `generate-postman.ts` script to extract values.
 
 ---
 

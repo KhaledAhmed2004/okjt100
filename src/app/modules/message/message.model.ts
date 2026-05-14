@@ -20,67 +20,6 @@ const AttachmentSchema = new Schema(
   { _id: false }
 );
 
-// Session Proposal Schema (in-chat booking)
-const SessionProposalSchema = new Schema(
-  {
-    subject: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-    startTime: {
-      type: Date,
-      required: true,
-    },
-    endTime: {
-      type: Date,
-      required: true,
-    },
-    duration: {
-      type: Number,
-      required: true, // in minutes
-    },
-    price: {
-      type: Number,
-      required: true, // in EUR
-    },
-    description: {
-      type: String,
-      trim: true,
-    },
-    status: {
-      type: String,
-      enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'COUNTER_PROPOSED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'STARTING_SOON', 'IN_PROGRESS'],
-      default: 'PROPOSED',
-    },
-    sessionId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Session',
-    },
-    rejectionReason: {
-      type: String,
-      trim: true,
-    },
-    expiresAt: {
-      type: Date,
-      required: true,
-    },
-    originalProposalId: {
-      type: Schema.Types.ObjectId,
-      ref: 'Message',
-    },
-    counterProposalReason: {
-      type: String,
-      trim: true,
-    },
-    noShowBy: {
-      type: String,
-      enum: ['tutor', 'student'],
-    },
-  },
-  { _id: false }
-);
-
 // Message Schema
 const messageSchema = new Schema<IMessage, MessageModel>(
   {
@@ -104,7 +43,7 @@ const messageSchema = new Schema<IMessage, MessageModel>(
     },
     type: {
       type: String,
-      enum: ['text', 'image', 'media', 'doc', 'mixed', 'session_proposal'],
+      enum: ['text', 'image', 'media', 'doc', 'mixed'],
       default: 'text',
     },
 
@@ -112,12 +51,6 @@ const messageSchema = new Schema<IMessage, MessageModel>(
     attachments: {
       type: [AttachmentSchema],
       default: [],
-    },
-
-    // In-chat booking (tutoring marketplace)
-    sessionProposal: {
-      type: SessionProposalSchema,
-      required: false,
     },
 
     // Delivery & read tracking
@@ -142,22 +75,6 @@ const messageSchema = new Schema<IMessage, MessageModel>(
 // Indexes
 messageSchema.index({ chatId: 1, createdAt: -1 });
 messageSchema.index({ sender: 1, createdAt: -1 });
-messageSchema.index({ 'sessionProposal.status': 1 }); // For filtering proposals
-
-// Pre-save: Set proposal expiration (24 hours)
-messageSchema.pre('save', function (next) {
-  if (
-    this.type === 'session_proposal' &&
-    this.sessionProposal &&
-    this.isNew &&
-    !this.sessionProposal.expiresAt
-  ) {
-    const expirationDate = new Date();
-    expirationDate.setHours(expirationDate.getHours() + 24); // 24 hours from now
-    this.sessionProposal.expiresAt = expirationDate;
-  }
-  next();
-});
 
 // Virtual field: 'content' as alias for 'text' (for frontend compatibility)
 messageSchema.virtual('content').get(function () {

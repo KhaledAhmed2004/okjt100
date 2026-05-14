@@ -2,7 +2,7 @@
 
 ```http
 PATCH /learning-contents/:contentId
-Content-Type: application/json
+Content-Type: multipart/form-data
 Auth: SUPER_ADMIN
 ```
 
@@ -14,14 +14,15 @@ Auth: SUPER_ADMIN
 | :--- | :--- | :--- |
 | `contentId` | `string` | ID of the learning content |
 
-## Request Body
+## Request Body (multipart/form-data)
 
-| Field | Type | Required | Description |
-| :--- | :--- | :---: | :--- |
-| `title` | `string` | ❌ | Updated title |
-| `description` | `string` | ❌ | Updated description |
-| `videoUrl` | `string` | ❌ | Updated video URL |
-| `category` | `string` | ❌ | Updated category |
+| Field | Type | Required | Description | Example |
+| :--- | :--- | :---: | :--- | :--- |
+| `title` | `string` | ❌ | Updated title | `Advanced Fiqh` |
+| `description` | `string` | ❌ | Updated description | `Deeper dive into Islamic jurisprudence` |
+| `category` | `string` | ❌ | Updated category | `Fiqh` |
+| `video` | `file` | ❌ | Updated video file (mp4, etc.) | — |
+| `durationInSeconds` | `number` | ❌ | Updated duration of the video in seconds | `390` |
 
 ## Implementation
 
@@ -39,13 +40,7 @@ Auth: SUPER_ADMIN
   "statusCode": 200,
   "message": "Learning content updated successfully",
   "data": {
-    "_id": "60d5ecb86372ad46101f1930",
-    "title": "Advanced Fiqh",
-    "description": "Deeper dive into Islamic jurisprudence",
-    "videoUrl": "https://example.com/video2.mp4",
-    "category": "Fiqh",
-    "likesCount": 10,
-    "commentsCount": 5,
+    "id": "60d5ecb86372ad46101f1930",
     "updatedAt": "2026-05-12T11:00:00.000Z"
   }
 }

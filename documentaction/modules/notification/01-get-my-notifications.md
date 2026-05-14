@@ -1,14 +1,15 @@
 # 01. Get My Notifications
 
 ```http
-GET /api/v1/notifications
+GET /api/v1/notifications/me
 Auth: Bearer {{accessToken}}
 ```
 
 **Business Logic (`getNotificationFromDB`):**
 - **Query Strategy**: Fetches the notification list and **unreadCount** in separate queries for accuracy.
-- **Index Optimization**: Uses `{ receiver: 1, createdAt: -1 }` and `{ receiver: 1, isRead: 1 }` compound indexes to ensure fast query performance.
-- **Unread Count**: The `unreadCount` represents the total number of unread notifications for the user across all pages. This is typically used to render the red dot on the notification bell icon in mobile/web apps.
+- **Data Transformation**: The response is flattened and simplified for frontend consumption.
+- **Resource Object**: The `resourceType` and `resourceId` are grouped into a `resource` object.
+- **Unread Count**: The `unreadCount` is returned within the `meta` object alongside pagination info.
 - **Pagination**: Supports page-based pagination (`page`, `limit`) using the `QueryBuilder`.
 
 ### Notification Types
@@ -38,45 +39,30 @@ The system can generate notifications for the following events:
   "success": true,
   "statusCode": 200,
   "message": "Notifications retrieved successfully",
-  "data": {
-    "data": [
-      {
-        "_id": "664a1b2c3d4e5f6a7b8c9d11",
-        "receiver": "664a1b2c3d4e5f6a7b8c9d00",
-        "type": "ADMIN",
-        "title": "System Update",
-        "text": "Maintenance scheduled for tomorrow.",
-        "isRead": false,
-        "createdAt": "2026-04-09T08:00:00.000Z",
-        "updatedAt": "2026-04-09T08:00:00.000Z"
+  "data": [
+    {
+      "id": "6a04c00e581ed9bcec093113",
+      "type": "SYSTEM",
+      "title": "New Connection Request",
+      "text": "John wants to connect",
+      "isRead": false,
+      "createdAt": "2026-05-13T18:16:46.496Z",
+      "resource": {
+        "type": "User",
+        "id": "6a047bd8edae48d18fc46bbf"
       }
-    ],
+    }
+  ],
+  "meta": {
     "pagination": {
-      "page": 1,
+      "total": 2,
       "limit": 10,
-      "total": 1,
-      "totalPage": 1
-    },
-    "unreadCount": 1
-  }
-}
-```
-
-### Scenario: Empty State (200)
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "message": "Notifications retrieved successfully",
-  "data": {
-    "data": [],
-    "pagination": {
       "page": 1,
-      "limit": 10,
-      "total": 0,
-      "totalPage": 0
+      "totalPages": 1,
+      "hasNext": false,
+      "hasPrev": false
     },
-    "unreadCount": 0
+    "unreadCount": 2
   }
 }
 ```

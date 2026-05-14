@@ -1,6 +1,7 @@
 import express from 'express';
 import { USER_ROLES } from '../../../enums/user';
 import auth from '../../middlewares/auth';
+import { fileHandler } from '../../middlewares/fileHandler';
 import validateRequest from '../../middlewares/validateRequest';
 import { LearningContentController } from './learning-content.controller';
 import { LearningContentValidation } from './learning-content.validation';
@@ -22,6 +23,7 @@ router.get(
 router.post(
   '/',
   auth(USER_ROLES.SUPER_ADMIN),
+  fileHandler([{ name: 'video', maxCount: 1, subfolder: 'learning-contents/videos' }], { maxFileSizeMB: 500 }),
   validateRequest(LearningContentValidation.createLearningContentZodSchema),
   LearningContentController.createLearningContent,
 );
@@ -29,6 +31,7 @@ router.post(
 router.patch(
   '/:contentId',
   auth(USER_ROLES.SUPER_ADMIN),
+  fileHandler([{ name: 'video', maxCount: 1, subfolder: 'learning-contents/videos' }], { maxFileSizeMB: 500 }),
   validateRequest(LearningContentValidation.updateLearningContentZodSchema),
   LearningContentController.updateLearningContent,
 );

@@ -229,16 +229,22 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
   const [pathPart, queryPart] = fullPath.trim().split('?');
   const pathSegments = pathPart.split('/').filter(p => p);
   
-  // Handle path variables (e.g., :cardId)
+  // Handle path variables — Postman v2.1 uses {{paramName}} syntax
+  // in both the raw URL and path segments array so the Params tab
+  // renders them as editable fields.
   const variables: any[] = [];
   const formattedPathSegments = pathSegments.map(segment => {
     if (segment.startsWith(':')) {
       const key = segment.substring(1);
       variables.push({ key, value: '' });
-      return `:${key}`;
+      return `{{${key}}}`; // Postman v2.1: {{paramName}} not :paramName
     }
     return segment;
   });
+
+  // Rebuild the raw path replacing :param → {{param}} for Postman resolution
+  const processedPath = '/' + formattedPathSegments.join('/');
+  const rawUrl = `{{baseUrl}}${queryPart ? processedPath + '?' + queryPart : processedPath}`;
 
   const queryParams: any[] = [];
   if (queryPart) {
@@ -265,7 +271,7 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
         if (header[0] === '') header.shift();
         if (header[header.length - 1] === '') header.pop();
 
-        const paramIdx = header.findIndex(h => h.includes('parameter'));
+        const paramIdx = header.findIndex(h => h.includes('parameter') || h.includes('field') || h.includes('key'));
         const descIdx = header.findIndex(h => h.includes('description'));
         const exampleIdx = header.findIndex(h => h.includes('example'));
         const defaultIdx = header.findIndex(h => h.includes('default'));
@@ -348,7 +354,7 @@ function parseSpecFile(filePath: string, id: string): PostmanRequest | null {
         }
       ],
       url: {
-        raw: `{{baseUrl}}${fullPath.trim()}`,
+        raw: rawUrl,
         host: ['{{baseUrl}}'],
         path: formattedPathSegments,
         query: queryParams.length > 0 ? queryParams : undefined,

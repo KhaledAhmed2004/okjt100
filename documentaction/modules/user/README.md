@@ -34,6 +34,7 @@
 | 17 | PATCH | `/users/:userId` | SUPER_ADMIN | [17-update-user-admin.md](./17-update-user-admin.md) |
 | 18 | DELETE | `/users/:userId` | SUPER_ADMIN | [18-delete-user-admin.md](./18-delete-user-admin.md) |
 | 19 | PATCH | `/users/:userId/review` | SUPER_ADMIN | [21-review-user-admin.md](./21-review-user-admin.md) |
+| 22 | GET | `/users/profiles` | Bearer (BROTHER, SISTER) | [22-list-user-profiles.md](./22-list-user-profiles.md) |
 
 > Admin-side user-management endpoints (list, stats, update, delete, approve/reject) have been consolidated into this module under `/api/v1/users/*`.
 
@@ -44,6 +45,7 @@
 - [../auth/](../auth/) — login, OTP, password reset/change, refresh, restore-account (the `tokenVersion` consumers across this module's session-invalidation policy)
 - [../admin/](../admin/) — admin-side user list, search, stats, update, hard delete; admin status-flip side effects (re-verify token + email + tokenVersion bump) interact with [06-delete-account.md](./06-delete-account.md) and [13-reverify-account.md](./13-reverify-account.md)
 - [../notification/](../notification/) — push delivery target. Device tokens registered via login/restore are stored in this module's `User.deviceTokens[]`; notification module reads them. Storage rules: [system-concepts.md — Device-Token Storage](../../system-concepts.md#device-token-storage).
+- [../connection/](../connection/) — the `GET /users/profiles` endpoint (doc `22`) enriches each profile with `connectionStatus` and `connectionId` via a server-side `$lookup` against the `connections` collection. The four possible values (`NONE`, `PENDING_SENT`, `PENDING_RECEIVED`, `CONNECTED`) mirror the states managed by the Connection module.
 
 ---
 
@@ -63,3 +65,4 @@
 | 11 | `DELETE /users/me/sessions/:tokenId` | Done | User / Admin | Per-device revoke; no tokenVersion bump |
 | 12 | `POST /users/me/sessions/revoke-all` | Done | User / Admin | Logout-all-devices (bumps tokenVersion); idempotent |
 | 13 | `POST /users/reverify` | Done | Public (token) | Re-submit after admin rejection; 24h token; 5/hour rate limit; idempotent |
+| 22 | `GET /users/profiles` | Done | BROTHER, SISTER | Nearby/new-reverts community discovery; `$geoNear` proximity sort; `connectionStatus` + `connectionId` injected via single-pass `$lookup` |

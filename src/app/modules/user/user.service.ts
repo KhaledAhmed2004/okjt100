@@ -364,7 +364,66 @@ const getUserProfilesFromDB = async (
     },
   });
 
-  // 3. Pagination Facet
+  // 3. Lookup connection between requesting user and each profile (single round-trip, no N+1)
+  //    Connection model stores: sender, receiver, status ('PENDING' | 'ACCEPTED')
+  //    We match both directions (A→B or B→A).
+  pipeline.push({
+    $lookup: {
+      from: 'connections',
+      let: { profileId: '$_id' },
+      pipeline: [
+        {
+          $match: {
+            $expr: {
+              $or: [
+                {
+                  $and: [
+                    { $eq: ['$sender',   new Types.ObjectId(user.id)] },
+                    { $eq: ['$receiver', '$$profileId'] },
+                  ],
+                },
+                {
+                  $and: [
+                    { $eq: ['$receiver', new Types.ObjectId(user.id)] },
+                    { $eq: ['$sender',   '$$profileId'] },
+                  ],
+                },
+              ],
+            },
+          },
+        },
+        { $project: { _id: 1, status: 1 } },
+      ],
+      as: 'connectionInfo',
+    },
+  });
+
+  // 4. Set connectionStatus using the exact Connection model enum values:
+  //    NONE     → no connection document exists
+  //    PENDING  → connection document exists with status 'PENDING'
+  //    ACCEPTED → connection document exists with status 'ACCEPTED'
+  pipeline.push({
+    $addFields: {
+      connectionStatus: {
+        $let: {
+          vars: { conn: { $arrayElemAt: ['$connectionInfo', 0] } },
+          in: {
+            $cond: {
+              if: { $not: ['$$conn'] },
+              then: 'NONE',
+              else: '$$conn.status',
+            },
+          },
+        },
+      },
+      connectionId: { $arrayElemAt: ['$connectionInfo._id', 0] },
+    },
+  });
+
+  // 5. Strip the raw lookup array before pagination
+  pipeline.push({ $project: { connectionInfo: 0 } });
+
+  // 6. Pagination Facet
   pipeline.push({
     $facet: {
       data: [{ $skip: skip }, { $limit: Number(limit) }],

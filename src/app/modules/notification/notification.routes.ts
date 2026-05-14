@@ -11,7 +11,7 @@ const router = express.Router();
 
 // Fetch notifications + unread count
 router.get(
-  '/',
+  '/me',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
   NotificationController.getNotificationFromDB
 );

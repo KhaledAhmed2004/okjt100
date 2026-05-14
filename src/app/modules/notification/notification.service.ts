@@ -27,13 +27,30 @@ const getNotificationFromDB = async (
   const data = await notificationQuery.modelQuery;
   const pagination = await notificationQuery.getPaginationInfo();
 
+  // Format data to match the requested structure
+  const formattedData = data.map((item: any) => {
+    const doc = item.toObject();
+    return {
+      id: doc._id,
+      type: doc.type,
+      title: doc.title,
+      text: doc.text,
+      isRead: doc.isRead,
+      createdAt: doc.createdAt,
+      resource: doc.resourceType ? {
+        type: doc.resourceType,
+        id: doc.resourceId
+      } : null
+    };
+  });
+
   const unreadCount = await Notification.countDocuments({
     receiver: user.id,
     isRead: false,
   });
 
   return {
-    data,
+    data: formattedData,
     pagination,
     unreadCount,
   };

@@ -264,6 +264,15 @@ Use comment dividers whenever a new flow group starts:
 <!-- ══════════════════════════════════════ -->
 ```
 
+### Markdown Tables (MANDATORY for Postman Generator)
+When creating tables for `Query Parameters`, `Path Parameters`, or `Request Body`, you **MUST** include an `Example` or `Default` column. The `generate-postman.ts` script explicitly looks for these columns to populate Postman.
+
+```markdown
+| Field | Type | Required | Description | Example |
+| :--- | :--- | :---: | :--- | :--- |
+| `name` | `string` | ✅ | User's full name | `John Doe` |
+```
+
 ### HTTP Spec Block
 ```
 POST /auth/login

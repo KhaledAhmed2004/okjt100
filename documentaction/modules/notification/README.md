@@ -12,7 +12,7 @@ The Notification module handles in-app, real-time (Socket.io), and push (FCM) no
 ## Endpoint Inventory
 
 ### User Notifications
-- [01-Get My Notifications](01-get-my-notifications.md) - Fetch notifications for the logged-in user.
+- [01-Get My Notifications](01-get-my-notifications.md) - Fetch notifications for the logged-in user (`GET /notifications/me`).
 - [02-Mark as Read](02-mark-as-read.md) - Mark a specific notification as read.
 - [03-Mark All as Read](03-mark-all-as-read.md) - Mark all notifications as read.
 
