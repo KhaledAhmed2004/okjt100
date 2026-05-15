@@ -71,13 +71,6 @@ router.post(
   MessageController.sendMessage
 );
 
-// Get a single message by ID
-router.get(
-  '/:messageId',
-  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
-  MessageController.getMessage
-);
-
 // ============ CHAT-LEVEL OPERATIONS ============
 
 // Get all messages in a chat (alias route for frontend compatibility)

@@ -21,9 +21,10 @@ import { errorLogger, logger } from '../../../shared/logger';
 import { User } from './user.model';
 import { Notification } from '../notification/notification.model';
 import { Group, GroupMember, GroupPost, PostLike, PostComment } from '../group/group.model';
-import { AskQuestion } from '../ask-question/ask-question.model';
+import AskQuestion from '../ask-question/ask-question.model';
 import { ResetToken } from '../auth/resetToken/resetToken.model';
 import { PendingEmail } from '../pending-email/pending-email.model';
+import { LearningContentLike, LearningContentComment } from '../learning-content/learning-content.model';
 
 let cron: any = null;
 try {
@@ -168,7 +169,7 @@ export class AccountPurgeScheduler {
     // 1. Decrement memberCount for groups this user belongs to
     const memberships = await GroupMember.find({ userId }).select('groupId').lean();
     const groupIds = memberships.map(m => m.groupId);
-    
+
     if (groupIds.length > 0) {
       await Group.updateMany(
         { _id: { $in: groupIds } },
@@ -180,15 +181,18 @@ export class AccountPurgeScheduler {
     // PendingEmail is keyed by `to: email`, not userId, so it gets its
     // own delete clause when we know the address. If `email` is
     // somehow missing we skip the cascade (the TTL on SENT rows will
-    // eventually clear; DEAD rows stay until ops requeues or wipes).
+    // TTL on SENT rows will eventually clear; DEAD rows stay until ops
+    // requeues or wipes).
     const cascades: Array<Promise<unknown>> = [
-      Notification.deleteMany({ userId }),
+      Notification.deleteMany({ receiver: userId }),
       GroupMember.deleteMany({ userId }),
       GroupPost.deleteMany({ userId }),
       PostLike.deleteMany({ userId }),
       PostComment.deleteMany({ userId }),
       AskQuestion.deleteMany({ userId }),
       ResetToken.deleteMany({ user: userId }),
+      LearningContentLike.deleteMany({ userId }),
+      LearningContentComment.deleteMany({ userId }),
     ];
     if (email) {
       cascades.push(PendingEmail.deleteMany({ to: email }));

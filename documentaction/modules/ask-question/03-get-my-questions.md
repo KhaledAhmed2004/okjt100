@@ -23,7 +23,17 @@ Allows a registered user (`BROTHER` or `SISTER`) to retrieve a paginated list of
 
 ---
 
-## 3. Implementation
+## 3. Query Parameters
+
+| Parameter | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `status` | `string` | Filter by status (`pending`, `answered`) | `answered` |
+| `page` | `number` | Page number | `1` |
+| `limit` | `number` | Items per page | `10` |
+
+---
+
+## 4. Implementation
 - **Route**: [src/app/modules/ask-question/ask-question.route.ts](../../../src/app/modules/ask-question/ask-question.route.ts) — `router.get('/my-questions', ...)`
 - **Controller**: [src/app/modules/ask-question/ask-question.controller.ts](../../../src/app/modules/ask-question/ask-question.controller.ts) — `getMyQuestions`
 - **Service**: [src/app/modules/ask-question/ask-question.service.ts](../../../src/app/modules/ask-question/ask-question.service.ts) — `getMyQuestionsFromDB`

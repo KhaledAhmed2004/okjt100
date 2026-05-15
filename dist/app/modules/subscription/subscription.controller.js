@@ -125,7 +125,7 @@ exports.getPendingWebhooksController = (0, catchAsync_1.default)((_req, res) => 
     });
 }));
 exports.getSubscriptionByIdController = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield subscription_service_1.default.getSubscriptionById(req.params.id);
+    const result = yield subscription_service_1.default.getSubscriptionById(req.params.subscriptionId);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_1.default.OK,

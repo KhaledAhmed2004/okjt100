@@ -11,6 +11,7 @@ exports.default = {
     database_url: process.env.DATABASE_URL,
     node_env: process.env.NODE_ENV,
     port: process.env.PORT,
+    redis_url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
     bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,
     frontend_url: process.env.FRONTEND_URL,
     // Project branding configuration

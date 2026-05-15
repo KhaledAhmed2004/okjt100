@@ -26,26 +26,16 @@ const getDashboardStats = (0, catchAsync_1.default)((_req, res) => __awaiter(voi
         data: result,
     });
 }));
-const getPreferenceCardMonthly = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield admin_service_1.AdminService.getPreferenceCardMonthlyTrend(req.query);
+const getRecentActivities = (0, catchAsync_1.default)((_req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield admin_service_1.AdminService.getRecentActivities();
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Preference card monthly trend',
-        data: result,
-    });
-}));
-const getActiveSubscriptionMonthly = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield admin_service_1.AdminService.getActiveSubscriptionMonthlyTrend(req.query);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Active subscription monthly trend',
+        message: 'Recent activities fetched successfully',
         data: result,
     });
 }));
 exports.AdminController = {
     getDashboardStats,
-    getPreferenceCardMonthly,
-    getActiveSubscriptionMonthly,
+    getRecentActivities,
 };

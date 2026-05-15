@@ -17,27 +17,29 @@ const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const http_status_codes_1 = require("http-status-codes");
 const chat_service_1 = require("./chat.service");
+// POST /api/v1/chats/:otherUserId
+// Requirements: 3.1 — createOrGet wired to HTTP route
 const createChat = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
-    const otherUser = req.params.otherUserId;
-    const participants = [user === null || user === void 0 ? void 0 : user.id, otherUser];
-    console.log('participants', participants);
-    const chat = yield chat_service_1.ChatService.createChatToDB(participants);
+    const otherUserId = req.params.otherUserId;
+    const chat = yield chat_service_1.ChatService.createOrGet(user.id, otherUserId);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_codes_1.StatusCodes.CREATED,
         success: true,
-        message: 'Create Chat Successfully',
+        message: 'Chat created or retrieved successfully',
         data: chat,
     });
 }));
+// GET /api/v1/chats
+// Requirements: 4.1 — getList wired to HTTP route
 const getChat = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
-    const searchTerm = req.query.searchTerm;
-    const chatList = yield chat_service_1.ChatService.getChatFromDB(user, searchTerm);
+    const search = req.query.search;
+    const chatList = yield chat_service_1.ChatService.getList(user.id, search);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_codes_1.StatusCodes.OK,
         success: true,
-        message: 'Chat Retrieve Successfully',
+        message: 'Chat list retrieved successfully',
         data: chatList,
     });
 }));

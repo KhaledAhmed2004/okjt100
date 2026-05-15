@@ -30,8 +30,8 @@ const saveToDatabase = (users, content) => __awaiter(void 0, void 0, void 0, fun
     // Prepare notification documents
     const notifications = users.map(user => ({
         title: content.title,
-        subtitle: content.text,
-        userId: user._id,
+        text: content.text,
+        receiver: user._id,
         type: content.type || 'SYSTEM',
         resourceType: content.resourceType,
         resourceId: resolvedResourceId,
@@ -49,7 +49,7 @@ const saveToDatabase = (users, content) => __awaiter(void 0, void 0, void 0, fun
         if (error.insertedDocs) {
             result.sent = error.insertedDocs.length;
             // Remaining are failed
-            const insertedIds = new Set(error.insertedDocs.map((d) => d.userId.toString()));
+            const insertedIds = new Set(error.insertedDocs.map((d) => d.receiver.toString()));
             result.failed = users
                 .filter(u => !insertedIds.has(u._id.toString()))
                 .map(u => u._id.toString());

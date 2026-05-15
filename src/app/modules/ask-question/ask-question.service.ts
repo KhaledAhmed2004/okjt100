@@ -13,8 +13,11 @@ const submitQuestionIntoDB = async (payload: Partial<IAskQuestion>) => {
 };
 
 const getAllQuestionsFromDB = async (query: Record<string, unknown>) => {
-  const questionQuery = new QueryBuilder(AskQuestion.find().populate('userId', 'name email'), query)
-    .textSearch(['question'])
+  const questionQuery = new QueryBuilder(
+    AskQuestion.find().populate('userId', 'name email'),
+    query,
+  )
+    .textSearch()
     .filter()
     .sort()
     .paginate()
@@ -29,7 +32,10 @@ const getAllQuestionsFromDB = async (query: Record<string, unknown>) => {
   };
 };
 
-const getMyQuestionsFromDB = async (userId: string, query: Record<string, unknown>) => {
+const getMyQuestionsFromDB = async (
+  userId: string,
+  query: Record<string, unknown>,
+) => {
   const questionQuery = new QueryBuilder(AskQuestion.find({ userId }), query)
     .filter()
     .sort()
@@ -80,17 +86,17 @@ const getQuestionMetricsFromDB = async () => {
   const aggregationBuilder = new AggregationBuilder(AskQuestion);
 
   // Total questions growth
-  const totalStats = await aggregationBuilder.calculateGrowth({ period: 'month' });
+  const totalStats = await aggregationBuilder.calculateGrowth({
+    period: 'month',
+  });
 
   // Answered questions growth
-  aggregationBuilder.reset();
   const answeredStats = await aggregationBuilder.calculateGrowth({
     filter: { status: 'answered' },
     period: 'month',
   });
 
   // Pending questions growth
-  aggregationBuilder.reset();
   const pendingStats = await aggregationBuilder.calculateGrowth({
     filter: { status: 'pending' },
     period: 'month',

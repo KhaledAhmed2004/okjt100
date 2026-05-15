@@ -14,14 +14,8 @@ const notification_model_1 = require("./notification.model");
 const user_model_1 = require("../user/user.model");
 const pushNotificationHelper_1 = require("./pushNotificationHelper");
 const sendNotifications = (data) => __awaiter(void 0, void 0, void 0, function* () {
-    // Set default expiry to 30 days if not provided
-    if (!data.expiresAt) {
-        const expiryDate = new Date();
-        expiryDate.setDate(expiryDate.getDate() + 30);
-        data.expiresAt = expiryDate;
-    }
     const result = yield notification_model_1.Notification.create(data);
-    const user = yield user_model_1.User.findById(data === null || data === void 0 ? void 0 : data.userId);
+    const user = yield user_model_1.User.findById(data === null || data === void 0 ? void 0 : data.receiver);
     // Extract raw token strings from the deviceTokens sub-document array.
     const tokens = Array.isArray(user === null || user === void 0 ? void 0 : user.deviceTokens)
         ? user.deviceTokens.map(entry => entry === null || entry === void 0 ? void 0 : entry.token).filter(Boolean)
@@ -30,7 +24,7 @@ const sendNotifications = (data) => __awaiter(void 0, void 0, void 0, function* 
         const message = {
             notification: {
                 title: (data === null || data === void 0 ? void 0 : data.title) || 'TBSosick Notification',
-                body: (data === null || data === void 0 ? void 0 : data.subtitle) || (data === null || data === void 0 ? void 0 : data.title) || '',
+                body: (data === null || data === void 0 ? void 0 : data.subtitle) || (data === null || data === void 0 ? void 0 : data.text) || (data === null || data === void 0 ? void 0 : data.title) || '',
             },
             tokens,
         };
@@ -44,9 +38,9 @@ const sendNotifications = (data) => __awaiter(void 0, void 0, void 0, function* 
     //@ts-ignore
     const socketIo = global.io;
     if (socketIo) {
-        socketIo.to(`user::${data === null || data === void 0 ? void 0 : data.userId}`).emit('notification:new', result);
+        socketIo.to(`user::${data === null || data === void 0 ? void 0 : data.receiver}`).emit('notification:new', result);
         // Legacy alias — kept for older mobile clients
-        socketIo.emit(`get-notification::${data === null || data === void 0 ? void 0 : data.userId}`, result);
+        socketIo.emit(`get-notification::${data === null || data === void 0 ? void 0 : data.receiver}`, result);
     }
     return result;
 });

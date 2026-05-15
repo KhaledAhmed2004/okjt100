@@ -9,7 +9,7 @@ const KhutbaSchema = new mongoose_1.Schema({
     description: { type: String },
     audioUrl: { type: String, required: true },
     thumbnailUrl: { type: String, required: true },
-    duration: { type: Number },
+    durationInSeconds: { type: Number },
 }, {
     timestamps: true,
 });

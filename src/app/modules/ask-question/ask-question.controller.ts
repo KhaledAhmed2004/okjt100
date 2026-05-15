@@ -5,13 +5,13 @@ import sendResponse from '../../../shared/sendResponse';
 import { AskQuestionService } from './ask-question.service';
 
 const submitQuestion = catchAsync(async (req: Request, res: Response) => {
-  const { user } = req as any;
+  const user = req.user!;
   const { image, ...rest } = req.body;
 
   // Securing data by taking userId and userRole directly from verified token
   const result = await AskQuestionService.submitQuestionIntoDB({
     ...rest,
-    userId: user.id || user._id,
+    userId: user.id as string,
     userRole: user.role,
     imageUrl: image,
   });
@@ -37,8 +37,11 @@ const getAllQuestions = catchAsync(async (req: Request, res: Response) => {
 });
 
 const getMyQuestions = catchAsync(async (req: Request, res: Response) => {
-  const { user } = req as any;
-  const result = await AskQuestionService.getMyQuestionsFromDB(user.id || user._id, req.query);
+  const user = req.user!;
+  const result = await AskQuestionService.getMyQuestionsFromDB(
+    user.id as string,
+    req.query,
+  );
 
   sendResponse(res, {
     success: true,
@@ -53,7 +56,10 @@ const answerQuestion = catchAsync(async (req: Request, res: Response) => {
   const { questionId } = req.params;
   const { answer } = req.body;
 
-  const result = await AskQuestionService.answerQuestionInDB(questionId, answer);
+  const result = await AskQuestionService.answerQuestionInDB(
+    questionId,
+    answer,
+  );
 
   sendResponse(res, {
     success: true,

@@ -22,6 +22,7 @@ const AskQuestionSchema = new Schema<IAskQuestion>(
 );
 
 // Indexes
+AskQuestionSchema.index({ question: 'text' });
 AskQuestionSchema.index({ userId: 1 });
 AskQuestionSchema.index({ userRole: 1 });
 AskQuestionSchema.index({ status: 1 });

@@ -179,15 +179,15 @@ const createStorage = (mode: 'local' | 'memory') => {
   return multer.diskStorage({
     destination: (req, file, cb) => {
       const canonicalFolder = getFolderByMime(file.mimetype);
-      
+
       // Check if there's a custom subfolder for this field
       const options = (req as any)._fileHandlerOptions as FileHandlerOptions;
       const customSub = options?.perFieldSubfolder?.[file.fieldname];
-      
-      const folderPath = customSub 
+
+      const folderPath = customSub
         ? path.join(baseUploadDir, customSub)
         : path.join(baseUploadDir, canonicalFolder);
-        
+
       ensureDir(folderPath);
       cb(null, folderPath);
     },
@@ -215,8 +215,7 @@ const fileFilter = (
     return cb(
       new ApiError(
         StatusCodes.BAD_REQUEST,
-        `Invalid file type '${file.mimetype}'. Allowed for ${folder}: ${
-          allowedTypes[folder]?.join(', ') || 'none'
+        `Invalid file type '${file.mimetype}'. Allowed for ${folder}: ${allowedTypes[folder]?.join(', ') || 'none'
         }`
       )
     );
@@ -360,11 +359,11 @@ const processFilesToUrls = async (
 };
 
 const normalizeOptions = (
-  fields?: FileHandlerOptions | string[] | Array<string | { name: string; maxCount?: number }>,
+  fields?: FileHandlerOptions | string[] | Array<string | { name: string; maxCount?: number; subfolder?: string }>,
   options?: FileHandlerOptions
 ): FileHandlerOptions => {
   const arrayToOptions = (
-    arr: Array<string | { name: string; maxCount?: number }>
+    arr: Array<string | { name: string; maxCount?: number; subfolder?: string }>
   ): FileHandlerOptions => {
     const enforceAllowedFields: string[] = [];
     const perFieldMaxCount: Record<string, number> = {};
@@ -398,7 +397,7 @@ const normalizeOptions = (
 // Middleware
 // ===============================
 export const fileHandler = (
-  fields?: FileHandlerOptions | string[] | Array<string | { name: string; maxCount?: number }>,
+  fields?: FileHandlerOptions | string[] | Array<string | { name: string; maxCount?: number; subfolder?: string }>,
   options?: FileHandlerOptions
 ) => {
   const resolved = normalizeOptions(fields, options);

@@ -8,7 +8,7 @@ export interface IKhutba extends Document {
   description?: string;
   audioUrl: string;
   thumbnailUrl: string;
-  duration?: number;
+  durationInSeconds?: number;
   createdAt: Date;
   updatedAt: Date;
 }

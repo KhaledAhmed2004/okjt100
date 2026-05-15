@@ -72,8 +72,6 @@ const updateUserZodSchema = zod_1.z.object({
         name: zod_1.z.string().optional(),
         aboutMe: zod_1.z.string().optional(),
         revertStory: zod_1.z.string().optional(),
-        specialty: zod_1.z.string().optional(),
-        hospital: zod_1.z.string().optional(),
         revertDate: zod_1.z.string().datetime().optional(),
         interests: zod_1.z
             .preprocess((v) => {
@@ -89,14 +87,20 @@ const updateUserZodSchema = zod_1.z.object({
         }, zod_1.z.array(zod_1.z.string()))
             .optional(),
         profileImage: zod_1.z.string().optional(),
-        location: zod_1.z.object({
-            country: zod_1.z.string().optional(),
-            city: zod_1.z.string().optional(),
-            coordinates: zod_1.z.object({
-                lat: zod_1.z.number().min(-90).max(90),
-                lng: zod_1.z.number().min(-180).max(180)
-            }).optional()
-        }).optional()
+        location: zod_1.z.union([
+            zod_1.z.object({
+                country: zod_1.z.string().optional(),
+                city: zod_1.z.string().optional(),
+                latitude: zod_1.z.preprocess((v) => (v === '' ? undefined : Number(v)), zod_1.z.number().min(-90).max(90)),
+                longitude: zod_1.z.preprocess((v) => (v === '' ? undefined : Number(v)), zod_1.z.number().min(-180).max(180))
+            }),
+            zod_1.z.object({
+                country: zod_1.z.string().optional(),
+                city: zod_1.z.string().optional(),
+                type: zod_1.z.literal('Point'),
+                coordinates: zod_1.z.tuple([zod_1.z.number(), zod_1.z.number()])
+            })
+        ]).optional()
     }),
 });
 exports.UserValidation = {
@@ -168,6 +172,20 @@ exports.UserValidation = {
                 return v;
             }, zod_1.z.array(zod_1.z.string()))
                 .optional(),
+            location: zod_1.z.union([
+                zod_1.z.object({
+                    country: zod_1.z.string().optional(),
+                    city: zod_1.z.string().optional(),
+                    latitude: zod_1.z.preprocess((v) => (v === '' ? undefined : Number(v)), zod_1.z.number().min(-90).max(90)).optional(),
+                    longitude: zod_1.z.preprocess((v) => (v === '' ? undefined : Number(v)), zod_1.z.number().min(-180).max(180)).optional()
+                }),
+                zod_1.z.object({
+                    country: zod_1.z.string().optional(),
+                    city: zod_1.z.string().optional(),
+                    type: zod_1.z.literal('Point'),
+                    coordinates: zod_1.z.tuple([zod_1.z.number(), zod_1.z.number()])
+                })
+            ]).optional()
         }),
     }),
     getUserDetailsZodSchema: zod_1.z.object({

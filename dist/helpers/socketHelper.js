@@ -17,6 +17,7 @@ const colors_1 = __importDefault(require("colors"));
 const logger_1 = require("../shared/logger");
 const jwtHelper_1 = require("./jwtHelper");
 const config_1 = __importDefault(require("../config"));
+const redisClient_1 = require("../shared/redisClient");
 // Optional chat/message modules: fall back to stubs when absent
 let Message;
 let Chat;
@@ -119,18 +120,17 @@ const socket = (io) => {
             // 🔹 Chat Room Join / Leave Events
             // ---------------------------------------------
             socket.on('JOIN_CHAT', (_a) => __awaiter(void 0, [_a], void 0, function* ({ chatId }) {
+                // Requirement 8.2: ignore event if chatId is absent or empty string
                 if (!chatId)
                     return;
-                // Security: Ensure only chat participants can join the room
-                const allowed = yield Chat.exists({ _id: chatId, participants: userId });
-                if (!allowed) {
-                    socket.emit('ACK_ERROR', {
-                        message: 'You are not a participant of this chat',
-                        chatId: String(chatId),
-                    });
-                    handleEventProcessed('JOIN_CHAT_DENIED', `for chat_id: ${chatId}`);
-                    return;
+                // Write active:{userId}:chat = chatId with 3600-second TTL (Requirement 8.1)
+                try {
+                    yield redisClient_1.redisClient.set(`active:${userId}:chat`, chatId, 'EX', 3600);
                 }
+                catch (err) {
+                    logger_1.errorLogger.error(colors_1.default.red(`JOIN_CHAT: failed to write active-chat key for user ${userId}: ${String(err)}`));
+                }
+                // Join the socket room for this chat
                 socket.join(CHAT_ROOM(chatId));
                 yield (0, presenceHelper_1.addUserRoom)(userId, chatId);
                 handleEventProcessed('JOIN_CHAT', `for chat_id: ${chatId}`);
@@ -142,45 +142,16 @@ const socket = (io) => {
                     lastActive,
                 });
                 logger_1.logger.info(colors_1.default.green(`User ${userId} joined chat room ${CHAT_ROOM(chatId)}`));
-                // Auto-mark undelivered messages as delivered for this user upon joining the chat.
-                // This fixes cases where messages sent while the user was offline remain stuck at "sent"
-                // after the user logs back in and rejoins rooms.
-                try {
-                    const undelivered = yield Message.find({
-                        chatId,
-                        sender: { $ne: userId },
-                        deliveredTo: { $nin: [userId] },
-                    }, { _id: 1 });
-                    if (undelivered && undelivered.length > 0) {
-                        const ids = undelivered.map((m) => m._id);
-                        yield Message.updateMany({ _id: { $in: ids } }, { $addToSet: { deliveredTo: userId } });
-                        for (const msg of undelivered) {
-                            io.to(CHAT_ROOM(String(chatId))).emit('MESSAGE_DELIVERED', {
-                                messageId: String(msg._id),
-                                chatId: String(chatId),
-                                userId,
-                            });
-                        }
-                        logger_1.logger.info(colors_1.default.green(`Auto-delivered ${undelivered.length} pending messages for user ${userId} on join to ${CHAT_ROOM(chatId)}`));
-                        handleEventProcessed('AUTO_DELIVERED_ON_JOIN', `count=${undelivered.length} chat_id=${chatId}`);
-                    }
-                }
-                catch (err) {
-                    logger_1.logger.error(colors_1.default.red(`JOIN_CHAT auto deliver error: ${String(err)}`));
-                }
             }));
             socket.on('LEAVE_CHAT', (_a) => __awaiter(void 0, [_a], void 0, function* ({ chatId }) {
                 if (!chatId)
                     return;
-                // Guard: Ensure only participants can leave (consistency & logging)
-                const allowed = yield Chat.exists({ _id: chatId, participants: userId });
-                if (!allowed) {
-                    socket.emit('ACK_ERROR', {
-                        message: 'You are not a participant of this chat',
-                        chatId: String(chatId),
-                    });
-                    handleEventProcessed('LEAVE_CHAT_DENIED', `for chat_id: ${chatId}`);
-                    return;
+                // Delete active:{userId}:chat from Redis (Requirement 8.3)
+                try {
+                    yield redisClient_1.redisClient.del(`active:${userId}:chat`);
+                }
+                catch (err) {
+                    logger_1.errorLogger.error(colors_1.default.red(`LEAVE_CHAT: failed to delete active-chat key for user ${userId}: ${String(err)}`));
                 }
                 socket.leave(CHAT_ROOM(chatId));
                 yield (0, presenceHelper_1.removeUserRoom)(userId, chatId);
@@ -350,6 +321,13 @@ const socket = (io) => {
                     yield (0, presenceHelper_1.updateLastActive)(userId);
                     const remaining = yield (0, presenceHelper_1.decrConnCount)(userId);
                     const lastActive = yield (0, presenceHelper_1.getLastActive)(userId);
+                    // Delete active:{userId}:chat from Redis on disconnect (Requirement 8.4)
+                    try {
+                        yield redisClient_1.redisClient.del(`active:${userId}:chat`);
+                    }
+                    catch (err) {
+                        logger_1.errorLogger.error(colors_1.default.red(`disconnect: failed to delete active-chat key for user ${userId}: ${String(err)}`));
+                    }
                     // Only mark offline and broadcast if no other sessions remain
                     if (!remaining || remaining <= 0) {
                         yield (0, presenceHelper_1.setOffline)(userId);

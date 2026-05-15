@@ -164,12 +164,6 @@ const userSchema = new mongoose_1.Schema({
         type: String,
         required: true,
     },
-    specialty: {
-        type: String,
-    },
-    hospital: {
-        type: String,
-    },
     aboutMe: {
         type: String,
     },
@@ -183,10 +177,8 @@ const userSchema = new mongoose_1.Schema({
     location: {
         country: { type: String },
         city: { type: String },
-        coordinates: {
-            lat: { type: Number },
-            lng: { type: Number },
-        },
+        type: { type: String, enum: ['Point'], default: 'Point' },
+        coordinates: { type: [Number] }, // [longitude, latitude]
     },
     status: {
         type: String,
@@ -215,6 +207,29 @@ const userSchema = new mongoose_1.Schema({
         unique: true,
     },
     appleId: {
+        type: String,
+        sparse: true,
+        unique: true,
+    },
+    subscriptionTier: {
+        type: String,
+        enum: Object.values(user_1.SUBSCRIPTION_TIER),
+        default: user_1.SUBSCRIPTION_TIER.FREE,
+    },
+    subscriptionStatus: {
+        type: String,
+        enum: Object.values(user_1.SUBSCRIPTION_STATUS),
+        default: user_1.SUBSCRIPTION_STATUS.NONE,
+    },
+    subscriptionExpiryDate: {
+        type: Date,
+    },
+    appleOriginalTransactionId: {
+        type: String,
+        sparse: true,
+        unique: true,
+    },
+    googlePurchaseToken: {
         type: String,
         sparse: true,
         unique: true,
@@ -288,6 +303,8 @@ userSchema.index({ 'deviceTokens.token': 1 });
 // Cron purge query: find users whose recovery window has expired.
 // Compound index speeds up `find({ status: DELETED, recoveryDeadline: { $lt: now } })`.
 userSchema.index({ status: 1, recoveryDeadline: 1 });
+// Geospatial index for nearby users
+userSchema.index({ 'location.coordinates': '2dsphere' });
 userSchema.statics.isExistUserById = (id) => __awaiter(void 0, void 0, void 0, function* () {
     return yield exports.User.findById(id);
 });

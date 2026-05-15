@@ -170,6 +170,21 @@ subscriptionSchema.statics.upsertForUser = function (userId, payload) {
                 console.error('Failed to write SubscriptionEvent:', err);
             }
         }
+        // Synchronize the core subscription state onto the User model directly.
+        try {
+            yield (0, mongoose_1.model)('User').findByIdAndUpdate(userId, {
+                $set: {
+                    subscriptionTier: next.plan,
+                    subscriptionStatus: next.status,
+                    subscriptionExpiryDate: next.currentPeriodEnd,
+                    appleOriginalTransactionId: next.appleOriginalTransactionId,
+                    googlePurchaseToken: next.googlePurchaseToken,
+                },
+            });
+        }
+        catch (err) {
+            console.error('Failed to sync subscription to User model:', err);
+        }
         return next;
     });
 };

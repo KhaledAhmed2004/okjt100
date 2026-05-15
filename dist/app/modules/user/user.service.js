@@ -31,6 +31,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -104,6 +115,16 @@ const getUserProfileFromDB = (user) => __awaiter(void 0, void 0, void 0, functio
     if (!isExistUser) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "User doesn't exist!");
     }
+    // Flatten location for consistency with list API
+    if (isExistUser.location) {
+        isExistUser.country = isExistUser.location.country;
+        isExistUser.city = isExistUser.location.city;
+        if (isExistUser.location.coordinates) {
+            isExistUser.latitude = isExistUser.location.coordinates[1];
+            isExistUser.longitude = isExistUser.location.coordinates[0];
+        }
+        delete isExistUser.location;
+    }
     return isExistUser;
 });
 const updateProfileToDB = (user, payload) => __awaiter(void 0, void 0, void 0, function* () {
@@ -119,6 +140,13 @@ const updateProfileToDB = (user, payload) => __awaiter(void 0, void 0, void 0, f
     //unlink file here
     if (payload.profileImage) {
         (0, unlinkFile_1.default)(isExistUser.profileImage);
+    }
+    // Transform legacy location format {latitude, longitude} to GeoJSON [longitude, latitude]
+    if (payload.location) {
+        const _a = payload.location, { latitude, longitude } = _a, remainingLocation = __rest(_a, ["latitude", "longitude"]);
+        if (latitude !== undefined && longitude !== undefined) {
+            payload.location = Object.assign(Object.assign({}, remainingLocation), { type: 'Point', coordinates: [longitude, latitude] });
+        }
     }
     const updateDoc = yield user_model_1.User.findOneAndUpdate({ _id: id }, payload, {
         new: true,
@@ -179,7 +207,6 @@ const getUserMetricsFromDB = () => __awaiter(void 0, void 0, void 0, function* (
     };
 });
 const getAllUserRolesFromDB = (query) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
     const { searchTerm, email, role, status, isVerified, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = query;
     const skip = (Number(page) - 1) * Number(limit);
     const match = {
@@ -217,8 +244,6 @@ const getAllUserRolesFromDB = (query) => __awaiter(void 0, void 0, void 0, funct
                     name: 1,
                     email: 1,
                     phone: 1,
-                    specialty: 1,
-                    hospital: 1,
                     status: 1,
                     isVerified: 1,
                     role: 1,
@@ -229,7 +254,7 @@ const getAllUserRolesFromDB = (query) => __awaiter(void 0, void 0, void 0, funct
         },
     ];
     const sortStage = {
-        $sort: { [sortBy]: sortOrder === 'desc' ? -1 : 1 },
+        $sort: { [sortBy]: sortOrder === -1 ? -1 : 1 },
     };
     const paginatedPipeline = [
         ...basePipeline,
@@ -245,7 +270,7 @@ const getAllUserRolesFromDB = (query) => __awaiter(void 0, void 0, void 0, funct
         user_model_1.User.aggregate(paginatedPipeline),
         user_model_1.User.aggregate(countPipeline),
     ]);
-    const total = ((_a = countResult[0]) === null || _a === void 0 ? void 0 : _a.total) || 0;
+    const total = countResult.length > 0 ? countResult[0].total : 0;
     const totalPages = Math.ceil(total / Number(limit));
     return {
         meta: {
@@ -253,11 +278,156 @@ const getAllUserRolesFromDB = (query) => __awaiter(void 0, void 0, void 0, funct
             limit: Number(limit),
             total,
             totalPages,
-            hasNext: Number(page) < totalPages,
-            hasPrev: Number(page) > 1,
         },
         data,
     };
+});
+const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const { searchTerm, page = 1, limit = 10, latitude, longitude, filter, // 'new-reverts' or 'nearby-me'
+     } = query;
+    // Enforce same-role discovery and ACTIVE status only
+    const match = {
+        role: user.role,
+        status: user_1.USER_STATUS.ACTIVE,
+        _id: { $ne: new mongoose_1.Types.ObjectId(user.id) }, // Exclude self
+        deletedAt: { $exists: false }
+    };
+    if (searchTerm) {
+        match.$or = [
+            { name: { $regex: searchTerm, $options: 'i' } },
+        ];
+    }
+    const skip = (Number(page) - 1) * Number(limit);
+    const pipeline = [];
+    // 1. Proximity Search & Sorting Logic
+    if (latitude && longitude) {
+        const userLat = parseFloat(latitude);
+        const userLng = parseFloat(longitude);
+        if (!isNaN(userLat) && !isNaN(userLng)) {
+            pipeline.push({
+                $geoNear: {
+                    near: { type: 'Point', coordinates: [userLng, userLat] },
+                    distanceField: 'distanceInKm',
+                    spherical: true,
+                    distanceMultiplier: 0.001, // Convert meters to km
+                    query: match,
+                },
+            });
+            // If NOT explicitly nearby-me, sort by createdAt but keep distanceInKm
+            if (filter !== 'nearby-me') {
+                pipeline.push({ $sort: { createdAt: -1 } });
+            }
+        }
+        else {
+            pipeline.push({ $match: match });
+            pipeline.push({ $sort: { createdAt: -1 } });
+        }
+    }
+    else {
+        pipeline.push({ $match: match });
+        pipeline.push({ $sort: { createdAt: -1 } });
+    }
+    // 2. Projection & Derived Fields
+    pipeline.push({
+        $project: {
+            _id: 1,
+            name: 1,
+            profileImage: 1,
+            revertDate: 1,
+            distanceInKm: 1,
+            age: {
+                $dateDiff: {
+                    startDate: '$dateOfBirth',
+                    endDate: '$$NOW',
+                    unit: 'year',
+                },
+            },
+        },
+    });
+    // 3. Lookup connection between requesting user and each profile (single round-trip, no N+1)
+    //    Connection model stores: sender, receiver, status ('PENDING' | 'ACCEPTED')
+    //    We match both directions (A→B or B→A).
+    pipeline.push({
+        $lookup: {
+            from: 'connections',
+            let: { profileId: '$_id' },
+            pipeline: [
+                {
+                    $match: {
+                        $expr: {
+                            $or: [
+                                {
+                                    $and: [
+                                        { $eq: ['$sender', new mongoose_1.Types.ObjectId(user.id)] },
+                                        { $eq: ['$receiver', '$$profileId'] },
+                                    ],
+                                },
+                                {
+                                    $and: [
+                                        { $eq: ['$receiver', new mongoose_1.Types.ObjectId(user.id)] },
+                                        { $eq: ['$sender', '$$profileId'] },
+                                    ],
+                                },
+                            ],
+                        },
+                    },
+                },
+                { $project: { _id: 1, status: 1 } },
+            ],
+            as: 'connectionInfo',
+        },
+    });
+    // 4. Set connectionStatus using the exact Connection model enum values:
+    //    NONE     → no connection document exists
+    //    PENDING  → connection document exists with status 'PENDING'
+    //    ACCEPTED → connection document exists with status 'ACCEPTED'
+    pipeline.push({
+        $addFields: {
+            connectionStatus: {
+                $let: {
+                    vars: { conn: { $arrayElemAt: ['$connectionInfo', 0] } },
+                    in: {
+                        $cond: {
+                            if: { $not: ['$$conn'] },
+                            then: 'NONE',
+                            else: '$$conn.status',
+                        },
+                    },
+                },
+            },
+            connectionId: { $arrayElemAt: ['$connectionInfo._id', 0] },
+        },
+    });
+    // 5. Strip the raw lookup array before pagination
+    pipeline.push({ $project: { connectionInfo: 0 } });
+    // 6. Pagination Facet
+    pipeline.push({
+        $facet: {
+            data: [{ $skip: skip }, { $limit: Number(limit) }],
+            totalCount: [{ $count: 'total' }],
+        },
+    });
+    const result = yield user_model_1.User.aggregate(pipeline);
+    const data = result[0].data;
+    const total = ((_a = result[0].totalCount[0]) === null || _a === void 0 ? void 0 : _a.total) || 0;
+    const totalPages = Math.ceil(total / Number(limit));
+    return {
+        data,
+        meta: {
+            page: Number(page),
+            limit: Number(limit),
+            total,
+            totalPages,
+        },
+    };
+});
+const getUserByIdFromDB = (id) => __awaiter(void 0, void 0, void 0, function* () {
+    const isExistUser = yield user_model_1.User.findById(id).select('-password -authentication -tokenVersion -deviceTokens -deletedAt');
+    if (!isExistUser) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "User doesn't exist!");
+    }
+    return isExistUser;
 });
 // Statuses that should make every live JWT for the user stop working
 // immediately. We bump `tokenVersion` on flips INTO these so a stolen or
@@ -361,10 +531,6 @@ const updateUserByAdminInDB = (id, payload) => __awaiter(void 0, void 0, void 0,
         user.aboutMe = payload.aboutMe;
     if (payload.revertStory !== undefined)
         user.revertStory = payload.revertStory;
-    if (payload.specialty !== undefined)
-        user.specialty = payload.specialty;
-    if (payload.hospital !== undefined)
-        user.hospital = payload.hospital;
     if (payload.interests !== undefined)
         user.interests = payload.interests;
     if (payload.email !== undefined)
@@ -373,10 +539,16 @@ const updateUserByAdminInDB = (id, payload) => __awaiter(void 0, void 0, void 0,
         user.dateOfBirth = payload.dateOfBirth;
     if (payload.revertDate !== undefined)
         user.revertDate = payload.revertDate;
-    if (payload.location !== undefined)
-        user.location = payload.location;
-    if (payload.gender !== undefined)
-        user.gender = payload.gender;
+    if (payload.location !== undefined) {
+        const _b = payload.location, { latitude, longitude } = _b, remainingLocation = __rest(_b, ["latitude", "longitude"]);
+        if (latitude !== undefined && longitude !== undefined) {
+            user.location = Object.assign(Object.assign({}, remainingLocation), { type: 'Point', coordinates: [longitude, latitude] });
+        }
+        else {
+            user.location = payload.location;
+        }
+    }
+    // if (payload.gender !== undefined) (user as any).gender = payload.gender;
     if (payload.profileImage !== undefined)
         user.profileImage = payload.profileImage;
     if (payload.status !== undefined)
@@ -421,17 +593,8 @@ const updateUserByAdminInDB = (id, payload) => __awaiter(void 0, void 0, void 0,
     delete plain.reverification;
     return plain;
 });
-// Approve user
-const getUserByIdFromDB = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    // Only return user info; remove task/bid side data
-    const user = yield user_model_1.User.findById(id).select('-password -authentication');
-    if (!user) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "User doesn't exist!");
-    }
-    return { user };
-});
 const getUserDetailsByIdFromDB = (id, requester) => __awaiter(void 0, void 0, void 0, function* () {
-    const user = yield user_model_1.User.findById(id).select('_id name role profileImage location isVerified revertDate aboutMe revertStory interests specialty hospital createdAt status deletedAt');
+    const user = yield user_model_1.User.findById(id).select('_id name role profileImage location isVerified revertDate aboutMe revertStory interests createdAt status deletedAt');
     // 1. Check existence and visibility
     if (!user || user.status !== user_1.USER_STATUS.ACTIVE || user.deletedAt) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'User not found');
@@ -447,6 +610,10 @@ const getUserDetailsByIdFromDB = (id, requester) => __awaiter(void 0, void 0, vo
     if (result.location) {
         result.country = result.location.country;
         result.city = result.location.city;
+        if (result.location.coordinates) {
+            result.latitude = result.location.coordinates[1];
+            result.longitude = result.location.coordinates[0];
+        }
         delete result.location;
     }
     // Final cleanup of internal status/flags
@@ -752,8 +919,8 @@ const exportMyDataFromDB = (user) => __awaiter(void 0, void 0, void 0, function*
     // cost on every other endpoint.
     const { Notification } = yield Promise.resolve().then(() => __importStar(require('../notification/notification.model')));
     const { GroupMember, GroupPost, PostLike, PostComment } = yield Promise.resolve().then(() => __importStar(require('../group/group.model')));
-    const AskImamModule = yield Promise.resolve().then(() => __importStar(require('../ask-imam/ask-imam.model')));
-    const AskImam = AskImamModule.default;
+    const AskQuestionModule = yield Promise.resolve().then(() => __importStar(require('../ask-question/ask-question.model')));
+    const AskQuestion = AskQuestionModule.default;
     const { Subscription } = yield Promise.resolve().then(() => __importStar(require('../subscription/subscription.model')));
     const { SubscriptionEvent } = yield Promise.resolve().then(() => __importStar(require('../subscription/subscription-event.model')));
     // Profile — strip all the fields a GDPR export must NOT leak even back
@@ -780,13 +947,13 @@ const exportMyDataFromDB = (user) => __awaiter(void 0, void 0, void 0, function*
     });
     profile.deviceTokens = deviceTokens;
     // Fan-out: each collection that references this user.
-    const [notifications, groupMemberships, groupPosts, postLikes, postComments, askImamQuestions, subscriptions, subscriptionEvents,] = yield Promise.all([
+    const [notifications, groupMemberships, groupPosts, postLikes, postComments, askQuestionData, subscriptions, subscriptionEvents,] = yield Promise.all([
         Notification.find({ userId: id }).lean(),
         GroupMember.find({ userId: id }).lean(),
         GroupPost.find({ userId: id }).lean(),
         PostLike.find({ userId: id }).lean(),
         PostComment.find({ userId: id }).lean(),
-        AskImam.find({ userId: id }).lean(),
+        AskQuestion.find({ userId: id }).lean(),
         Subscription.find({ userId: id }).lean(),
         SubscriptionEvent.find({ userId: id }).lean(),
     ]);
@@ -801,7 +968,7 @@ const exportMyDataFromDB = (user) => __awaiter(void 0, void 0, void 0, function*
             likes: postLikes,
             comments: postComments,
         },
-        askImamQuestions,
+        askQuestionData,
         subscriptions: {
             current: subscriptions,
             events: subscriptionEvents,
@@ -839,4 +1006,5 @@ exports.UserService = {
     revokeMySessionFromDB,
     revokeAllMySessionsFromDB,
     reverifyAccountFromDB,
+    getUserProfilesFromDB,
 };

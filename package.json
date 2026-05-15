@@ -99,6 +99,7 @@
     "http-status": "^2.1.0",
     "http-status-codes": "^2.3.0",
     "i": "^0.3.7",
+    "ioredis": "5.3.2",
     "jsbarcode": "^3.12.1",
     "jsonwebtoken": "^9.0.2",
     "libphonenumber-js": "^1.12.17",

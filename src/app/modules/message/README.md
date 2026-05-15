@@ -2,473 +2,425 @@
 
 ## Overview
 
-The Message module handles individual messages within chat conversations. It supports text messages, image sharing, and mixed content, providing a comprehensive communication system for Task Titans users.
+The Message module handles sending, retrieving, and reading messages within 1-on-1 chat conversations. It was refactored to remove unused fields, eliminate auto-populate hooks, introduce cursor-based pagination, and implement a clean notification routing system backed by Redis.
 
-## Features
+**What changed in the refactor:**
+- Removed `deliveredTo`, `status` (`sent|delivered|seen`), and `editedAt` fields from the Message schema
+- Removed `pre('find')` and `pre('findOne')` auto-populate hooks — all `.populate()` calls are now explicit at the call site
+- Replaced the old `markChatAsRead` (used `global.io`) with `markRead` (uses `SocketManager`)
+- Replaced the old `getMessageFromDB` (page-based) with `getHistory` (cursor-based pagination)
+- Replaced the old `sendMessageToDB` (used `global.io`, no routing logic) with `send` (full notification routing via Redis active-chat tracking)
+- Message type enum expanded: `text | image | media | doc | mixed` (was `text | image | both`)
+- Attachments are now a structured array of objects (`{ type, url, name }`) instead of a plain string array
 
-- ✅ **Text Messages**: Send and receive text-based messages
-- ✅ **Image Messages**: Share images in conversations
-- ✅ **Mixed Content**: Combine text and images in single messages
-- ✅ **Message Types**: Support for different message formats
-- ✅ **Chat Integration**: Seamless integration with chat system
-- ✅ **User Association**: Track message senders and recipients
-
-## Message Types
-
-```
-TEXT → Pure text messages
-IMAGE → Image-only messages  
-BOTH → Text + Image combination
-```
+---
 
 ## API Endpoints
 
-### Protected Endpoints (Requires Authentication)
+All endpoints require a valid JWT in the `Authorization: Bearer <token>` header.
+
+Allowed roles: `BROTHER`, `SISTER`, `SUPER_ADMIN`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/chats/:chatId/messages` | Send message in chat |
-| `GET` | `/api/chats/:chatId/messages` | Get messages in chat |
-| `GET` | `/api/messages/:id` | Get specific message |
-| `PUT` | `/api/messages/:id` | Update message (edit) |
-| `DELETE` | `/api/messages/:id` | Delete message |
-| `POST` | `/api/messages/:id/read` | Mark message as read |
+| `POST` | `/api/v1/messages` | Send a message (text and/or file attachments) |
+| `GET` | `/api/v1/messages/chat/:chatId` | Get message history (cursor-based pagination) |
+| `POST` | `/api/v1/messages/chat/:chatId/read` | Mark all unread messages in a chat as read |
+
+---
 
 ## Data Models
 
 ### Message Interface
 
 ```typescript
-export type IMessage = {
-  _id?: Types.ObjectId;
-  chatId: Types.ObjectId;       // Chat this message belongs to
-  sender: Types.ObjectId;       // User who sent the message
-  text?: string;                // Message text content (optional)
-  type: "text" | "image" | "both"; // Message type
-  images?: string[];            // Array of image URLs (optional)
-  readBy?: Types.ObjectId[];    // Users who have read this message
-  editedAt?: Date;              // When message was last edited
-  createdAt?: Date;
-  updatedAt?: Date;
-}
+type AttachmentType = 'image' | 'audio' | 'video' | 'file';
 
-export type MessageModel = Model<IMessage, Record<string, unknown>>;
+type IMessageAttachment = {
+  type: AttachmentType;
+  url: string;
+  name?: string;
+};
+
+type IMessage = {
+  chatId: ObjectId;       // required — ref: Chat
+  sender: ObjectId;       // required — ref: User
+  text?: string;          // optional; required when type === 'text'; max 4000 chars
+  type: 'text' | 'image' | 'media' | 'doc' | 'mixed';  // required
+  attachments: IMessageAttachment[];  // max 10 items
+  readBy: ObjectId[];     // max 1000 items
+  createdAt: Date;
+  updatedAt: Date;
+  // REMOVED: deliveredTo, status (sent|delivered|seen), editedAt
+};
 ```
 
-### Request/Response Examples
+**Indexes:**
+- `{ chatId: 1, createdAt: -1 }` — efficient message history queries
 
-#### Send Text Message
+**Validation:**
+- When `type === 'text'`, `text` must be present and non-empty (Mongoose custom validator)
 
-**Request:**
+---
+
+## Endpoint Details
+
+### POST `/api/v1/messages`
+
+Sends a message. Supports plain text, file uploads (images, video/audio, documents), or a combination. The `type` field is auto-detected by the route middleware based on what files are attached.
+
+**Request — text only (JSON body):**
 ```json
 {
-  "text": "Hello! I'm interested in your laptop repair task. When would be a good time to discuss the details?",
-  "type": "text"
+  "chatId": "664f1a2b3c4d5e6f7a8b9c0d",
+  "text": "Hello, when can we talk?"
 }
 ```
 
-**Response:**
+**Request — with file attachments (multipart/form-data):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `chatId` | string | MongoDB ObjectId of the chat |
+| `text` | string | Optional message text |
+| `image` | file(s) | Image files (jpg, png, etc.) |
+| `media` | file(s) | Video or audio files (mp4, webm, mov, mp3) |
+| `doc` | file(s) | Document files (pdf, docx, etc.) |
+
+The route middleware auto-detects `type`:
+- Only text → `text`
+- Only images → `image`
+- Only video/audio → `media`
+- Only documents → `doc`
+- Any combination → `mixed`
+
+**Success response (201):**
 ```json
 {
   "success": true,
   "statusCode": 201,
   "message": "Message sent successfully",
   "data": {
-    "_id": "507f1f77bcf86cd799439025",
-    "chatId": "507f1f77bcf86cd799439020",
-    "sender": "507f1f77bcf86cd799439015",
-    "text": "Hello! I'm interested in your laptop repair task...",
+    "_id": "664f1a2b3c4d5e6f7a8b9c0e",
+    "chatId": "664f1a2b3c4d5e6f7a8b9c0d",
+    "sender": {
+      "_id": "507f1f77bcf86cd799439013",
+      "name": "John Doe",
+      "profilePicture": "https://example.com/avatar.jpg"
+    },
+    "text": "Hello, when can we talk?",
     "type": "text",
-    "readBy": ["507f1f77bcf86cd799439015"],
-    "createdAt": "2024-01-15T11:00:00.000Z"
+    "attachments": [],
+    "readBy": [],
+    "createdAt": "2024-01-15T11:00:00.000Z",
+    "updatedAt": "2024-01-15T11:00:00.000Z"
   }
 }
 ```
 
-#### Send Image Message
+**Error responses:**
 
-**Request:**
-```json
-{
-  "type": "image",
-  "images": [
-    "https://example.com/uploads/repair-tools.jpg",
-    "https://example.com/uploads/workspace.jpg"
-  ]
-}
-```
+| Status | Condition |
+|--------|-----------|
+| 400 | `chatId` is not a valid ObjectId |
+| 400 | No text and no attachments (empty message) |
+| 400 | `text` exceeds 10,000 characters |
+| 400 | More than 10 attachments |
+| 403 | Sender is not a participant of the chat |
+| 404 | Chat not found |
 
-**Response:**
-```json
-{
-  "success": true,
-  "statusCode": 201,
-  "message": "Message sent successfully",
-  "data": {
-    "_id": "507f1f77bcf86cd799439026",
-    "chatId": "507f1f77bcf86cd799439020",
-    "sender": "507f1f77bcf86cd799439015",
-    "type": "image",
-    "images": [
-      "https://example.com/uploads/repair-tools.jpg",
-      "https://example.com/uploads/workspace.jpg"
-    ],
-    "readBy": ["507f1f77bcf86cd799439015"],
-    "createdAt": "2024-01-15T11:05:00.000Z"
-  }
-}
-```
+---
 
-#### Send Mixed Content Message
+### GET `/api/v1/messages/chat/:chatId`
 
-**Request:**
-```json
-{
-  "text": "Here are my tools and workspace. I can start tomorrow if you're available.",
-  "type": "both",
-  "images": ["https://example.com/uploads/setup.jpg"]
-}
-```
+Returns message history for a chat using cursor-based pagination. Messages are sorted ascending by `createdAt` (oldest first).
 
-#### Get Chat Messages
+**URL params:**
 
-**Response:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `chatId` | string | MongoDB ObjectId of the chat |
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `cursor` | string | No | ISO 8601 timestamp — returns messages strictly after this time |
+| `limit` | number | No | Page size, 1–100, defaults to 20 |
+
+**Success response (200):**
 ```json
 {
   "success": true,
   "statusCode": 200,
-  "message": "Messages retrieved successfully",
+  "message": "Chat messages retrieved successfully",
   "data": [
     {
-      "_id": "507f1f77bcf86cd799439025",
+      "_id": "664f1a2b3c4d5e6f7a8b9c0e",
+      "chatId": "664f1a2b3c4d5e6f7a8b9c0d",
       "sender": {
-        "_id": "507f1f77bcf86cd799439015",
-        "name": "Jane Smith",
-        "avatar": "https://example.com/avatar2.jpg"
+        "_id": "507f1f77bcf86cd799439013",
+        "name": "John Doe",
+        "profilePicture": "https://example.com/avatar.jpg"
       },
-      "text": "Hello! I'm interested in your laptop repair task...",
+      "text": "Hello!",
       "type": "text",
-      "isRead": true,
+      "attachments": [],
+      "readBy": ["507f1f77bcf86cd799439013"],
       "createdAt": "2024-01-15T11:00:00.000Z"
-    },
-    {
-      "_id": "507f1f77bcf86cd799439026",
-      "sender": {
-        "_id": "507f1f77bcf86cd799439015",
-        "name": "Jane Smith",
-        "avatar": "https://example.com/avatar2.jpg"
-      },
-      "type": "image",
-      "images": [
-        "https://example.com/uploads/repair-tools.jpg",
-        "https://example.com/uploads/workspace.jpg"
-      ],
-      "isRead": false,
-      "createdAt": "2024-01-15T11:05:00.000Z"
     }
   ],
-  "pagination": {
-    "page": 1,
+  "meta": {
+    "total": 42,
     "limit": 20,
-    "total": 15,
-    "totalPages": 1
+    "hasNextPage": true,
+    "nextCursor": "2024-01-15T11:00:00.000Z"
   }
 }
 ```
+
+**How to paginate:**
+1. First call: no `cursor` param → gets the first 20 messages
+2. If `meta.hasNextPage === true`, take `meta.nextCursor`
+3. Next call: `?cursor=<nextCursor>` → gets the next page
+4. Repeat until `hasNextPage === false`
+
+**Error responses:**
+
+| Status | Condition |
+|--------|-----------|
+| 400 | `chatId` is not a valid ObjectId |
+| 400 | `userId` (from JWT) is not a valid ObjectId |
+
+---
+
+### POST `/api/v1/messages/chat/:chatId/read`
+
+Marks all unread messages in a chat as read for the authenticated user. Only marks messages sent by the **other** participant — never the caller's own messages.
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `chatId` | string | MongoDB ObjectId of the chat |
+
+**Success response (200):**
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Chat messages marked as read",
+  "data": {
+    "modifiedCount": 3,
+    "updatedIds": [
+      "664f1a2b3c4d5e6f7a8b9c10",
+      "664f1a2b3c4d5e6f7a8b9c11",
+      "664f1a2b3c4d5e6f7a8b9c12"
+    ]
+  }
+}
+```
+
+When there are no unread messages, returns `{ modifiedCount: 0, updatedIds: [] }` — no socket event is emitted in this case.
+
+**Error responses:**
+
+| Status | Condition |
+|--------|-----------|
+| 400 | `chatId` is not a valid ObjectId |
+| 403 | User is not a participant of the chat |
+
+---
+
+## Notification Routing Logic
+
+When `send` is called, after saving the message it determines how to notify the receiver using Redis:
+
+```
+Read active:{receiverId}:chat from Redis
+         │
+         ├── equals chatId ──────────────→ Do nothing (receiver is watching this chat)
+         │
+         ├── different chatId ───────────→ Emit CHAT_UPDATED to user::{receiverId}
+         │                                  (receiver is online but in another chat)
+         │
+         └── key absent ─────────────────→ Send push notification
+                                            (max 1 per 60s via notif:dedup:{chatId}:{receiverId})
+```
+
+All side effects (socket emit, Redis increment, push notification) are wrapped in individual `try/catch` blocks. If any of them fail, the error is logged with `errorLogger` and the saved message is still returned — side-effect failures never suppress the message.
+
+---
+
+## Redis Keys
+
+| Key | Value | TTL | Purpose |
+|-----|-------|-----|---------|
+| `unread:{chatId}:{userId}` | integer string | none | Unread count per user per chat |
+| `active:{userId}:chat` | chatId string | 3600s | Which chat the user currently has open |
+| `notif:dedup:{chatId}:{userId}` | `"1"` | 60s | Push notification deduplication |
+
+---
+
+## Socket Events
+
+| Event | Direction | Room | Payload | When |
+|-------|-----------|------|---------|------|
+| `MESSAGE_SENT` | Server → Client | `chat::{chatId}` | `{ message: IMessage }` | Message saved successfully |
+| `CHAT_UPDATED` | Server → Client | `user::{receiverId}` | `{ lastMessage, unreadCount }` | Receiver is online but in a different chat |
+| `MESSAGES_READ` | Server → Client | `chat::{chatId}` | `{ chatId, userId, updatedIds }` | `markRead` completes with ≥1 update |
+| `TYPING_START` | Server → Client | `chat::{chatId}` | `{ userId, chatId }` | User starts typing |
+| `TYPING_STOP` | Server → Client | `chat::{chatId}` | `{ userId, chatId }` | User stops typing |
+
+---
+
+## Testing with Postman
+
+### 1. HTTP Endpoints
+
+#### Send a text message
+
+```
+POST http://localhost:5000/api/v1/messages
+Authorization: Bearer <your_jwt_token>
+Content-Type: application/json
+
+{
+  "chatId": "664f1a2b3c4d5e6f7a8b9c0d",
+  "text": "Hello!"
+}
+```
+
+#### Send a message with image attachment
+
+In Postman, set the request to `multipart/form-data`:
+
+| Key | Type | Value |
+|-----|------|-------|
+| `chatId` | Text | `664f1a2b3c4d5e6f7a8b9c0d` |
+| `text` | Text | `Here is the photo` |
+| `image` | File | *(select an image file)* |
+
+#### Get message history (first page)
+
+```
+GET http://localhost:5000/api/v1/messages/chat/664f1a2b3c4d5e6f7a8b9c0d
+Authorization: Bearer <your_jwt_token>
+```
+
+#### Get next page using cursor
+
+```
+GET http://localhost:5000/api/v1/messages/chat/664f1a2b3c4d5e6f7a8b9c0d?cursor=2024-01-15T11:00:00.000Z&limit=20
+Authorization: Bearer <your_jwt_token>
+```
+
+#### Mark all messages as read
+
+```
+POST http://localhost:5000/api/v1/messages/chat/664f1a2b3c4d5e6f7a8b9c0d/read
+Authorization: Bearer <your_jwt_token>
+```
+
+No request body needed.
+
+---
+
+### 2. Real-time Socket Testing with Postman
+
+Postman supports Socket.io natively (v9.13+).
+
+#### Step 1 — Connect
+
+1. In Postman, click **New → Socket.IO**
+2. URL: `http://localhost:5000`
+3. Under **Connection** tab, add handshake auth:
+   - Key: `auth`
+   - Value: `{ "token": "<your_jwt_token>" }`
+4. Click **Connect**
+
+#### Step 2 — Join a chat room
+
+Emit `JOIN_CHAT` to start receiving messages for a specific chat:
+
+- **Event:** `JOIN_CHAT`
+- **Body (JSON):** `{ "chatId": "664f1a2b3c4d5e6f7a8b9c0d" }`
+
+This writes `active:{userId}:chat` to Redis (3600s TTL) and joins the `chat::664f1a2b3c4d5e6f7a8b9c0d` room.
+
+#### Step 3 — Listen for events
+
+Add these listeners in the **Events** tab:
+
+| Event | What triggers it |
+|-------|-----------------|
+| `MESSAGE_SENT` | The other user sends a message in this chat |
+| `CHAT_UPDATED` | A message arrives while you're in a different chat |
+| `MESSAGES_READ` | The other user calls the markRead endpoint |
+| `TYPING_START` | The other user starts typing |
+| `TYPING_STOP` | The other user stops typing |
+
+#### Step 4 — Test the full send → receive flow
+
+Open **two Postman windows**, each authenticated as a different user:
+
+1. **User A** connects and emits `JOIN_CHAT` with `chatId`
+2. **User B** connects and emits `JOIN_CHAT` with the same `chatId`
+3. **User A** sends a message via `POST /api/v1/messages`
+4. **User B** sees `MESSAGE_SENT` event arrive in real time
+5. **User B** calls `POST /api/v1/messages/chat/:chatId/read`
+6. **User A** sees `MESSAGES_READ` event arrive
+
+#### Step 5 — Test notification routing
+
+| Scenario | How to set it up | What you should see |
+|----------|-----------------|---------------------|
+| Receiver has chat open | User B emits `JOIN_CHAT` for this `chatId` | No push, no `CHAT_UPDATED` |
+| Receiver in different chat | User B emits `JOIN_CHAT` for a **different** `chatId` | `CHAT_UPDATED` emitted to User B |
+| Receiver offline | User B does not connect at all | Push notification sent (once per 60s) |
+
+#### Step 6 — Test typing indicators
+
+- **Event:** `TYPING_START`
+- **Body:** `{ "chatId": "664f1a2b3c4d5e6f7a8b9c0d" }`
+
+The other user (who has joined the same chat room) will receive a `TYPING_START` event. Emit `TYPING_STOP` when done.
+
+---
 
 ## Service Methods
 
-### Core Operations
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `send` | `(chatId, senderId, payload) → IMessage` | Save message, update lastMessage, run notification routing |
+| `getHistory` | `(chatId, userId, cursor?, limit?) → IHistoryResult` | Cursor-based message history |
+| `markRead` | `(chatId, userId) → IMarkReadResult` | Bulk mark unread messages as read, reset Redis count |
 
-- `sendMessage(chatId, senderId, messageData)` - Send new message
-- `getChatMessages(chatId, userId, query?)` - Get messages in chat
-- `getMessageById(messageId, userId)` - Get specific message
-- `updateMessage(messageId, userId, updateData)` - Edit message
-- `deleteMessage(messageId, userId)` - Delete message
-- `markAsRead(messageId, userId)` - Mark message as read
-- `getUnreadCount(chatId, userId)` - Get unread message count
-- `searchMessages(chatId, searchTerm)` - Search messages in chat
+Legacy methods `sendMessageToDB`, `getMessageFromDB`, `markChatAsRead`, `markAsDelivered`, `getUnreadCount` remain in the service for backward compatibility but are no longer used by the controller.
 
-## Database Schema
+---
 
-```javascript
-const messageSchema = new Schema({
-  chatId: {
-    type: Schema.Types.ObjectId,
-    ref: 'Chat',
-    required: true,
-    index: true
-  },
-  sender: {
-    type: Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  text: {
-    type: String,
-    maxlength: 1000,
-    trim: true
-  },
-  type: {
-    type: String,
-    enum: ['text', 'image', 'both'],
-    required: true
-  },
-  images: [{
-    type: String,
-    validate: {
-      validator: function(url) {
-        return /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i.test(url);
-      },
-      message: 'Invalid image URL format'
-    }
-  }],
-  readBy: [{
-    type: Schema.Types.ObjectId,
-    ref: 'User'
-  }],
-  editedAt: {
-    type: Date
-  }
-}, {
-  timestamps: true
-});
+## Error Reference
 
-// Compound index for efficient chat message queries
-messageSchema.index({ chatId: 1, createdAt: -1 });
+| Status | Message | Cause |
+|--------|---------|-------|
+| 400 | `Invalid chatId` | `chatId` is not a valid ObjectId |
+| 400 | `Invalid senderId` | Sender ID from JWT is not a valid ObjectId |
+| 400 | `Message must contain text or at least one attachment` | Empty message payload |
+| 400 | `Message text exceeds maximum length` | `text` > 10,000 characters |
+| 400 | `Attachments cannot exceed 10 items` | More than 10 files |
+| 403 | `You are not a participant of this chat` | Sender or reader not in chat participants |
+| 404 | `Chat not found` | `chatId` does not exist |
 
-// Index for sender queries
-messageSchema.index({ sender: 1, createdAt: -1 });
+---
 
-// Text index for message search
-messageSchema.index({ text: 'text' });
+## Running Tests
 
-// Validation for message content
-messageSchema.pre('save', function() {
-  if (this.type === 'text' && !this.text) {
-    throw new Error('Text messages must have text content');
-  }
-  if (this.type === 'image' && (!this.images || this.images.length === 0)) {
-    throw new Error('Image messages must have at least one image');
-  }
-  if (this.type === 'both' && (!this.text || !this.images || this.images.length === 0)) {
-    throw new Error('Mixed messages must have both text and images');
-  }
-});
+```bash
+# Run the full test suite (single pass, no watch mode)
+npm run test:run
 ```
 
-## Business Rules
-
-### Message Creation
-
-1. **Chat Participation**: Only chat participants can send messages
-2. **Content Validation**: Messages must have appropriate content for their type
-3. **Image Limits**: Maximum 5 images per message
-4. **Text Limits**: Maximum 1000 characters per message
-5. **Active Chat**: Messages can only be sent in active chats
-
-### Message Types
-
-1. **Text Messages**: Must have non-empty text content
-2. **Image Messages**: Must have at least one valid image URL
-3. **Mixed Messages**: Must have both text and images
-4. **Content Validation**: Images must be valid URLs with supported formats
-
-### Message Management
-
-1. **Edit Permission**: Only sender can edit their messages
-2. **Edit Time Limit**: Messages can be edited within 15 minutes of sending
-3. **Delete Permission**: Only sender can delete their messages
-4. **Read Tracking**: Automatic read tracking for message recipients
-
-## Error Handling
-
-Common error scenarios:
-
-```json
-{
-  "success": false,
-  "statusCode": 403,
-  "message": "You are not a participant in this chat"
-}
-
-{
-  "success": false,
-  "statusCode": 400,
-  "message": "Text messages must have text content"
-}
-
-{
-  "success": false,
-  "statusCode": 400,
-  "message": "Maximum 5 images allowed per message"
-}
-
-{
-  "success": false,
-  "statusCode": 400,
-  "message": "Message text cannot exceed 1000 characters"
-}
-
-{
-  "success": false,
-  "statusCode": 403,
-  "message": "Cannot edit message after 15 minutes"
-}
-```
-
-## Usage Examples
-
-### Sending a Text Message
-
-```typescript
-import { MessageService } from './message.service';
-
-const messageData = {
-  text: 'Hello! When can we discuss the project details?',
-  type: 'text' as const
-};
-
-try {
-  const message = await MessageService.sendMessage(chatId, senderId, messageData);
-  console.log('Message sent:', message._id);
-} catch (error) {
-  console.error('Failed to send message:', error.message);
-}
-```
-
-### Sending an Image Message
-
-```typescript
-const imageMessage = {
-  type: 'image' as const,
-  images: [
-    'https://example.com/uploads/photo1.jpg',
-    'https://example.com/uploads/photo2.jpg'
-  ]
-};
-
-const message = await MessageService.sendMessage(chatId, senderId, imageMessage);
-```
-
-### Getting Chat Messages with Pagination
-
-```typescript
-const query = {
-  page: 1,
-  limit: 20,
-  sort: 'createdAt',
-  sortOrder: 'desc' as const
-};
-
-const messages = await MessageService.getChatMessages(chatId, userId, query);
-console.log(`Retrieved ${messages.length} messages`);
-```
-
-### Marking Messages as Read
-
-```typescript
-// Mark single message as read
-await MessageService.markAsRead(messageId, userId);
-
-// Mark all messages in chat as read
-const unreadMessages = await MessageService.getUnreadMessages(chatId, userId);
-for (const message of unreadMessages) {
-  await MessageService.markAsRead(message._id, userId);
-}
-```
-
-## Integration Points
-
-### With Chat Module
-- Validates chat existence and user participation
-- Updates chat's last activity timestamp
-- Provides message counts for chat listings
-
-### With User Module
-- Validates sender existence and status
-- Populates sender information in responses
-- Handles user blocking and privacy settings
-
-### With File Upload Module
-- Handles image upload and storage
-- Validates image formats and sizes
-- Manages image cleanup on message deletion
-
-### With Notification Module
-- Sends push notifications for new messages
-- Creates in-app notifications for offline users
-- Handles notification preferences
-
-## Real-time Features
-
-### WebSocket Events
-
-```typescript
-const messageEvents = {
-  MESSAGE_SENT: 'message_sent',
-  MESSAGE_RECEIVED: 'message_received',
-  MESSAGE_READ: 'message_read',
-  MESSAGE_EDITED: 'message_edited',
-  MESSAGE_DELETED: 'message_deleted',
-  TYPING_START: 'typing_start',
-  TYPING_STOP: 'typing_stop'
-};
-```
-
-### Typing Indicators
-
-```typescript
-interface TypingStatus {
-  chatId: string;
-  userId: string;
-  isTyping: boolean;
-  timestamp: Date;
-}
-```
-
-## Performance Considerations
-
-1. **Indexing**: 
-   - Compound index on (chatId, createdAt) for message queries
-   - Index on sender for user message history
-   - Text index for message search functionality
-
-2. **Pagination**: 
-   - All message lists use cursor-based pagination
-   - Efficient reverse chronological ordering
-   - Limit message batch sizes
-
-3. **Caching**: 
-   - Cache recent messages for active chats
-   - Cache unread message counts
-   - Real-time cache updates via WebSocket
-
-4. **File Handling**: 
-   - Optimize image compression and storage
-   - Use CDN for image delivery
-   - Implement lazy loading for message images
-
-## Security Measures
-
-1. **Authentication**: All endpoints require valid JWT
-2. **Authorization**: Participant-only access to chat messages
-3. **Content Filtering**: Scan messages for inappropriate content
-4. **Rate Limiting**: Prevent message spam
-5. **Image Validation**: Validate uploaded images for security
-6. **XSS Prevention**: Sanitize message content
-
-## Future Enhancements
-
-- [ ] Message reactions and emojis
-- [ ] Message threading and replies
-- [ ] Voice message support
-- [ ] File attachment support (documents, etc.)
-- [ ] Message encryption for privacy
-- [ ] Message translation
-- [ ] Advanced search with filters
-- [ ] Message scheduling
-- [ ] Message templates
-- [ ] Bulk message operations
-- [ ] Message analytics and insights
-- [ ] Message backup and export
+Test files for this module:
+- `src/app/modules/message/__tests__/message.service.spec.ts` — unit tests
+- `src/app/modules/message/__tests__/message.integration.spec.ts` — integration tests (send→getHistory round-trip, markRead Redis reset)

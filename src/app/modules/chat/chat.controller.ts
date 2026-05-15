@@ -5,30 +5,34 @@ import { StatusCodes } from 'http-status-codes';
 import { ChatService } from './chat.service';
 import { JwtPayload } from 'jsonwebtoken';
 
+// POST /api/v1/chats/:otherUserId
+// Requirements: 3.1 — createOrGet wired to HTTP route
 const createChat = catchAsync(async (req: Request, res: Response) => {
   const user = req.user as JwtPayload;
-  const otherUser = req.params.otherUserId;
+  const otherUserId = req.params.otherUserId;
 
-  const participants = [user?.id, otherUser];
-  const chat = await ChatService.createChatToDB(participants);
+  const chat = await ChatService.createOrGet(user.id as string, otherUserId);
 
   sendResponse(res, {
     statusCode: StatusCodes.CREATED,
     success: true,
-    message: 'Create Chat Successfully',
+    message: 'Chat created or retrieved successfully',
     data: chat,
   });
 });
 
+// GET /api/v1/chats
+// Requirements: 4.1 — getList wired to HTTP route
 const getChat = catchAsync(async (req: Request, res: Response) => {
-  const user = req.user;
-  const searchTerm = req.query.searchTerm as string;
-  const chatList = await ChatService.getChatFromDB(user, searchTerm);
+  const user = req.user as JwtPayload;
+  const search = req.query.search as string | undefined;
+
+  const chatList = await ChatService.getList(user.id as string, search);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Chat Retrieve Successfully',
+    message: 'Chat list retrieved successfully',
     data: chatList,
   });
 });

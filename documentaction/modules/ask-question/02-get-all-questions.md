@@ -22,12 +22,26 @@ Allows the `SUPER_ADMIN` to retrieve a paginated list of all questions submitted
 - **Sorting**: Defaults to `-createdAt`.
 - **Pagination**: Standard pagination via `.paginate()`.
 
+---
+
 ### 2.3 Data Population
 - The `userId` field is automatically populated with the user's `name` and `email` for administrative context.
 
 ---
 
-## 3. Implementation
+## 3. Query Parameters
+
+| Parameter | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `searchTerm` | `string` | Search within question text | `Wudu` |
+| `status` | `string` | Filter by status (`pending`, `answered`) | `pending` |
+| `userRole` | `string` | Filter by user role (`BROTHER`, `SISTER`) | `SISTER` |
+| `page` | `number` | Page number | `1` |
+| `limit` | `number` | Items per page | `10` |
+
+---
+
+## 4. Implementation
 - **Route**: [src/app/modules/ask-question/ask-question.route.ts](../../../src/app/modules/ask-question/ask-question.route.ts) — `router.get('/', ...)`
 - **Controller**: [src/app/modules/ask-question/ask-question.controller.ts](../../../src/app/modules/ask-question/ask-question.controller.ts) — `getAllQuestions`
 - **Service**: [src/app/modules/ask-question/ask-question.service.ts](../../../src/app/modules/ask-question/ask-question.service.ts) — `getAllQuestionsFromDB`

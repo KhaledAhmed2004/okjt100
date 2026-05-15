@@ -42,6 +42,8 @@ router.get('/:userId/user', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, u
     max: 60,
     routeName: 'public-user-details',
 }), (0, validateRequest_1.default)(user_validation_1.UserValidation.getUserDetailsZodSchema), user_controller_1.UserController.getUserDetailsById);
+// Community Discovery (Lists active users of the same role)
+router.get('/profiles', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), user_controller_1.UserController.getUserProfiles);
 // --- Self Management (User/Doctor) ---
 // Fetch own profile details
 router.get('/me', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), user_controller_1.UserController.getUserProfile);
@@ -81,7 +83,7 @@ router.get('/metrics', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_
 router.patch('/:userId/review', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(user_validation_1.UserValidation.updateUserReviewZodSchema), user_controller_1.UserController.updateUserReview);
 // Get specific user details by ID (Admin)
 router.get('/:userId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.getUserById);
-// Admin: Update any user (Update fields including specialty, role, status)
+// Admin: Update any user (Update fields including role, status)
 router.patch('/:userId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(user_validation_1.UserValidation.adminUpdateUserZodSchema), user_controller_1.UserController.adminUpdateUser);
 // Admin: Delete user permanently
 router.delete('/:userId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.deleteUser);

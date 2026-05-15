@@ -1,3 +1,4 @@
+import { PipelineStage } from 'mongoose';
 import { StatusCodes } from 'http-status-codes';
 import ApiError from '../../../errors/ApiError';
 import { IMosque } from './mosque.interface';
@@ -115,7 +116,7 @@ const getSingleMosqueFromDB = async (id: string) => {
   if (result.location && result.location.coordinates) {
     (result as any).latitude = result.location.coordinates[1];
     (result as any).longitude = result.location.coordinates[0];
-    delete result.location;
+    delete (result as any).location;
   }
 
   return result;

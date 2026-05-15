@@ -99,7 +99,11 @@ const updateUserReview = (0, catchAsync_1.default)((req, res) => __awaiter(void 
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'User review status updated',
-        data: result,
+        data: {
+            id: result === null || result === void 0 ? void 0 : result._id,
+            status: result === null || result === void 0 ? void 0 : result.status,
+            updatedAt: result === null || result === void 0 ? void 0 : result.updatedAt,
+        },
     });
 }));
 const adminUpdateUser = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -168,6 +172,17 @@ const getUserMetrics = (0, catchAsync_1.default)((req, res) => __awaiter(void 0,
         statusCode: http_status_codes_1.StatusCodes.OK,
         message: 'User metrics retrieved',
         data: result,
+    });
+}));
+const getUserProfiles = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = req.user;
+    const result = yield user_service_1.UserService.getUserProfilesFromDB(user, req.query);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'User profiles fetched successfully',
+        meta: result.meta,
+        data: result.data,
     });
 }));
 const requestAccountDeletion = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
@@ -304,4 +319,5 @@ exports.UserController = {
     revokeMySession,
     revokeAllMySessions,
     reverifyAccount,
+    getUserProfiles,
 };

@@ -10,21 +10,21 @@ const router = express.Router();
 // Admin routes
 router.post(
   '/',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
+  auth(USER_ROLES.SUPER_ADMIN),
   validateRequest(GroupValidation.createGroupZodSchema),
   GroupController.createGroup,
 );
 
 router.patch(
   '/:groupId',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
+  auth(USER_ROLES.SUPER_ADMIN),
   validateRequest(GroupValidation.updateGroupZodSchema),
   GroupController.updateGroup,
 );
 
 router.delete(
   '/:groupId',
-  auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.ADMIN),
+  auth(USER_ROLES.SUPER_ADMIN),
   GroupController.deleteGroup,
 );
 

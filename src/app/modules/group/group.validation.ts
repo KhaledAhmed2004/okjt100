@@ -37,8 +37,18 @@ const updateCommentZodSchema = z.object({
   }),
 });
 
+const updateGroupZodSchema = z.object({
+  body: z.object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    userType: z.enum([USER_ROLES.BROTHER, USER_ROLES.SISTER]).optional(),
+    category: z.string().optional(),
+  }),
+});
+
 export const GroupValidation = {
   createGroupZodSchema,
+  updateGroupZodSchema,
   createPostZodSchema,
   addCommentZodSchema,
   updatePostZodSchema,

@@ -11,8 +11,5 @@ const admin_controller_1 = require("./admin.controller");
 const router = express_1.default.Router();
 // --- Dashboard Metrics ---
 router.get('/growth-metrics', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getDashboardStats);
-// Preference cards monthly trend (each month’s count)
-router.get('/preference-cards/trends/monthly', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getPreferenceCardMonthly);
-// Active subscriptions monthly trend (each month’s count)
-router.get('/subscriptions/trends/monthly', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getActiveSubscriptionMonthly);
+router.get('/recent-activities', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getRecentActivities);
 exports.AdminRoutes = router;

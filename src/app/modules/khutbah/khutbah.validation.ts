@@ -9,7 +9,7 @@ const createKhutbaZodSchema = z.object({
     description: z.string().optional(),
     audio: z.string({ required_error: 'Audio file is required' }),
     thumbnail: z.string({ required_error: 'Thumbnail image is required' }),
-    duration: z.string().optional().transform(val => val ? Number(val) : undefined),
+    durationInSeconds: z.preprocess((val) => (val ? Number(val) : val), z.number().optional()),
   }),
 });
 
@@ -22,7 +22,7 @@ const updateKhutbaZodSchema = z.object({
     description: z.string().optional(),
     audio: z.string().optional(),
     thumbnail: z.string().optional(),
-    duration: z.string().optional().transform(val => val ? Number(val) : undefined),
+    durationInSeconds: z.preprocess((val) => (val ? Number(val) : val), z.number().optional()),
   }),
 });
 

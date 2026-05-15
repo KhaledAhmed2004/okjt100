@@ -11,10 +11,19 @@ const prayerTimesSchema = zod_1.z.object({
     isha: zod_1.z.string().regex(timeRegex, 'Invalid time format (HH:MM)'),
     jummah: zod_1.z.string().regex(timeRegex, 'Invalid time format (HH:MM)').optional(),
 });
-const locationSchema = zod_1.z.object({
-    latitude: zod_1.z.number(),
-    longitude: zod_1.z.number(),
-});
+const locationSchema = zod_1.z.union([
+    zod_1.z.object({
+        latitude: zod_1.z.preprocess((v) => (v === '' ? undefined : Number(v)), zod_1.z.number().min(-90).max(90)),
+        longitude: zod_1.z.preprocess((v) => (v === '' ? undefined : Number(v)), zod_1.z.number().min(-180).max(180)),
+    }),
+    zod_1.z.object({
+        type: zod_1.z.literal('Point'),
+        coordinates: zod_1.z.tuple([
+            zod_1.z.number().min(-180).max(180), // Longitude
+            zod_1.z.number().min(-90).max(90) // Latitude
+        ]),
+    }),
+]);
 const createMosqueZodSchema = zod_1.z.object({
     body: zod_1.z.object({
         mosqueName: zod_1.z.string().min(1, 'Mosque name is required'),

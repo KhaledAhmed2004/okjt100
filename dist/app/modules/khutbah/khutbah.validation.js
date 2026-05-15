@@ -9,7 +9,9 @@ const createKhutbaZodSchema = zod_1.z.object({
         imam: zod_1.z.string().min(1, 'Imam name is required'),
         date: zod_1.z.string({ required_error: 'Date is required' }).datetime(),
         description: zod_1.z.string().optional(),
-        duration: zod_1.z.string().optional().transform(val => val ? Number(val) : undefined),
+        audio: zod_1.z.string({ required_error: 'Audio file is required' }),
+        thumbnail: zod_1.z.string({ required_error: 'Thumbnail image is required' }),
+        durationInSeconds: zod_1.z.preprocess((val) => (val ? Number(val) : val), zod_1.z.number().optional()),
     }),
 });
 const updateKhutbaZodSchema = zod_1.z.object({
@@ -19,7 +21,9 @@ const updateKhutbaZodSchema = zod_1.z.object({
         imam: zod_1.z.string().optional(),
         date: zod_1.z.string().datetime().optional(),
         description: zod_1.z.string().optional(),
-        duration: zod_1.z.string().optional().transform(val => val ? Number(val) : undefined),
+        audio: zod_1.z.string().optional(),
+        thumbnail: zod_1.z.string().optional(),
+        durationInSeconds: zod_1.z.preprocess((val) => (val ? Number(val) : val), zod_1.z.number().optional()),
     }),
 });
 exports.KhutbaValidation = {

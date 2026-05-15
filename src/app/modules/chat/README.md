@@ -2,391 +2,303 @@
 
 ## Overview
 
-The Chat module manages chat conversations between users in the Task Titans platform. It provides the foundation for communication between task posters and taskers, enabling them to discuss task details, negotiate terms, and coordinate work.
+The Chat module manages 1-on-1 conversations between users. It was refactored to eliminate N+1 query patterns, replace MongoDB-based unread counts with Redis, and serve the full chat list in a single database query plus one batched Redis read.
 
-## Features
+**What changed in the refactor:**
+- Removed the `status` boolean field from the Chat schema
+- Added a denormalized `lastMessage` sub-document so the chat list needs no per-chat message query
+- Replaced per-chat `Message.countDocuments` unread queries with a single batched Redis `MGET`
+- Replaced `global.io` with the typed `SocketManager` singleton
+- All `populate()` calls are now explicit at the call site — no auto-populate hooks
 
-- ✅ **Chat Creation**: Automatic chat creation between task participants
-- ✅ **Participant Management**: Handle two-party conversations
-- ✅ **Chat Status**: Active/inactive chat management
-- ✅ **User Association**: Link chats to specific user pairs
-- ✅ **Message Integration**: Foundation for message exchange
-
-## Chat Lifecycle
-
-```
-CHAT CREATION → ACTIVE → INACTIVE
-     ↑              ↓
-     └── REACTIVATE ←┘
-```
+---
 
 ## API Endpoints
 
-### Protected Endpoints (Requires Authentication)
+All endpoints require a valid JWT in the `Authorization: Bearer <token>` header.
+
+Allowed roles: `BROTHER`, `SISTER`, `SUPER_ADMIN`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/chats` | Create new chat between users |
-| `GET` | `/api/chats` | Get user's chat conversations |
-| `GET` | `/api/chats/:id` | Get specific chat details |
-| `PUT` | `/api/chats/:id/status` | Update chat status |
-| `GET` | `/api/chats/:id/messages` | Get messages in chat |
+| `POST` | `/api/v1/chats/:otherUserId` | Create or retrieve a chat with another user |
+| `GET` | `/api/v1/chats` | Get the logged-in user's chat list |
+
+---
 
 ## Data Models
 
-### Chat Interface
+### Chat Schema
 
 ```typescript
-export type IChat = {
-  _id?: Types.ObjectId;
-  participants: [Types.ObjectId];  // Array of exactly 2 user IDs
-  status: Boolean;                 // true = active, false = inactive
-  createdAt?: Date;
-  updatedAt?: Date;
-}
+type ILastMessage = {
+  text: string;       // max 2000 characters
+  sender: ObjectId;   // ref: User
+  createdAt: Date;
+};
 
-export type ChatModel = Model<IChat, Record<string, unknown>>;
+type IChat = {
+  participants: ObjectId[];   // exactly 2 User refs
+  lastMessage: ILastMessage | null;
+  createdAt: Date;
+  updatedAt: Date;
+  // NOTE: 'status' boolean field was removed in the refactor
+};
 ```
 
-### Request/Response Examples
+**Indexes:**
+- `{ participants: 1 }` — fast participant-based lookups
 
-#### Create Chat
+---
 
-**Request:**
-```json
-{
-  "participantId": "507f1f77bcf86cd799439015"
-}
-```
+## Endpoint Details
 
-**Response:**
+### POST `/api/v1/chats/:otherUserId`
+
+Creates a new chat between the authenticated user and `otherUserId`. If a chat already exists between them, returns the existing one (idempotent).
+
+**URL params:**
+
+| Param | Type | Description |
+|-------|------|-------------|
+| `otherUserId` | string | MongoDB ObjectId of the other user |
+
+**Success response (201):**
 ```json
 {
   "success": true,
   "statusCode": 201,
-  "message": "Chat created successfully",
+  "message": "Chat created or retrieved successfully",
   "data": {
-    "_id": "507f1f77bcf86cd799439020",
+    "_id": "664f1a2b3c4d5e6f7a8b9c0d",
     "participants": [
       "507f1f77bcf86cd799439013",
       "507f1f77bcf86cd799439015"
     ],
-    "status": true,
-    "createdAt": "2024-01-15T10:30:00.000Z"
+    "lastMessage": null,
+    "createdAt": "2024-01-15T10:30:00.000Z",
+    "updatedAt": "2024-01-15T10:30:00.000Z"
   }
 }
 ```
 
-#### Get User Chats
+**Error responses:**
 
-**Response:**
+| Status | Condition |
+|--------|-----------|
+| 400 | `otherUserId` is not a valid ObjectId |
+| 400 | `userId === otherUserId` (cannot chat with yourself) |
+| 404 | `otherUserId` does not exist in the User collection |
+
+---
+
+### GET `/api/v1/chats`
+
+Returns the authenticated user's chat list, sorted by most recent message first. Chats with no messages appear last.
+
+**Query params:**
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `search` | string | No | Case-insensitive filter on the other participant's name |
+
+**Success response (200):**
 ```json
 {
   "success": true,
   "statusCode": 200,
-  "message": "Chats retrieved successfully",
+  "message": "Chat list retrieved successfully",
   "data": [
     {
-      "_id": "507f1f77bcf86cd799439020",
+      "_id": "664f1a2b3c4d5e6f7a8b9c0d",
       "participants": [
         {
           "_id": "507f1f77bcf86cd799439013",
           "name": "John Doe",
-          "email": "john@example.com",
-          "role": "POSTER"
+          "image": "https://example.com/avatar1.jpg",
+          "role": "BROTHER"
         },
         {
           "_id": "507f1f77bcf86cd799439015",
           "name": "Jane Smith",
-          "email": "jane@example.com",
-          "role": "TASKER"
+          "image": "https://example.com/avatar2.jpg",
+          "role": "SISTER"
         }
       ],
-      "status": true,
       "lastMessage": {
-        "text": "When can you start the work?",
+        "text": "When can you start?",
         "sender": "507f1f77bcf86cd799439013",
         "createdAt": "2024-01-15T11:00:00.000Z"
       },
       "unreadCount": 2,
-      "createdAt": "2024-01-15T10:30:00.000Z"
+      "createdAt": "2024-01-15T10:30:00.000Z",
+      "updatedAt": "2024-01-15T11:00:00.000Z"
     }
   ]
 }
 ```
 
-#### Get Chat Details
+**Notes:**
+- `unreadCount` is fetched from Redis in a single batched `MGET`. If Redis is unavailable, it falls back to `0` for all chats — no error is thrown.
+- `participants` is populated with `_id`, `name`, `image`, `role` only.
+- `search` filters on the **other** participant's name (not the logged-in user's own name).
 
-**Response:**
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "message": "Chat details retrieved successfully",
-  "data": {
-    "_id": "507f1f77bcf86cd799439020",
-    "participants": [
-      {
-        "_id": "507f1f77bcf86cd799439013",
-        "name": "John Doe",
-        "email": "john@example.com",
-        "role": "POSTER",
-        "avatar": "https://example.com/avatar1.jpg"
-      },
-      {
-        "_id": "507f1f77bcf86cd799439015",
-        "name": "Jane Smith",
-        "email": "jane@example.com",
-        "role": "TASKER",
-        "avatar": "https://example.com/avatar2.jpg"
-      }
-    ],
-    "status": true,
-    "messageCount": 15,
-    "createdAt": "2024-01-15T10:30:00.000Z",
-    "updatedAt": "2024-01-15T11:30:00.000Z"
-  }
-}
+---
+
+## Redis Keys
+
+| Key | Value | TTL | Purpose |
+|-----|-------|-----|---------|
+| `unread:{chatId}:{userId}` | integer string | none | Unread message count per user per chat |
+| `active:{userId}:chat` | chatId string | 3600s | Which chat the user currently has open |
+
+---
+
+## Socket Events (Real-time)
+
+The chat module participates in these socket events. See the Message module README for the full send/read flow.
+
+| Event | Direction | Payload | When |
+|-------|-----------|---------|------|
+| `JOIN_CHAT` | Client → Server | `{ chatId }` | User opens a chat |
+| `LEAVE_CHAT` | Client → Server | `{ chatId }` | User closes a chat |
+| `CHAT_UPDATED` | Server → Client | `{ lastMessage, unreadCount }` | A new message arrives while receiver is in a different chat |
+
+---
+
+## Testing with Postman
+
+### 1. HTTP Endpoints
+
+#### Create or get a chat
+
 ```
+POST http://localhost:5000/api/v1/chats/507f1f77bcf86cd799439015
+Authorization: Bearer <your_jwt_token>
+```
+
+No request body needed — the other user's ID is in the URL.
+
+#### Get chat list
+
+```
+GET http://localhost:5000/api/v1/chats
+Authorization: Bearer <your_jwt_token>
+```
+
+With search:
+```
+GET http://localhost:5000/api/v1/chats?search=John
+Authorization: Bearer <your_jwt_token>
+```
+
+---
+
+### 2. Real-time Socket Testing with Postman
+
+Postman supports Socket.io connections natively (v9.13+).
+
+#### Step 1 — Open a Socket.io connection
+
+1. In Postman, click **New → Socket.IO**
+2. Enter your server URL: `http://localhost:5000`
+3. Under **Connection** tab, add a handshake auth header:
+   - Key: `auth`
+   - Value: `{ "token": "<your_jwt_token>" }`
+4. Click **Connect**
+
+You should see a `connect` event in the event log confirming the connection.
+
+#### Step 2 — Join a chat room
+
+After connecting, emit `JOIN_CHAT` to start receiving messages for a specific chat:
+
+- **Event name:** `JOIN_CHAT`
+- **Message (JSON):**
+```json
+{ "chatId": "664f1a2b3c4d5e6f7a8b9c0d" }
+```
+
+This writes `active:{userId}:chat` to Redis with a 3600s TTL and joins the socket to the `chat::664f1a2b3c4d5e6f7a8b9c0d` room.
+
+#### Step 3 — Listen for incoming events
+
+Add listeners for these events in the **Events** tab:
+
+| Event to listen for | When you'll see it |
+|--------------------|--------------------|
+| `MESSAGE_SENT` | Another user sends a message in this chat |
+| `CHAT_UPDATED` | A message arrives in a chat you're NOT currently viewing |
+| `MESSAGES_READ` | The other user marks messages as read |
+| `TYPING_START` | The other user starts typing |
+| `TYPING_STOP` | The other user stops typing |
+| `USER_ONLINE` | A participant joins the chat room |
+| `USER_OFFLINE` | A participant leaves or disconnects |
+
+#### Step 4 — Leave a chat room
+
+Emit `LEAVE_CHAT` when done:
+
+- **Event name:** `LEAVE_CHAT`
+- **Message (JSON):**
+```json
+{ "chatId": "664f1a2b3c4d5e6f7a8b9c0d" }
+```
+
+This deletes `active:{userId}:chat` from Redis and leaves the socket room.
+
+#### Step 5 — Test the full flow end-to-end
+
+Open **two Postman windows** (or two browser tabs using a Socket.io client), each authenticated as a different user:
+
+1. **User A** connects and emits `JOIN_CHAT` with a shared `chatId`
+2. **User B** connects and emits `JOIN_CHAT` with the same `chatId`
+3. **User A** sends a message via `POST /api/v1/messages` (HTTP)
+4. **User B** should immediately receive a `MESSAGE_SENT` event in Postman
+5. **User B** calls `POST /api/v1/messages/chat/:chatId/read` (HTTP)
+6. **User A** should receive a `MESSAGES_READ` event
+
+#### Notification routing test
+
+To test the three notification routing paths:
+
+| Scenario | Setup | Expected result |
+|----------|-------|-----------------|
+| Receiver has chat open | User B has emitted `JOIN_CHAT` for this chatId | No push, no `CHAT_UPDATED` |
+| Receiver in different chat | User B has emitted `JOIN_CHAT` for a **different** chatId | `CHAT_UPDATED` emitted to User B's user room |
+| Receiver offline | User B has not connected at all | Push notification sent (once per 60s) |
+
+---
 
 ## Service Methods
 
-### Core Operations
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `createOrGet` | `(userId, otherUserId) → IChat` | Find existing chat or create new one |
+| `getList` | `(userId, search?) → IChatListItem[]` | Get user's chat list with unread counts |
 
-- `createChat(userId, participantId)` - Create chat between two users
-- `getUserChats(userId, query?)` - Get user's chat conversations (supports `searchTerm`, `page`, `limit`)
-- `getChatById(chatId, userId)` - Get specific chat with validation
-- `updateChatStatus(chatId, status)` - Activate/deactivate chat
-- `findExistingChat(user1Id, user2Id)` - Check if chat already exists
-- `addParticipant(chatId, userId)` - Add user to chat (future feature)
-- `removeParticipant(chatId, userId)` - Remove user from chat (future feature)
+Legacy methods `createChatToDB` and `getChatFromDB` remain in the service for backward compatibility but are no longer used by the controller.
 
-## Database Schema
+---
 
-```javascript
-const chatSchema = new Schema({
-  participants: {
-    type: [{
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    }],
-    validate: {
-      validator: function(participants) {
-        return participants.length === 2;
-      },
-      message: 'Chat must have exactly 2 participants'
-    }
-  },
-  status: {
-    type: Boolean,
-    default: true
-  }
-}, {
-  timestamps: true
-});
+## Error Reference
 
-// Compound index to prevent duplicate chats and optimize queries
-chatSchema.index({ participants: 1 });
+| Status | Message | Cause |
+|--------|---------|-------|
+| 400 | `Invalid userId` | `userId` is not a valid ObjectId |
+| 400 | `Invalid otherUserId` | `otherUserId` is not a valid ObjectId |
+| 400 | `Cannot create a chat with yourself` | Both IDs are the same |
+| 404 | `User not found` | `otherUserId` does not exist |
 
-// Index for user chat queries
-chatSchema.index({ 'participants': 1, 'updatedAt': -1 });
+---
 
-// Ensure unique chat between two users
-chatSchema.index(
-  { participants: 1 }, 
-  { 
-    unique: true,
-    partialFilterExpression: { status: true }
-  }
-);
+## Running Tests
+
+```bash
+# Run the full test suite (single pass, no watch mode)
+npm run test:run
 ```
 
-## Business Rules
-
-### Chat Creation
-
-1. **Two Participants Only**: Chats are limited to exactly 2 users
-2. **Unique Conversations**: Only one active chat between any two users
-3. **Self-Chat Prevention**: Users cannot create chats with themselves
-4. **User Validation**: Both participants must be valid, active users
-5. **Automatic Creation**: Chats can be auto-created when users interact
-
-### Chat Access
-
-1. **Participant Only**: Only chat participants can access the chat
-2. **Active Status**: Inactive chats may have limited functionality
-3. **Privacy**: Users cannot see chats they're not part of
-
-### Chat Management
-
-1. **Status Control**: Participants can activate/deactivate chats
-2. **Reactivation**: Inactive chats can be reactivated
-3. **Message Dependency**: Chats with messages cannot be permanently deleted
-
-## Error Handling
-
-Common error scenarios:
-
-```json
-{
-  "success": false,
-  "statusCode": 400,
-  "message": "Cannot create chat with yourself"
-}
-
-{
-  "success": false,
-  "statusCode": 409,
-  "message": "Chat already exists between these users"
-}
-
-{
-  "success": false,
-  "statusCode": 404,
-  "message": "User not found"
-}
-
-{
-  "success": false,
-  "statusCode": 403,
-  "message": "You are not a participant in this chat"
-}
-```
-
-## Usage Examples
-
-### Creating a Chat
-
-```typescript
-import { ChatService } from './chat.service';
-
-try {
-  const chat = await ChatService.createChat(currentUserId, otherUserId);
-  console.log('Chat created:', chat._id);
-} catch (error) {
-  if (error.statusCode === 409) {
-    console.log('Chat already exists');
-  } else {
-    console.error('Failed to create chat:', error.message);
-  }
-}
-```
-
-### Getting User Chats
-
-```typescript
-const query = {
-  searchTerm: 'John',  // Search by participant name
-  status: true,        // Only active chats
-  page: 1,
-  limit: 20,
-  sort: 'updatedAt',
-  sortOrder: 'desc'
-};
-
-const chats = await ChatService.getUserChats(userId, query);
-console.log(`User has ${chats.length} active chats matching "John"`);
-```
-
-### Checking Chat Access
-
-```typescript
-const validateChatAccess = async (chatId: string, userId: string) => {
-  const chat = await ChatService.getChatById(chatId, userId);
-  if (!chat) {
-    throw new ApiError(StatusCodes.FORBIDDEN, 'Access denied');
-  }
-  return chat;
-};
-```
-
-## Integration Points
-
-### With Message Module
-- Provides chat context for messages
-- Validates message sender is chat participant
-- Updates chat timestamp when messages are sent
-- Calculates unread message counts
-
-### With User Module
-- Validates participant user accounts
-- Populates user information in chat responses
-- Handles user status changes (active/inactive)
-
-### With Task Module
-- Auto-creates chats when bids are accepted
-- Links chats to specific tasks for context
-- Enables task-related communication
-
-### With Notification Module
-- Sends notifications for new chats
-- Notifies about chat status changes
-- Alerts for new messages in chats
-
-## Real-time Features (Future)
-
-### WebSocket Integration
-
-```typescript
-// Example WebSocket events
-const chatEvents = {
-  JOIN_CHAT: 'join_chat',
-  LEAVE_CHAT: 'leave_chat',
-  CHAT_CREATED: 'chat_created',
-  CHAT_STATUS_CHANGED: 'chat_status_changed',
-  USER_TYPING: 'user_typing',
-  USER_ONLINE: 'user_online',
-  USER_OFFLINE: 'user_offline'
-};
-```
-
-### Online Status
-
-```typescript
-// Track user online status in chats
-interface ChatWithOnlineStatus extends IChat {
-  participants: Array<{
-    user: IUser;
-    isOnline: boolean;
-    lastSeen: Date;
-  }>;
-}
-```
-
-## Performance Considerations
-
-1. **Indexing**: 
-   - Compound index on participants for fast lookups
-   - Index on (participants, updatedAt) for user chat lists
-   - Partial index for active chats only
-
-2. **Population**: 
-   - Selective field population for user data
-   - Efficient aggregation for chat lists with message counts
-
-3. **Caching**: 
-   - Cache frequently accessed chats
-   - Cache user chat lists
-   - Real-time cache updates for active chats
-
-## Security Measures
-
-1. **Authentication**: All endpoints require valid JWT
-2. **Authorization**: Participant-only access to chats
-3. **Input Validation**: Validate user IDs and chat parameters
-4. **Rate Limiting**: Prevent chat creation spam
-5. **Privacy**: No cross-chat data leakage
-
-## Future Enhancements
-
-- [ ] Group chats (3+ participants)
-- [ ] Chat archiving and search
-- [ ] Chat templates for common scenarios
-- [ ] Chat analytics and insights
-- [ ] Chat moderation tools
-- [ ] File sharing in chats
-- [ ] Voice and video call integration
-- [ ] Chat backup and export
-- [ ] Chat encryption for sensitive communications
-- [ ] Chat bots for automated responses
+Test files for this module:
+- `src/app/modules/chat/__tests__/chat.service.spec.ts` — unit tests
+- `src/app/modules/message/__tests__/message.integration.spec.ts` — integration tests including `getList` Redis fallback

@@ -110,7 +110,7 @@ const loginUserFromDB = async (
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Password is required!');
   }
 
-  if (!(await User.isMatchPassword(password, isExistUser.password))) {
+  if (!(await User.isMatchPassword(password, isExistUser.password as string))) {
     throw new ApiError(StatusCodes.UNAUTHORIZED, 'Invalid email or password');
   }
 
@@ -119,7 +119,7 @@ const loginUserFromDB = async (
     {
       id: isExistUser._id.toString(),
       role: isExistUser.role,
-      email: isExistUser.email,
+      email: isExistUser.email as string,
       tokenVersion: isExistUser.tokenVersion ?? 0,
     },
     config.jwt.jwt_secret as Secret,
@@ -131,7 +131,7 @@ const loginUserFromDB = async (
     {
       id: isExistUser._id.toString(),
       role: isExistUser.role,
-      email: isExistUser.email,
+      email: isExistUser.email as string,
       tokenVersion: isExistUser.tokenVersion ?? 0,
     },
     config.jwt.jwt_refresh_secret as Secret,
@@ -436,7 +436,7 @@ const changePasswordToDB = async (
   //current password match
   if (
     currentPassword &&
-    !(await User.isMatchPassword(currentPassword, isExistUser.password))
+    !(await User.isMatchPassword(currentPassword, isExistUser.password as string))
   ) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Password is incorrect');
   }

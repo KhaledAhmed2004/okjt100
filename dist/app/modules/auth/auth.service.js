@@ -40,7 +40,7 @@ const googleAudience = [
 ].filter(Boolean);
 const loginUserFromDB = (payload, sessionMetadata) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
-    const { email, password, deviceToken } = payload;
+    const { email, password, deviceToken, platform, appVersion } = payload;
     // `tokenVersion` is `select: false` on the schema — pull it explicitly
     // here so the issued JWT carries the current rotation counter.
     const isExistUser = yield user_model_1.User.findOne({ email }).select('+password +tokenVersion');
@@ -95,7 +95,7 @@ const loginUserFromDB = (payload, sessionMetadata) => __awaiter(void 0, void 0, 
     }, config_1.default.jwt.jwt_refresh_secret, config_1.default.jwt.jwt_refresh_expire_in);
     // ✅ save device token
     if (deviceToken) {
-        yield user_model_1.User.addDeviceToken(isExistUser._id.toString(), deviceToken, undefined, undefined, sessionMetadata);
+        yield user_model_1.User.addDeviceToken(isExistUser._id.toString(), deviceToken, platform, appVersion, sessionMetadata);
     }
     return { tokens: { accessToken, refreshToken } };
 });

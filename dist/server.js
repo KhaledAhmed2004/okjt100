@@ -41,6 +41,7 @@ const app_1 = __importDefault(require("./app"));
 const config_1 = __importDefault(require("./config"));
 const seedAdmin_1 = require("./DB/seedAdmin");
 const socketHelper_1 = require("./helpers/socketHelper");
+const socketManager_1 = require("./helpers/socketManager");
 const logger_1 = require("./shared/logger");
 const CacheHelper_1 = require("./app/shared/CacheHelper");
 const accountPurgeScheduler_1 = require("./app/modules/user/accountPurgeScheduler");
@@ -220,8 +221,7 @@ function main() {
                     },
                 });
                 socketHelper_1.socketHelper.socket(io);
-                //@ts-ignore
-                global.io = io;
+                socketManager_1.SocketManager.init(io);
                 socketSpinner.succeed('Socket.IO ready for real-time connections');
                 startupStatus.socketIO = true;
                 // Add timestamp

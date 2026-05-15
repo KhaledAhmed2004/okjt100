@@ -1549,6 +1549,33 @@
               ],
               "path": [
                 "ask-question"
+              ],
+              "query": [
+                {
+                  "key": "searchTerm",
+                  "value": "Wudu",
+                  "description": "Search within question text"
+                },
+                {
+                  "key": "status",
+                  "value": "pending",
+                  "description": "Filter by status (`pending`, `answered`)"
+                },
+                {
+                  "key": "userRole",
+                  "value": "SISTER",
+                  "description": "Filter by user role (`BROTHER`, `SISTER`)"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                }
               ]
             },
             "description": "",
@@ -1584,6 +1611,23 @@
               "path": [
                 "ask-question",
                 "my-questions"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "answered",
+                  "description": "Filter by status (`pending`, `answered`)"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number"
+                },
+                {
+                  "key": "limit",
+                  "value": "10",
+                  "description": "Items per page"
+                }
               ]
             },
             "description": "",
@@ -3064,8 +3108,8 @@
                   "description": "The video file (mp4, etc.)"
                 },
                 {
-                  "key": "duration",
-                  "value": "120",
+                  "key": "durationInSeconds",
+                  "value": "300",
                   "type": "text",
                   "description": "Video duration in seconds"
                 }
@@ -3216,8 +3260,8 @@
                   "description": "Updated video file (mp4, etc.)"
                 },
                 {
-                  "key": "duration",
-                  "value": "150",
+                  "key": "durationInSeconds",
+                  "value": "390",
                   "type": "text",
                   "description": "Updated duration of the video in seconds"
                 }
@@ -4807,6 +4851,184 @@
                   "type": "string"
                 }
               ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Subscription Module",
+      "item": [
+        {
+          "name": "17.1 Get My Subscription",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "me"
+              ]
+            },
+            "description": "User tar nijer current subscription status, plan, expiry date ityadi dekhbar jonno ei endpoint call korbe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17.2 Verify Apple Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/apple/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "apple",
+                "verify"
+              ]
+            },
+            "description": "iOS app theke purchase transaction verify korar jonno ei endpoint use kora hoy. Apple StoreKit theke pawa `signedTransactionInfo` pathate hobe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17.3 Apple Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/apple/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "apple",
+                "webhook"
+              ]
+            },
+            "description": "Apple App Store Server Notifications V2 handle korar jonno endpoint. Subscription renewal, cancellation, grace period ityadi events Apple theke direct ei endpoint-e ashe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17.4 Verify Google Subscription",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/google/verify",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "google",
+                "verify"
+              ]
+            },
+            "description": "Android app theke purchase verify korar jonno ei endpoint use kora hoy. Google Play Billing Client theke pawa `purchaseToken` ebong `productId` pathate hobe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17.5 Google Webhook",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/google/webhook",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "google",
+                "webhook"
+              ]
+            },
+            "description": "Google Play Real-Time Developer Notifications (RTDN) handle korar jonno endpoint. Subscription renewal, cancellation ityadi events Google Pub/Sub theke push message hishebe ei endpoint-e ashe.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "17.6 Choose Free Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/subscriptions/choose/free",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "subscriptions",
+                "choose",
+                "free"
+              ]
+            },
+            "description": "User manually FREE plan-e switch korar jonno ei endpoint use korbe (jodi tar kono active store subscription na thake).",
+            "auth": {
+              "type": "noauth"
             }
           },
           "response": []

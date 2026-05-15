@@ -38,34 +38,45 @@ const messageSchema = new Schema<IMessage, MessageModel>(
     text: {
       type: String,
       required: false,
-      maxlength: 1000,
+      maxlength: 4000,
       trim: true,
+      validate: {
+        validator: function (this: IMessage, value: string | undefined): boolean {
+          // When type is 'text', text must be present and non-empty
+          if (this.type === 'text') {
+            return typeof value === 'string' && value.trim().length > 0;
+          }
+          return true;
+        },
+        message: 'text is required and must be non-empty when type is "text"',
+      },
     },
     type: {
       type: String,
       enum: ['text', 'image', 'media', 'doc', 'mixed'],
+      required: true,
       default: 'text',
     },
 
-    // Unified attachment system
+    // Unified attachment system (max 10 elements)
     attachments: {
       type: [AttachmentSchema],
       default: [],
+      validate: {
+        validator: (v: unknown[]): boolean => v.length <= 10,
+        message: 'Attachments cannot exceed 10 items',
+      },
     },
 
-    // Delivery & read tracking
-    deliveredTo: [{ type: Schema.Types.ObjectId, ref: 'User', default: [] }],
-    readBy: [{ type: Schema.Types.ObjectId, ref: 'User', default: [] }],
-
-    // Message status
-    status: {
-      type: String,
-      enum: ['sent', 'delivered', 'seen'],
-      default: 'sent',
+    // Read tracking (max 1000 elements)
+    readBy: {
+      type: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+      default: [],
+      validate: {
+        validator: (v: unknown[]): boolean => v.length <= 1000,
+        message: 'readBy cannot exceed 1000 entries',
+      },
     },
-
-    // Edit tracking
-    editedAt: { type: Date },
   },
   {
     timestamps: true,
@@ -89,13 +100,8 @@ messageSchema.virtual('content').set(function (value: string) {
 messageSchema.set('toJSON', { virtuals: true });
 messageSchema.set('toObject', { virtuals: true });
 
-// Auto-populate sender on find queries
-messageSchema.pre('find', function () {
-  this.populate('sender', '_id name profilePicture');
-});
-
-messageSchema.pre('findOne', function () {
-  this.populate('sender', '_id name profilePicture');
-});
+// NOTE: pre('find') and pre('findOne') auto-populate hooks have been intentionally removed.
+// All population must be performed explicitly at the call site:
+//   .populate('sender', '_id name profilePicture')
 
 export const Message = model<IMessage, MessageModel>('Message', messageSchema);

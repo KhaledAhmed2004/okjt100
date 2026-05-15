@@ -8,8 +8,8 @@ const MosqueSchema = new mongoose_1.Schema({
     phoneNumber: { type: String, required: true },
     website: { type: String },
     location: {
-        latitude: { type: Number, required: true },
-        longitude: { type: Number, required: true },
+        type: { type: String, enum: ['Point'], default: 'Point', required: true },
+        coordinates: { type: [Number], required: true }, // [longitude, latitude]
     },
     prayerTimes: {
         fajr: { type: String, required: true },
@@ -25,5 +25,6 @@ const MosqueSchema = new mongoose_1.Schema({
 // Indexes for search and filtering
 MosqueSchema.index({ mosqueName: 'text', area: 'text', address: 'text' });
 MosqueSchema.index({ area: 1 });
+MosqueSchema.index({ 'location.coordinates': '2dsphere' });
 const Mosque = (0, mongoose_1.model)('Mosque', MosqueSchema);
 exports.default = Mosque;

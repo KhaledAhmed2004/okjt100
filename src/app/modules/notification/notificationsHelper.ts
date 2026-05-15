@@ -4,16 +4,9 @@ import { User } from '../user/user.model';
 import { pushNotificationHelper } from './pushNotificationHelper';
 
 export const sendNotifications = async (data: Partial<INotification>): Promise<INotification> => {
-  // Set default expiry to 30 days if not provided
-  if (!data.expiresAt) {
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + 30);
-    data.expiresAt = expiryDate;
-  }
-
   const result = await Notification.create(data);
 
-  const user = await User.findById(data?.userId);
+  const user = await User.findById(data?.receiver as unknown as string);
 
   // Extract raw token strings from the deviceTokens sub-document array.
   const tokens = Array.isArray(user?.deviceTokens)
@@ -24,7 +17,7 @@ export const sendNotifications = async (data: Partial<INotification>): Promise<I
     const message = {
       notification: {
         title: data?.title || 'TBSosick Notification',
-        body: data?.subtitle || data?.title || '',
+        body: (data as any)?.subtitle || data?.text || data?.title || '',
       },
       tokens,
     };
@@ -39,9 +32,9 @@ export const sendNotifications = async (data: Partial<INotification>): Promise<I
   //@ts-ignore
   const socketIo = global.io;
   if (socketIo) {
-    socketIo.to(`user::${data?.userId}`).emit('notification:new', result);
+    socketIo.to(`user::${data?.receiver}`).emit('notification:new', result);
     // Legacy alias — kept for older mobile clients
-    socketIo.emit(`get-notification::${data?.userId}`, result);
+    socketIo.emit(`get-notification::${data?.receiver}`, result);
   }
 
   return result;

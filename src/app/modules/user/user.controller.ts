@@ -95,7 +95,7 @@ const updateProfile = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'Profile updated successfully',
     data: {
-      id: result?._id,
+      id: (result as any)?._id,
       ...payload,
       updatedAt: result?.updatedAt,
     },
@@ -130,7 +130,7 @@ const adminUpdateUser = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     message: 'User updated successfully',
     data: {
-      id: result?._id,
+      id: (result as any)?._id,
       updatedAt: result?.updatedAt,
     },
   });

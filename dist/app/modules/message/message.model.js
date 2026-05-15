@@ -17,63 +17,6 @@ const AttachmentSchema = new mongoose_1.Schema({
     height: { type: Number },
     duration: { type: Number }, // For audio/video
 }, { _id: false });
-// Session Proposal Schema (in-chat booking)
-const SessionProposalSchema = new mongoose_1.Schema({
-    subject: {
-        type: String,
-        required: true,
-        trim: true,
-    },
-    startTime: {
-        type: Date,
-        required: true,
-    },
-    endTime: {
-        type: Date,
-        required: true,
-    },
-    duration: {
-        type: Number,
-        required: true, // in minutes
-    },
-    price: {
-        type: Number,
-        required: true, // in EUR
-    },
-    description: {
-        type: String,
-        trim: true,
-    },
-    status: {
-        type: String,
-        enum: ['PROPOSED', 'ACCEPTED', 'REJECTED', 'EXPIRED', 'COUNTER_PROPOSED', 'CANCELLED', 'COMPLETED', 'NO_SHOW', 'STARTING_SOON', 'IN_PROGRESS'],
-        default: 'PROPOSED',
-    },
-    sessionId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'Session',
-    },
-    rejectionReason: {
-        type: String,
-        trim: true,
-    },
-    expiresAt: {
-        type: Date,
-        required: true,
-    },
-    originalProposalId: {
-        type: mongoose_1.Schema.Types.ObjectId,
-        ref: 'Message',
-    },
-    counterProposalReason: {
-        type: String,
-        trim: true,
-    },
-    noShowBy: {
-        type: String,
-        enum: ['tutor', 'student'],
-    },
-}, { _id: false });
 // Message Schema
 const messageSchema = new mongoose_1.Schema({
     chatId: {
@@ -91,54 +34,49 @@ const messageSchema = new mongoose_1.Schema({
     text: {
         type: String,
         required: false,
-        maxlength: 1000,
+        maxlength: 4000,
         trim: true,
+        validate: {
+            validator: function (value) {
+                // When type is 'text', text must be present and non-empty
+                if (this.type === 'text') {
+                    return typeof value === 'string' && value.trim().length > 0;
+                }
+                return true;
+            },
+            message: 'text is required and must be non-empty when type is "text"',
+        },
     },
     type: {
         type: String,
-        enum: ['text', 'image', 'media', 'doc', 'mixed', 'session_proposal'],
+        enum: ['text', 'image', 'media', 'doc', 'mixed'],
+        required: true,
         default: 'text',
     },
-    // Unified attachment system
+    // Unified attachment system (max 10 elements)
     attachments: {
         type: [AttachmentSchema],
         default: [],
+        validate: {
+            validator: (v) => v.length <= 10,
+            message: 'Attachments cannot exceed 10 items',
+        },
     },
-    // In-chat booking (tutoring marketplace)
-    sessionProposal: {
-        type: SessionProposalSchema,
-        required: false,
+    // Read tracking (max 1000 elements)
+    readBy: {
+        type: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'User' }],
+        default: [],
+        validate: {
+            validator: (v) => v.length <= 1000,
+            message: 'readBy cannot exceed 1000 entries',
+        },
     },
-    // Delivery & read tracking
-    deliveredTo: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'User', default: [] }],
-    readBy: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'User', default: [] }],
-    // Message status
-    status: {
-        type: String,
-        enum: ['sent', 'delivered', 'seen'],
-        default: 'sent',
-    },
-    // Edit tracking
-    editedAt: { type: Date },
 }, {
     timestamps: true,
 });
 // Indexes
 messageSchema.index({ chatId: 1, createdAt: -1 });
 messageSchema.index({ sender: 1, createdAt: -1 });
-messageSchema.index({ 'sessionProposal.status': 1 }); // For filtering proposals
-// Pre-save: Set proposal expiration (24 hours)
-messageSchema.pre('save', function (next) {
-    if (this.type === 'session_proposal' &&
-        this.sessionProposal &&
-        this.isNew &&
-        !this.sessionProposal.expiresAt) {
-        const expirationDate = new Date();
-        expirationDate.setHours(expirationDate.getHours() + 24); // 24 hours from now
-        this.sessionProposal.expiresAt = expirationDate;
-    }
-    next();
-});
 // Virtual field: 'content' as alias for 'text' (for frontend compatibility)
 messageSchema.virtual('content').get(function () {
     return this.text;
@@ -149,11 +87,7 @@ messageSchema.virtual('content').set(function (value) {
 // Ensure virtuals are included in JSON/Object output
 messageSchema.set('toJSON', { virtuals: true });
 messageSchema.set('toObject', { virtuals: true });
-// Auto-populate sender on find queries
-messageSchema.pre('find', function () {
-    this.populate('sender', '_id name profilePicture');
-});
-messageSchema.pre('findOne', function () {
-    this.populate('sender', '_id name profilePicture');
-});
+// NOTE: pre('find') and pre('findOne') auto-populate hooks have been intentionally removed.
+// All population must be performed explicitly at the call site:
+//   .populate('sender', '_id name profilePicture')
 exports.Message = (0, mongoose_1.model)('Message', messageSchema);

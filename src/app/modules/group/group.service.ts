@@ -12,7 +12,7 @@ import { Notification } from '../notification/notification.model';
 
 // Helper to check if user is a member of a group
 const checkMembership = async (groupId: string, userId: string, userRole: string) => {
-  if (userRole === USER_ROLES.SUPER_ADMIN || userRole === USER_ROLES.ADMIN) return true;
+  if (userRole === USER_ROLES.SUPER_ADMIN) return true;
   const isMember = await GroupMember.findOne({ groupId, userId });
   if (!isMember) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'Only members can access this resource');
@@ -54,15 +54,15 @@ const deleteGroupFromDB = async (groupId: string) => {
 
     // Cascade delete: Members, Posts, Likes, Comments
     await GroupMember.deleteMany({ groupId }).session(session);
-    
+
     // Find all posts to delete their attachments
     const posts = await GroupPost.find({ groupId }).session(session);
     for (const post of posts) {
       if (post.attachments && post.attachments.length > 0) {
-        post.attachments.forEach(file => deleteFile(file).catch(() => {}));
+        post.attachments.forEach(file => deleteFile(file).catch(() => { }));
       }
     }
-    
+
     await GroupPost.deleteMany({ groupId }).session(session);
     // Since likes and comments are per postId, and we just deleted the group, 
     // it's more efficient to just delete everything associated with the posts of this group.
@@ -88,13 +88,13 @@ const getAllGroupsFromDB = async (query: Record<string, unknown>, userRole: stri
   // BROTHER sees BROTHER groups, SISTER sees SISTER groups.
   // SUPER_ADMIN sees ALL groups (no userType filter).
   const filter: Record<string, any> = {};
-  
+
   if (userRole !== USER_ROLES.SUPER_ADMIN) {
     filter.userType = userRole;
   }
-  
+
   const groupQuery = new QueryBuilder(Group.find(filter), query)
-    .textSearch(['name', 'category'])
+    .textSearch()
     .filter()
     .sort()
     .paginate()
@@ -127,7 +127,7 @@ const joinGroupInDB = async (groupId: string, userId: string, userRole: string) 
     if (isAlreadyMember) throw new ApiError(StatusCodes.BAD_REQUEST, 'Already a member');
 
     const result = await GroupMember.create([{ groupId, userId, role: 'member' }], { session });
-    
+
     await Group.findByIdAndUpdate(groupId, { $inc: { memberCount: 1 } }, { session });
 
     await session.commitTransaction();
@@ -159,7 +159,7 @@ const leaveGroupInDB = async (groupId: string, userId: string) => {
     session.endSession();
   }
 };
- 
+
 const createPostInDB = async (
   groupId: string,
   userId: string,
@@ -197,7 +197,7 @@ const getGroupFeedFromDB = async (
     GroupPost.find(baseFilter).populate('userId', 'name profileImage'),
     query,
   )
-    .textSearch(['content']);
+    .textSearch();
 
   if (query.sort) {
     postQuery.sort();
@@ -358,7 +358,7 @@ const deletePostInDB = async (postId: string, userId: string, userRole: string) 
   }
 
   if (post.attachments && post.attachments.length > 0) {
-    post.attachments.forEach(file => deleteFile(file).catch(() => {}));
+    post.attachments.forEach(file => deleteFile(file).catch(() => { }));
   }
 
   await GroupPost.findByIdAndDelete(postId);

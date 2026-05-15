@@ -35,9 +35,10 @@ const logger_1 = require("../../../shared/logger");
 const user_model_1 = require("./user.model");
 const notification_model_1 = require("../notification/notification.model");
 const group_model_1 = require("../group/group.model");
-const ask_imam_model_1 = __importDefault(require("../ask-imam/ask-imam.model"));
+const ask_question_model_1 = __importDefault(require("../ask-question/ask-question.model"));
 const resetToken_model_1 = require("../auth/resetToken/resetToken.model");
 const pending_email_model_1 = require("../pending-email/pending-email.model");
+const learning_content_model_1 = require("../learning-content/learning-content.model");
 let cron = null;
 try {
     cron = require('node-cron');
@@ -144,19 +145,28 @@ class AccountPurgeScheduler {
      */
     static purgeOne(userId, email) {
         return __awaiter(this, void 0, void 0, function* () {
+            // 1. Decrement memberCount for groups this user belongs to
+            const memberships = yield group_model_1.GroupMember.find({ userId }).select('groupId').lean();
+            const groupIds = memberships.map(m => m.groupId);
+            if (groupIds.length > 0) {
+                yield group_model_1.Group.updateMany({ _id: { $in: groupIds } }, { $inc: { memberCount: -1 } });
+            }
             // GDPR cascade — anything that stores the user's data must go.
             // PendingEmail is keyed by `to: email`, not userId, so it gets its
             // own delete clause when we know the address. If `email` is
             // somehow missing we skip the cascade (the TTL on SENT rows will
-            // eventually clear; DEAD rows stay until ops requeues or wipes).
+            // TTL on SENT rows will eventually clear; DEAD rows stay until ops
+            // requeues or wipes).
             const cascades = [
-                notification_model_1.Notification.deleteMany({ userId }),
+                notification_model_1.Notification.deleteMany({ receiver: userId }),
                 group_model_1.GroupMember.deleteMany({ userId }),
                 group_model_1.GroupPost.deleteMany({ userId }),
                 group_model_1.PostLike.deleteMany({ userId }),
                 group_model_1.PostComment.deleteMany({ userId }),
-                ask_imam_model_1.default.deleteMany({ userId }),
+                ask_question_model_1.default.deleteMany({ userId }),
                 resetToken_model_1.ResetToken.deleteMany({ user: userId }),
+                learning_content_model_1.LearningContentLike.deleteMany({ userId }),
+                learning_content_model_1.LearningContentComment.deleteMany({ userId }),
             ];
             if (email) {
                 cascades.push(pending_email_model_1.PendingEmail.deleteMany({ to: email }));

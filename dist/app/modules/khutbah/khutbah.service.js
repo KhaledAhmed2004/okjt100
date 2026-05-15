@@ -17,8 +17,29 @@ const http_status_codes_1 = require("http-status-codes");
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const khutbah_model_1 = __importDefault(require("./khutbah.model"));
+const NotificationBuilder_1 = __importDefault(require("../../builder/NotificationBuilder/NotificationBuilder"));
+const user_1 = require("../../../enums/user");
 const createKhutbaIntoDB = (payload) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield khutbah_model_1.default.create(payload);
+    // Notify all users about new Khutbah
+    new NotificationBuilder_1.default()
+        .toRole(user_1.USER_ROLES.BROTHER)
+        .setTitle('New Khutbah')
+        .setText(`New Khutbah published: ${payload.title}`)
+        .setType('NEW_KHUTBAH')
+        .setResource('Khutbah', result._id.toString())
+        .viaAll()
+        .send()
+        .catch(err => console.error('Notification Error:', err));
+    new NotificationBuilder_1.default()
+        .toRole(user_1.USER_ROLES.SISTER)
+        .setTitle('New Khutbah')
+        .setText(`New Khutbah published: ${payload.title}`)
+        .setType('NEW_KHUTBAH')
+        .setResource('Khutbah', result._id.toString())
+        .viaAll()
+        .send()
+        .catch(err => console.error('Notification Error:', err));
     return result;
 });
 const getAllKhutbahsFromDB = (query) => __awaiter(void 0, void 0, void 0, function* () {

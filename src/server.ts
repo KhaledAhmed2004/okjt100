@@ -4,6 +4,7 @@ import app from './app';
 import config from './config';
 import { seedSuperAdmin } from './DB/seedAdmin';
 import { socketHelper } from './helpers/socketHelper';
+import { SocketManager } from './helpers/socketManager';
 import { errorLogger, logger, notifyCritical } from './shared/logger';
 import { CacheHelper } from './app/shared/CacheHelper';
 import { AccountPurgeScheduler } from './app/modules/user/accountPurgeScheduler';
@@ -200,8 +201,7 @@ async function main() {
         },
       });
       socketHelper.socket(io);
-      //@ts-ignore
-      global.io = io;
+      SocketManager.init(io);
       socketSpinner.succeed('Socket.IO ready for real-time connections');
       startupStatus.socketIO = true;
 

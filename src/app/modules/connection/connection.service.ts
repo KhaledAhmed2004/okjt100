@@ -121,7 +121,7 @@ const respondToRequest = async (connectionId: string, userId: string, action: 'A
   if (io) {
     io.to(`user::${String(connection.sender)}`).emit('CONNECTION_ACCEPTED', {
       connectionId: connection._id,
-      chatId: chat._id,
+      chatId: (chat as any)._id,
       user: receiverUser,
     });
   }

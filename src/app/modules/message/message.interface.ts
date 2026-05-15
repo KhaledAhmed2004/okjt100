@@ -14,21 +14,14 @@ export type IMessageAttachment = {
 };
 
 export type IMessage = {
-  chatId: Types.ObjectId;
-  sender: Types.ObjectId;
-  text?: string;
-  content?: string; // Virtual alias for text (for frontend compatibility)
-  type: 'text' | 'image' | 'media' | 'doc' | 'mixed';
-  attachments?: IMessageAttachment[]; // unified attachment system
-
-  deliveredTo?: Types.ObjectId[];
-  readBy?: Types.ObjectId[];
-  status?: 'sent' | 'delivered' | 'seen';
-  editedAt?: Date;
-
-  // Timestamps
-  createdAt?: Date;
-  updatedAt?: Date;
+  chatId: Types.ObjectId;                              // required
+  sender: Types.ObjectId;                              // required
+  text?: string;                                       // optional, max 4000 chars; required when type === 'text'
+  type: 'text' | 'image' | 'media' | 'doc' | 'mixed'; // required enum
+  attachments: IMessageAttachment[];                   // max 10 elements
+  readBy: Types.ObjectId[];                            // max 1000 elements
+  createdAt: Date;
+  updatedAt: Date;
 };
 
 export type MessageModel = Model<IMessage>;

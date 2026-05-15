@@ -192,31 +192,46 @@ const optimizeFile = (file, storageMode) => __awaiter(void 0, void 0, void 0, fu
     const isVideo = file.mimetype.startsWith('video/');
     let buffer = storageMode === 'memory' ? file.buffer : undefined;
     if (isImage) {
-        let sharpInstance = storageMode === 'local' ? (0, sharp_1.default)(file.path).resize(800) : (0, sharp_1.default)(buffer).resize(800);
+        let sharpInstance;
+        if (storageMode === 'local') {
+            // Read file into buffer first to avoid locking issues on Windows when writing back to same path
+            const inputBuffer = yield fs_1.default.promises.readFile(file.path);
+            sharpInstance = (0, sharp_1.default)(inputBuffer).resize(800);
+        }
+        else {
+            sharpInstance = (0, sharp_1.default)(buffer).resize(800);
+        }
         if (file.mimetype === 'image/png')
             sharpInstance = sharpInstance.png({ compressionLevel: 8, palette: true });
         else if (file.mimetype === 'image/webp')
             sharpInstance = sharpInstance.webp({ quality: 80 });
         else
             sharpInstance = sharpInstance.jpeg({ quality: 80 });
-        if (storageMode === 'memory')
+        if (storageMode === 'memory') {
             buffer = yield sharpInstance.toBuffer();
-        else
+        }
+        else {
             yield sharpInstance.toFile(file.path);
+        }
     }
     if (isVideo && storageMode === 'memory') {
         return buffer;
     }
     return buffer;
 });
-const generateFileUrl = (file, storageMode, provider, baseUrl) => __awaiter(void 0, void 0, void 0, function* () {
-    const canonicalFolder = getFolderByMime(file.mimetype);
-    if (storageMode === 'local') {
-        // Generate relative URL path
-        const relativePath = file.path.split('uploads')[1].replace(/\\/g, '/');
-        return `${baseUrl}/uploads${relativePath}`;
-    }
+const generateFileUrl = (file, storageMode, provider, baseUrl, folder) => __awaiter(void 0, void 0, void 0, function* () {
+    // 1. Optimize/Process file (resize images, etc.)
     const buffer = yield optimizeFile(file, storageMode);
+    if (storageMode === 'local') {
+        // 2. Generate relative URL path safely
+        const normalizedPath = file.path.replace(/\\/g, '/');
+        const parts = normalizedPath.split('/uploads/');
+        const relativePart = parts[parts.length - 1];
+        // Ensure baseUrl doesn't have trailing slash and relativePart doesn't have leading slash
+        const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+        return `${cleanBaseUrl}/uploads/${relativePart}`;
+    }
+    // 3. Cloud Storage path
     const ext = file.mimetype.split('/')[1];
     const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
     return provider.upload(buffer, fileName, folder, file.mimetype);
@@ -266,10 +281,12 @@ const enforceFieldPolicy = (filesByField, opts) => {
         }
     }
 };
-const processFilesToUrls = (filesByField, storageMode, provider, baseUrl) => __awaiter(void 0, void 0, void 0, function* () {
+const processFilesToUrls = (filesByField, storageMode, provider, baseUrl, opts) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
     const processed = {};
     for (const [fieldName, fileArray] of Object.entries(filesByField)) {
-        const urls = yield Promise.all(fileArray.map(file => generateFileUrl(file, storageMode, provider, baseUrl)));
+        const folder = ((_a = opts.perFieldSubfolder) === null || _a === void 0 ? void 0 : _a[fieldName]) || getFolderByMime(fileArray[0].mimetype);
+        const urls = yield Promise.all(fileArray.map(file => generateFileUrl(file, storageMode, provider, baseUrl, folder)));
         processed[fieldName] = fileArray.length > 1 ? urls : urls[0];
     }
     return processed;
@@ -338,7 +355,7 @@ const fileHandler = (fields, options) => {
                 if (req.files) {
                     filesByField = groupFilesByField(req.files);
                     enforceFieldPolicy(filesByField, resolved);
-                    const processedFiles = yield processFilesToUrls(filesByField, resolved.storageMode, provider, effectiveBaseUrl);
+                    const processedFiles = yield processFilesToUrls(filesByField, resolved.storageMode, provider, effectiveBaseUrl, resolved);
                     req.body = Object.assign(Object.assign({}, req.body), processedFiles);
                 }
                 next();

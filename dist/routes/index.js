@@ -12,10 +12,15 @@ const admin_route_1 = require("../app/modules/admin/admin.route");
 const legal_route_1 = require("../app/modules/legal/legal.route");
 const khutbah_route_1 = require("../app/modules/khutbah/khutbah.route");
 const mosque_route_1 = require("../app/modules/mosque/mosque.route");
-const ask_imam_route_1 = require("../app/modules/ask-imam/ask-imam.route");
+const ask_question_route_1 = require("../app/modules/ask-question/ask-question.route");
 const group_route_1 = require("../app/modules/group/group.route");
 const pending_email_route_1 = require("../app/modules/pending-email/pending-email.route");
 const support_ticket_route_1 = require("../app/modules/support-ticket/support-ticket.route");
+const learning_content_route_1 = require("../app/modules/learning-content/learning-content.route");
+const dua_route_1 = require("../app/modules/dua/dua.route");
+const connection_route_1 = require("../app/modules/connection/connection.route");
+const chat_route_1 = require("../app/modules/chat/chat.route");
+const message_route_1 = require("../app/modules/message/message.route");
 const router = express_1.default.Router();
 const apiRoutes = [
     {
@@ -51,8 +56,8 @@ const apiRoutes = [
         route: mosque_route_1.MosqueRoutes,
     },
     {
-        path: '/ask-imam',
-        route: ask_imam_route_1.AskImamRoutes,
+        path: '/ask-question',
+        route: ask_question_route_1.AskQuestionRoutes,
     },
     {
         path: '/groups',
@@ -65,6 +70,26 @@ const apiRoutes = [
     {
         path: '/support-tickets',
         route: support_ticket_route_1.SupportTicketRoutes,
+    },
+    {
+        path: '/learning-contents',
+        route: learning_content_route_1.LearningContentRoutes,
+    },
+    {
+        path: '/duas',
+        route: dua_route_1.DuaRoutes,
+    },
+    {
+        path: '/connections',
+        route: connection_route_1.ConnectionRoutes,
+    },
+    {
+        path: '/chats',
+        route: chat_route_1.ChatRoutes,
+    },
+    {
+        path: '/messages',
+        route: message_route_1.MessageRoutes,
     },
 ];
 apiRoutes.forEach(route => router.use(route.path, route.route));

@@ -23,67 +23,72 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AskImamController = void 0;
+exports.DuaController = void 0;
 const http_status_codes_1 = require("http-status-codes");
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
-const ask_imam_service_1 = require("./ask-imam.service");
-const submitQuestion = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { user } = req;
-    const _a = req.body, { image } = _a, rest = __rest(_a, ["image"]);
-    const result = yield ask_imam_service_1.AskImamService.submitQuestionIntoDB(Object.assign(Object.assign({}, rest), { userId: user._id, imageUrl: image }));
+const dua_service_1 = require("./dua.service");
+const createDua = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const _a = req.body, { audio } = _a, rest = __rest(_a, ["audio"]);
+    const result = yield dua_service_1.DuaService.createDuaIntoDB(Object.assign(Object.assign({}, rest), { audioUrl: audio }));
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.CREATED,
-        message: 'Question submitted successfully',
+        message: 'Dua created successfully',
         data: result,
     });
 }));
-const getAllQuestions = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield ask_imam_service_1.AskImamService.getAllQuestionsFromDB(req.query);
+const getAllDuas = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const result = yield dua_service_1.DuaService.getAllDuasFromDB(req.query);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Questions fetched successfully',
+        message: 'Duas fetched successfully',
         meta: result.pagination,
         data: result.data,
     });
 }));
-const getMyQuestions = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { user } = req;
-    const result = yield ask_imam_service_1.AskImamService.getMyQuestionsFromDB(user._id, req.query);
+const getSingleDua = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { duaId } = req.params;
+    const result = yield dua_service_1.DuaService.getSingleDuaFromDB(duaId);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Your questions fetched successfully',
-        meta: result.pagination,
-        data: result.data,
-    });
-}));
-const answerQuestion = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { questionId } = req.params;
-    const { answer } = req.body;
-    const result = yield ask_imam_service_1.AskImamService.answerQuestionInDB(questionId, answer);
-    (0, sendResponse_1.default)(res, {
-        success: true,
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Question answered successfully',
+        message: 'Dua fetched successfully',
         data: result,
     });
 }));
-const getAnalytics = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield ask_imam_service_1.AskImamService.getAnalyticsFromDB();
+const updateDua = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { duaId } = req.params;
+    const _a = req.body, { audio } = _a, rest = __rest(_a, ["audio"]);
+    const updateData = Object.assign({}, rest);
+    if (audio)
+        updateData.audioUrl = audio;
+    const result = yield dua_service_1.DuaService.updateDuaInDB(duaId, updateData);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,
-        message: 'Analytics fetched successfully',
-        data: result,
+        message: 'Dua updated successfully',
+        data: {
+            id: result === null || result === void 0 ? void 0 : result._id,
+            updatedAt: result === null || result === void 0 ? void 0 : result.updatedAt,
+        },
     });
 }));
-exports.AskImamController = {
-    submitQuestion,
-    getAllQuestions,
-    getMyQuestions,
-    answerQuestion,
-    getAnalytics,
+const deleteDua = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { duaId } = req.params;
+    const result = yield dua_service_1.DuaService.deleteDuaFromDB(duaId);
+    (0, sendResponse_1.default)(res, {
+        success: true,
+        statusCode: http_status_codes_1.StatusCodes.OK,
+        message: 'Dua deleted successfully',
+        data: { id: result === null || result === void 0 ? void 0 : result._id },
+    });
+}));
+exports.DuaController = {
+    createDua,
+    getAllDuas,
+    getSingleDua,
+    updateDua,
+    deleteDua,
 };
