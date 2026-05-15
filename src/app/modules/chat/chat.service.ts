@@ -180,11 +180,18 @@ const getList = async (userId: string, searchTerm?: string): Promise<any[]> => {
     unreadCounts = filteredChats.map(() => 0);
   }
 
-  // Attach unreadCount to each chat
-  return filteredChats.map((chat, index) => ({
-    ...chat,
-    unreadCount: unreadCounts[index] ?? 0,
-  }));
+  // Attach unreadCount and strip the logged-in user from participants
+  // so the response only contains the other person in the conversation
+  return filteredChats.map((chat, index) => {
+    const participants = (chat.participants as any[]).filter(
+      p => String(p._id) !== String(userId)
+    );
+    return {
+      ...chat,
+      participants,
+      unreadCount: unreadCounts[index] ?? 0,
+    };
+  });
 };
 
 export const ChatService = { createOrGet, createChatToDB, getChatFromDB, getList };
