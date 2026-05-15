@@ -4723,13 +4723,13 @@
               "formdata": [
                 {
                   "key": "chatId",
-                  "value": "",
+                  "value": "664a1b2c3d4e5f6a7b8c9d1z",
                   "type": "text",
                   "description": "Target Chat ID"
                 },
                 {
                   "key": "text",
-                  "value": "",
+                  "value": "Hello!",
                   "type": "text",
                   "description": "Message text"
                 },
@@ -4768,7 +4768,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/messages/chat/{{chatId}}",
+              "raw": "{{baseUrl}}/messages/chat/{{chatId}}?cursor=...&limit=20",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -4779,16 +4779,12 @@
               ],
               "query": [
                 {
-                  "key": "page",
-                  "value": ""
+                  "key": "cursor",
+                  "value": "..."
                 },
                 {
                   "key": "limit",
-                  "value": ""
-                },
-                {
-                  "key": "searchTerm",
-                  "value": ""
+                  "value": "20"
                 }
               ],
               "variable": [

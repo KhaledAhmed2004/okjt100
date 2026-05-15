@@ -131,7 +131,7 @@ const getChatFromDB = async (user: any, searchTerm: string): Promise<IChat[]> =>
   return chatList;
 };
 
-const getList = async (userId: string, search?: string): Promise<any[]> => {
+const getList = async (userId: string, searchTerm?: string): Promise<any[]> => {
   // Validate userId as a valid ObjectId (throw 400 if invalid)
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid userId');
@@ -156,8 +156,8 @@ const getList = async (userId: string, search?: string): Promise<any[]> => {
 
   // Apply optional case-insensitive search filter on the other participant's name (in JS after populate)
   let filteredChats = chats;
-  if (search && search.trim().length > 0) {
-    const searchRegex = new RegExp(search.trim(), 'i');
+  if (searchTerm && searchTerm.trim().length > 0) {
+    const searchRegex = new RegExp(searchTerm.trim(), 'i');
     filteredChats = chats.filter(chat => {
       const participants = chat.participants as any[];
       const other = participants.find(p => String(p._id) !== String(userId));

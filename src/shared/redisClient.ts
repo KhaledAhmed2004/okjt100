@@ -15,7 +15,9 @@ export const redisClient = new Redis(config.redis_url as string, {
   // Suppress unhandled-error events — callers catch errors at the call site
   lazyConnect: false,
   enableOfflineQueue: true,
-  maxRetriesPerRequest: null, // let ioredis retry indefinitely in the background
+  connectTimeout: 5000,
+  commandTimeout: 2000, // 2s timeout for any command to prevent hanging requests
+  maxRetriesPerRequest: 3, // Retry a few times then fail if Redis is down
 });
 
 redisClient.on('error', () => {

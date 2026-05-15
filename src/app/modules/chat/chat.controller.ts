@@ -25,9 +25,9 @@ const createChat = catchAsync(async (req: Request, res: Response) => {
 // Requirements: 4.1 — getList wired to HTTP route
 const getChat = catchAsync(async (req: Request, res: Response) => {
   const user = req.user as JwtPayload;
-  const search = req.query.search as string | undefined;
+  const searchTerm = req.query.searchTerm as string | undefined;
 
-  const chatList = await ChatService.getList(user.id as string, search);
+  const chatList = await ChatService.getList(user.id as string, searchTerm);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,

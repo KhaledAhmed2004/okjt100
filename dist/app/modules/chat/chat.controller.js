@@ -34,8 +34,8 @@ const createChat = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, voi
 // Requirements: 4.1 — getList wired to HTTP route
 const getChat = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
-    const search = req.query.search;
-    const chatList = yield chat_service_1.ChatService.getList(user.id, search);
+    const searchTerm = req.query.searchTerm;
+    const chatList = yield chat_service_1.ChatService.getList(user.id, searchTerm);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_codes_1.StatusCodes.OK,
         success: true,

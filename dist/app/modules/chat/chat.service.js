@@ -120,7 +120,7 @@ const getChatFromDB = (user, searchTerm) => __awaiter(void 0, void 0, void 0, fu
     })));
     return chatList;
 });
-const getList = (userId, search) => __awaiter(void 0, void 0, void 0, function* () {
+const getList = (userId, searchTerm) => __awaiter(void 0, void 0, void 0, function* () {
     // Validate userId as a valid ObjectId (throw 400 if invalid)
     if (!mongoose_1.default.Types.ObjectId.isValid(userId)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid userId');
@@ -142,8 +142,8 @@ const getList = (userId, search) => __awaiter(void 0, void 0, void 0, function* 
     });
     // Apply optional case-insensitive search filter on the other participant's name (in JS after populate)
     let filteredChats = chats;
-    if (search && search.trim().length > 0) {
-        const searchRegex = new RegExp(search.trim(), 'i');
+    if (searchTerm && searchTerm.trim().length > 0) {
+        const searchRegex = new RegExp(searchTerm.trim(), 'i');
         filteredChats = chats.filter(chat => {
             var _a;
             const participants = chat.participants;

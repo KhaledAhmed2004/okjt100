@@ -25,5 +25,5 @@ Stores conversation metadata between two users.
 
 | # | Method | Endpoint | Auth | Purpose & Status | Documentation |
 |---|---|---|---|---|---|
-| 01 | POST | `/chats/:otherUserId` | `BROTHER`, `SISTER` | ✅ Done: Creates or retrieves a chat with another user. | [01-create-get-chat.md](./01-create-get-chat.md) |
-| 02 | GET | `/chats` | `BROTHER`, `SISTER` | ✅ Done: Lists all chats for the user. | [02-list-my-chats.md](./02-list-my-chats.md) |
+| 01 | POST | `/chats/:otherUserId` | `BROTHER`, `SISTER`, `SUPER_ADMIN` | ✅ Done: Creates or retrieves a chat with another user. | [01-create-get-chat.md](./01-create-get-chat.md) |
+| 02 | GET | `/chats` | `BROTHER`, `SISTER`, `SUPER_ADMIN` | ✅ Done: Lists all chats for the user. | [02-list-my-chats.md](./02-list-my-chats.md) |

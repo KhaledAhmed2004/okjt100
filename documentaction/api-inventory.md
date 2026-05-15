@@ -177,16 +177,16 @@
 
 | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
 |---|---|---|---|:---:|---|---|
-| 15.1 | POST | `/chats/:otherUserId` | BROTHER, SISTER | ✅ | [Module 15.1](./modules/chat/01-create-get-chat.md) | — |
-| 15.2 | GET | `/chats` | BROTHER, SISTER | ✅ | [Module 15.2](./modules/chat/02-list-my-chats.md) | — |
+| 15.1 | POST | `/chats/:otherUserId` | BROTHER, SISTER, SUPER_ADMIN | ✅ | [Module 15.1](./modules/chat/01-create-get-chat.md) | — |
+| 15.2 | GET | `/chats` | BROTHER, SISTER, SUPER_ADMIN | ✅ | [Module 15.2](./modules/chat/02-list-my-chats.md) | — |
 
 ## Message Module
 
 | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
 |---|---|---|---|:---:|---|---|
-| 16.1 | POST | `/messages` | BROTHER, SISTER | ✅ | [Module 16.1](./modules/message/01-send-message.md) | — |
-| 16.2 | GET | `/messages/chat/:chatId` | BROTHER, SISTER | ✅ | [Module 16.2](./modules/message/02-get-chat-messages.md) | — |
-| 16.3 | POST | `/messages/chat/:chatId/read` | BROTHER, SISTER | ✅ | [Module 16.3](./modules/message/03-mark-chat-as-read.md) | — |
+| 16.1 | POST | `/messages` | BROTHER, SISTER, SUPER_ADMIN | ✅ | [Module 16.1](./modules/message/01-send-message.md) | — |
+| 16.2 | GET | `/messages/chat/:chatId` | BROTHER, SISTER, SUPER_ADMIN | ✅ | [Module 16.2](./modules/message/02-get-chat-messages.md) | — |
+| 16.3 | POST | `/messages/chat/:chatId/read` | BROTHER, SISTER, SUPER_ADMIN | ✅ | [Module 16.3](./modules/message/03-mark-chat-as-read.md) | — |
 
 ## Subscription Module
 
