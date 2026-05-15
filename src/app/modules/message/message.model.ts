@@ -87,19 +87,6 @@ const messageSchema = new Schema<IMessage, MessageModel>(
 messageSchema.index({ chatId: 1, createdAt: -1 });
 messageSchema.index({ sender: 1, createdAt: -1 });
 
-// Virtual field: 'content' as alias for 'text' (for frontend compatibility)
-messageSchema.virtual('content').get(function () {
-  return this.text;
-});
-
-messageSchema.virtual('content').set(function (value: string) {
-  this.text = value;
-});
-
-// Ensure virtuals are included in JSON/Object output
-messageSchema.set('toJSON', { virtuals: true });
-messageSchema.set('toObject', { virtuals: true });
-
 // NOTE: pre('find') and pre('findOne') auto-populate hooks have been intentionally removed.
 // All population must be performed explicitly at the call site:
 //   .populate('sender', '_id name profilePicture')
