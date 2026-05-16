@@ -2,11 +2,8 @@ import express from 'express';
 import auth from '../../middlewares/auth';
 import { USER_ROLES } from '../../../enums/user';
 import { AdminController } from './admin.controller';
-import validateRequest from '../../middlewares/validateRequest';
 
 const router = express.Router();
-
-// --- Dashboard Metrics ---
 
 router.get(
   '/growth-metrics',
