@@ -4,35 +4,9 @@ import { errorLogger, logger } from '../shared/logger';
 import { jwtHelper } from './jwtHelper';
 import config from '../config';
 import { redisClient } from '../shared/redisClient';
-// Optional chat/message modules: fall back to stubs when absent
-let Message: any;
-let Chat: any;
-try {
-  ({ Message } = require('../app/modules/message/message.model'));
-} catch {
-  Message = {
-    find: async () => [],
-    updateMany: async () => {},
-    findById: async () => ({ select: () => null }),
-    findByIdAndUpdate: async () => null,
-  };
-}
-try {
-  ({ Chat } = require('../app/modules/chat/chat.model'));
-} catch {
-  Chat = {
-    exists: async () => false,
-  };
-}
-let SupportTicket: any;
-try {
-  ({ SupportTicket } = require('../app/modules/support-ticket/support-ticket.model'));
-} catch {
-  SupportTicket = {
-    findById: async () => null,
-  };
-}
-import NodeCache from 'node-cache';
+import { Message } from '../app/modules/message/message.model';
+import { Chat } from '../app/modules/chat/chat.model';
+import { SupportTicket } from '../app/modules/support-ticket/support-ticket.model';
 import {
   setOnline,
   setOffline,
@@ -57,7 +31,34 @@ const TICKET_ROOM = (ticketId: string) => `ticket::${ticketId}`;
 const ADMIN_TICKETS_ROOM = 'admin-tickets';
 const TYPING_KEY = (chatId: string, userId: string) => `typing:${chatId}:${userId}`;
 const TYPING_TTL_SECONDS = 5; // throttle window
-const typingThrottle = new NodeCache({ stdTTL: TYPING_TTL_SECONDS, checkperiod: 10, useClones: false });
+
+// -------------------------
+// 🔹 Rate Limiting Helper (Req 12)
+// -------------------------
+/**
+ * Increments the rate-limit counter for an event+user pair.
+ * Returns true if the limit has been exceeded (caller should reject).
+ * Fails open on Redis errors — logs the error and allows the request through.
+ */
+const isRateLimited = async (
+  event: string,
+  userId: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<boolean> => {
+  try {
+    const key = `ratelimit:${event}:${userId}`;
+    const count = await redisClient.incr(key);
+    if (count === 1) {
+      // First increment — set TTL for the window
+      await redisClient.expire(key, windowSeconds);
+    }
+    return count > limit;
+  } catch (err) {
+    errorLogger.error(`isRateLimited: Redis error for event=${event} user=${userId}: ${String(err)}`);
+    return false; // fail open
+  }
+};
 
 // -------------------------
 // 🔹 Main Socket Handler
@@ -101,11 +102,9 @@ const socket = (io: Server) => {
       await setOnline(userId);
       await incrConnCount(userId);
       await updateLastActive(userId);
-      socket.join(USER_ROOM(userId)); // join user’s personal private room
-      logger.info(
-        colors.blue(`✅ User ${userId} connected & joined ${USER_ROOM(userId)}`)
-      );
-      logEvent('socket_connected', `for user_id: ${userId}`);
+      socket.join(USER_ROOM(userId)); // join user's personal private room
+      logger.info(`✅ User ${userId} connected & joined ${USER_ROOM(userId)}`);
+      logger.info(`🔔 Event processed: socket_connected for user_id: ${userId}`);
 
       // Admins auto-join the global support-ticket broadcast room so they
       // receive TICKET_CREATED/TICKET_REPLY events without needing to
@@ -116,20 +115,22 @@ const socket = (io: Server) => {
         socket.join(ADMIN_TICKETS_ROOM);
       }
 
-      // -----------------------------
-      // 🔹 Helper Function: Simplify repetitive event logging & activity update
-      // -----------------------------
-      const handleEventProcessed = (event: string, extra?: string) => {
-        updateLastActive(userId).catch(() => {});
-        logEvent(event, extra);
-      };
-
       // ---------------------------------------------
       // 🔹 Chat Room Join / Leave Events
       // ---------------------------------------------
       socket.on('JOIN_CHAT', async ({ chatId }: { chatId: string }) => {
         // Requirement 8.2: ignore event if chatId is absent or empty string
         if (!chatId) return;
+
+        // Req 7: participant authorization
+        const isParticipant = await Chat.exists({ _id: chatId, participants: userId });
+        if (!isParticipant) {
+          socket.emit('ACK_ERROR', {
+            message: 'You are not a participant of this chat',
+            chatId,
+          });
+          return;
+        }
 
         // Write active:{userId}:chat = chatId with 3600-second TTL (Requirement 8.1)
         try {
@@ -143,7 +144,8 @@ const socket = (io: Server) => {
         // Join the socket room for this chat
         socket.join(CHAT_ROOM(chatId));
         await addUserRoom(userId, chatId);
-        handleEventProcessed('JOIN_CHAT', `for chat_id: ${chatId}`);
+        updateLastActive(userId).catch(() => {});
+        logger.info(`🔔 Event processed: JOIN_CHAT for chat_id: ${chatId}`);
 
         // Broadcast to others in the chat that this user is now online
         const lastActive = await getLastActive(userId);
@@ -152,9 +154,7 @@ const socket = (io: Server) => {
           chatId,
           lastActive,
         });
-        logger.info(
-          colors.green(`User ${userId} joined chat room ${CHAT_ROOM(chatId)}`)
-        );
+        logger.info(`User ${userId} joined chat room ${CHAT_ROOM(chatId)}`);
       });
 
       socket.on('LEAVE_CHAT', async ({ chatId }: { chatId: string }) => {
@@ -171,7 +171,8 @@ const socket = (io: Server) => {
 
         socket.leave(CHAT_ROOM(chatId));
         await removeUserRoom(userId, chatId);
-        handleEventProcessed('LEAVE_CHAT', `for chat_id: ${chatId}`);
+        updateLastActive(userId).catch(() => {});
+        logger.info(`🔔 Event processed: LEAVE_CHAT for chat_id: ${chatId}`);
 
         // Notify others that user went offline in this chat
         const lastActive = await getLastActive(userId);
@@ -199,10 +200,8 @@ const socket = (io: Server) => {
               message: 'Ticket not found',
               ticketId: String(ticketId),
             });
-            handleEventProcessed(
-              'JOIN_TICKET_DENIED',
-              `not_found ticket_id: ${ticketId}`
-            );
+            updateLastActive(userId).catch(() => {});
+            logger.info(`🔔 Event processed: JOIN_TICKET_DENIED not_found ticket_id: ${ticketId}`);
             return;
           }
           const isAdmin = role === 'SUPER_ADMIN';
@@ -212,14 +211,13 @@ const socket = (io: Server) => {
               message: 'You do not have access to this ticket',
               ticketId: String(ticketId),
             });
-            handleEventProcessed(
-              'JOIN_TICKET_DENIED',
-              `forbidden ticket_id: ${ticketId}`
-            );
+            updateLastActive(userId).catch(() => {});
+            logger.info(`🔔 Event processed: JOIN_TICKET_DENIED forbidden ticket_id: ${ticketId}`);
             return;
           }
           socket.join(TICKET_ROOM(String(ticketId)));
-          handleEventProcessed('JOIN_TICKET', `for ticket_id: ${ticketId}`);
+          updateLastActive(userId).catch(() => {});
+          logger.info(`🔔 Event processed: JOIN_TICKET for ticket_id: ${ticketId}`);
         } catch (err) {
           logger.error(colors.red(`JOIN_TICKET error: ${String(err)}`));
         }
@@ -228,7 +226,8 @@ const socket = (io: Server) => {
       socket.on('LEAVE_TICKET', async ({ ticketId }: { ticketId: string }) => {
         if (!ticketId) return;
         socket.leave(TICKET_ROOM(String(ticketId)));
-        handleEventProcessed('LEAVE_TICKET', `for ticket_id: ${ticketId}`);
+        updateLastActive(userId).catch(() => {});
+        logger.info(`🔔 Event processed: LEAVE_TICKET for ticket_id: ${ticketId}`);
       });
 
       // ---------------------------------------------
@@ -236,25 +235,34 @@ const socket = (io: Server) => {
       // ---------------------------------------------
       socket.on('TYPING_START', async ({ chatId }: { chatId: string }) => {
         if (!chatId) return;
-        // Guard: Only participants can emit typing events for a chat
-        const allowed = await Chat.exists({ _id: chatId, participants: userId });
-        if (!allowed) {
-          handleEventProcessed('TYPING_START_DENIED', `for chat_id: ${chatId}`);
+
+        // Req 12: rate limit TYPING_START (60 per 60s)
+        if (await isRateLimited('TYPING_START', userId, 60, 60)) {
+          socket.emit('ACK_ERROR', { message: 'Rate limit exceeded', event: 'TYPING_START' });
           return;
         }
 
-        // Throttle typing events per user per chat using in-memory TTL key
-        {
-          const key = TYPING_KEY(chatId, userId);
-          if (typingThrottle.has(key)) {
-            handleEventProcessed('TYPING_START_THROTTLED_SKIP', `for chat_id: ${chatId}`);
-            return;
-          }
-          typingThrottle.set(key, 1, TYPING_TTL_SECONDS);
+        // Guard: Only participants can emit typing events for a chat
+        const allowed = await Chat.exists({ _id: chatId, participants: userId });
+        if (!allowed) {
+          updateLastActive(userId).catch(() => {});
+          logger.info(`🔔 Event processed: TYPING_START_DENIED for chat_id: ${chatId}`);
+          return;
+        }
+
+        // Req 2: Throttle typing events per user per chat using Redis SET NX
+        const key = TYPING_KEY(chatId, userId);
+        const acquired = await redisClient.set(key, '1', 'EX', TYPING_TTL_SECONDS, 'NX');
+        if (acquired === null) {
+          // Already throttled — suppress broadcast
+          updateLastActive(userId).catch(() => {});
+          logger.info(`🔔 Event processed: TYPING_START_THROTTLED_SKIP for chat_id: ${chatId}`);
+          return;
         }
 
         io.to(CHAT_ROOM(chatId)).emit('TYPING_START', { userId, chatId });
-        handleEventProcessed('TYPING_START', `for chat_id: ${chatId}`);
+        updateLastActive(userId).catch(() => {});
+        logger.info(`🔔 Event processed: TYPING_START for chat_id: ${chatId}`);
       });
 
       socket.on('TYPING_STOP', async ({ chatId }: { chatId: string }) => {
@@ -262,14 +270,16 @@ const socket = (io: Server) => {
         // Guard: Only participants can emit typing stop events
         const allowed = await Chat.exists({ _id: chatId, participants: userId });
         if (!allowed) {
-          handleEventProcessed('TYPING_STOP_DENIED', `for chat_id: ${chatId}`);
+          updateLastActive(userId).catch(() => {});
+          logger.info(`🔔 Event processed: TYPING_STOP_DENIED for chat_id: ${chatId}`);
           return;
         }
-        // Clear throttle key so next start can emit immediately
-        typingThrottle.del(TYPING_KEY(chatId, userId));
+        // Req 2.5: Clear throttle key so next start can emit immediately
+        await redisClient.del(TYPING_KEY(chatId, userId));
 
         io.to(CHAT_ROOM(chatId)).emit('TYPING_STOP', { userId, chatId });
-        handleEventProcessed('TYPING_STOP', `for chat_id: ${chatId}`);
+        updateLastActive(userId).catch(() => {});
+        logger.info(`🔔 Event processed: TYPING_STOP for chat_id: ${chatId}`);
       });
 
       // ---------------------------------------------
@@ -295,26 +305,19 @@ const socket = (io: Server) => {
                 chatId: String(found.chatId),
                 messageId: String(found._id),
               });
-              handleEventProcessed('DELIVERED_ACK_DENIED', `chat_id: ${String(found.chatId)}`);
+              updateLastActive(userId).catch(() => {});
+              logger.info(`🔔 Event processed: DELIVERED_ACK_DENIED chat_id: ${String(found.chatId)}`);
               return;
             }
 
-            const msg = await Message.findByIdAndUpdate(
-              messageId,
-              { $addToSet: { deliveredTo: userId } },
-              { new: true }
-            );
-            if (msg) {
-              io.to(CHAT_ROOM(String(msg.chatId))).emit('MESSAGE_DELIVERED', {
-                messageId: String(msg._id),
-                chatId: String(msg.chatId),
-                userId,
-              });
-              handleEventProcessed(
-                'DELIVERED_ACK',
-                `for message_id: ${String(msg._id)}`
-              );
-            }
+            // Req 5: emit MESSAGE_DELIVERED without any DB write
+            io.to(CHAT_ROOM(String(found.chatId))).emit('MESSAGE_DELIVERED', {
+              messageId: String(found._id),
+              chatId: String(found.chatId),
+              userId,
+            });
+            updateLastActive(userId).catch(() => {});
+            logger.info(`🔔 Event processed: DELIVERED_ACK for message_id: ${String(found._id)}`);
           } catch (err) {
             logger.error(colors.red(`❌ DELIVERED_ACK error: ${String(err)}`));
           }
@@ -323,6 +326,12 @@ const socket = (io: Server) => {
 
       socket.on('READ_ACK', async ({ messageId }: { messageId: string }) => {
         try {
+          // Req 12: rate limit READ_ACK (60 per 60s)
+          if (await isRateLimited('READ_ACK', userId, 60, 60)) {
+            socket.emit('ACK_ERROR', { message: 'Rate limit exceeded', event: 'READ_ACK' });
+            return;
+          }
+
           const found = await Message.findById(messageId).select('_id chatId');
           if (!found) {
             socket.emit('ACK_ERROR', {
@@ -339,7 +348,8 @@ const socket = (io: Server) => {
               chatId: String(found.chatId),
               messageId: String(found._id),
             });
-            handleEventProcessed('READ_ACK_DENIED', `chat_id: ${String(found.chatId)}`);
+            updateLastActive(userId).catch(() => {});
+            logger.info(`🔔 Event processed: READ_ACK_DENIED chat_id: ${String(found.chatId)}`);
             return;
           }
 
@@ -349,15 +359,14 @@ const socket = (io: Server) => {
             { new: true }
           );
           if (msg) {
-            io.to(CHAT_ROOM(String(msg.chatId))).emit('MESSAGE_READ', {
-              messageId: String(msg._id),
+            // Req 8: emit MESSAGES_READ (plural) with correct payload shape
+            io.to(CHAT_ROOM(String(msg.chatId))).emit('MESSAGES_READ', {
               chatId: String(msg.chatId),
               userId,
+              updatedIds: [String(msg._id)],
             });
-            handleEventProcessed(
-              'READ_ACK',
-              `for message_id: ${String(msg._id)}`
-            );
+            updateLastActive(userId).catch(() => {});
+            logger.info(`🔔 Event processed: READ_ACK for message_id: ${String(msg._id)}`);
           }
         } catch (err) {
           logger.error(colors.red(`❌ READ_ACK error: ${String(err)}`));
@@ -403,7 +412,7 @@ const socket = (io: Server) => {
           }
 
           logger.info(colors.red(`User ${userId} disconnected`));
-          logEvent('socket_disconnected', `for user_id: ${userId}`);
+          logger.info(`🔔 Event processed: socket_disconnected for user_id: ${userId}`);
         } catch (err) {
           logger.error(
             colors.red(`❌ Disconnect handling error: ${String(err)}`)
@@ -417,13 +426,6 @@ const socket = (io: Server) => {
       } catch {}
     }
   });
-};
-
-// -------------------------
-// 🔹 Helper: Log formatter
-// -------------------------
-const logEvent = (event: string, extra?: string) => {
-  logger.info(`🔔 Event processed: ${event} ${extra || ''}`);
 };
 
 export const socketHelper = { socket };

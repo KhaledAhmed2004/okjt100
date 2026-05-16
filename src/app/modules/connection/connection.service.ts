@@ -98,7 +98,7 @@ const respondToRequest = async (connectionId: string, userId: string, action: 'A
   const participants = [String(connection.sender), String(connection.receiver)];
   
   // Create or get chat using ChatService
-  const chat = await ChatService.createChatToDB(participants);
+  const chat = await ChatService.createOrGet(participants[0], participants[1]);
 
   connection.status = 'ACCEPTED';
   connection.chatId = (chat as any)._id;

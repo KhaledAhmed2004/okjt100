@@ -1,94 +1,68 @@
-import NodeCache from 'node-cache';
-import { logger } from '../../shared/logger';
+import { redisClient } from '../../shared/redisClient';
 
 const ONLINE_SET = 'presence:online';
-const LAST_ACTIVE_PREFIX = 'presence:lastActive:'; // presence:lastActive:<userId>
-const USER_ROOMS_PREFIX = 'presence:userRooms:'; // presence:userRooms:<userId>
-const CONN_COUNT_PREFIX = 'presence:connCount:'; // presence:connCount:<userId>
+const LAST_ACTIVE_KEY = (userId: string) => `presence:lastActive:${userId}`;
+const USER_ROOMS_KEY = (userId: string) => `presence:userRooms:${userId}`;
+const CONN_COUNT_KEY = (userId: string) => `presence:connCount:${userId}`;
 
-const memory = new NodeCache({ stdTTL: 0, checkperiod: 120, useClones: false });
-
-const getSet = (key: string): Set<string> => {
-  const existing = memory.get<string[]>(key);
-  return new Set(existing || []);
+export const setOnline = async (userId: string): Promise<void> => {
+  await redisClient.sadd(ONLINE_SET, userId);
+  await redisClient.set(LAST_ACTIVE_KEY(userId), String(Date.now()));
 };
 
-const saveSet = (key: string, set: Set<string>) => {
-  memory.set(key, Array.from(set));
+export const setOffline = async (userId: string): Promise<void> => {
+  await redisClient.srem(ONLINE_SET, userId);
+  await redisClient.set(LAST_ACTIVE_KEY(userId), String(Date.now()));
 };
 
-export const setOnline = async (userId: string) => {
-  const set = getSet(ONLINE_SET);
-  set.add(userId);
-  saveSet(ONLINE_SET, set);
-  memory.set(LAST_ACTIVE_PREFIX + userId, Date.now());
-  logger.info(`presence: setOnline -> ${userId}`);
+export const updateLastActive = async (userId: string): Promise<void> => {
+  await redisClient.set(LAST_ACTIVE_KEY(userId), String(Date.now()));
 };
 
-export const setOffline = async (userId: string) => {
-  const set = getSet(ONLINE_SET);
-  set.delete(userId);
-  saveSet(ONLINE_SET, set);
-  memory.set(LAST_ACTIVE_PREFIX + userId, Date.now());
-  logger.info(`presence: setOffline -> ${userId}`);
+export const isOnline = async (userId: string): Promise<boolean> => {
+  const result = await redisClient.sismember(ONLINE_SET, userId);
+  return result === 1;
 };
 
-export const updateLastActive = async (userId: string) => {
-  memory.set(LAST_ACTIVE_PREFIX + userId, Date.now());
+export const getLastActive = async (userId: string): Promise<number | undefined> => {
+  const raw = await redisClient.get(LAST_ACTIVE_KEY(userId));
+  if (raw === null) return undefined;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) ? n : undefined;
 };
 
-export const isOnline = async (userId: string) => {
-  const set = getSet(ONLINE_SET);
-  return set.has(userId);
+export const addUserRoom = async (userId: string, chatId: string): Promise<void> => {
+  await redisClient.sadd(USER_ROOMS_KEY(userId), chatId);
 };
 
-export const getLastActive = async (userId: string) => {
-  const ts = memory.get<number>(LAST_ACTIVE_PREFIX + userId);
-  return typeof ts === 'number' ? ts : undefined;
+export const removeUserRoom = async (userId: string, chatId: string): Promise<void> => {
+  await redisClient.srem(USER_ROOMS_KEY(userId), chatId);
 };
 
-export const addUserRoom = async (userId: string, chatId: string) => {
-  const key = USER_ROOMS_PREFIX + userId;
-  const set = getSet(key);
-  set.add(chatId);
-  saveSet(key, set);
+export const getUserRooms = async (userId: string): Promise<string[]> => {
+  return redisClient.smembers(USER_ROOMS_KEY(userId));
 };
 
-export const removeUserRoom = async (userId: string, chatId: string) => {
-  const key = USER_ROOMS_PREFIX + userId;
-  const set = getSet(key);
-  set.delete(chatId);
-  saveSet(key, set);
+export const clearUserRooms = async (userId: string): Promise<void> => {
+  await redisClient.del(USER_ROOMS_KEY(userId));
 };
 
-export const getUserRooms = async (userId: string) => {
-  const key = USER_ROOMS_PREFIX + userId;
-  return Array.from(getSet(key));
+export const incrConnCount = async (userId: string): Promise<number> => {
+  return redisClient.incr(CONN_COUNT_KEY(userId));
 };
 
-export const clearUserRooms = async (userId: string) => {
-  const key = USER_ROOMS_PREFIX + userId;
-  memory.del(key);
+export const decrConnCount = async (userId: string): Promise<number> => {
+  const result = await redisClient.decr(CONN_COUNT_KEY(userId));
+  if (result < 0) {
+    await redisClient.set(CONN_COUNT_KEY(userId), '0');
+    return 0;
+  }
+  return result;
 };
 
-export const incrConnCount = async (userId: string) => {
-  const key = CONN_COUNT_PREFIX + userId;
-  const current = memory.get<number>(key) ?? 0;
-  const next = current + 1;
-  memory.set(key, next);
-  return next;
-};
-
-export const decrConnCount = async (userId: string) => {
-  const key = CONN_COUNT_PREFIX + userId;
-  const current = memory.get<number>(key) ?? 0;
-  const next = Math.max(0, current - 1);
-  memory.set(key, next);
-  return next;
-};
-
-export const getConnCount = async (userId: string) => {
-  const key = CONN_COUNT_PREFIX + userId;
-  const v = memory.get<number>(key) ?? 0;
-  return v;
+export const getConnCount = async (userId: string): Promise<number> => {
+  const raw = await redisClient.get(CONN_COUNT_KEY(userId));
+  if (raw === null) return 0;
+  const n = parseInt(raw, 10);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
 };

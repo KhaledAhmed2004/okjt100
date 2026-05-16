@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import { Server } from 'socket.io';
 import app from './app';
 import config from './config';
+import { allowedOrigins } from './app/logging/corsLogger';
 import { seedSuperAdmin } from './DB/seedAdmin';
 import { socketHelper } from './helpers/socketHelper';
 import { SocketManager } from './helpers/socketManager';
@@ -181,29 +182,36 @@ async function main() {
       color: 'cyan'
     });
 
-    server = app.listen(port, host, () => {
+    // Req 14: create server reference first, then attach Socket.IO before 'listening' fires
+    server = app.listen(port, host);
+
+    // Req 11 + 14: initialize Socket.IO immediately after listen() returns the server
+    // reference — before the 'listening' event fires — so SocketManager.getIO() is
+    // callable from any code path that runs after this point.
+    const socketSpinner = createSpinner({
+      text: 'Initializing Socket.IO server...',
+      color: 'cyan'
+    });
+    const io = new Server(server, {
+      pingTimeout: 60000,
+      cors: {
+        origin: allowedOrigins,   // Req 11: use HTTP-layer allowlist, not '*'
+        methods: ['GET', 'POST'],
+        credentials: true,
+      },
+    });
+    socketHelper.socket(io);
+    SocketManager.init(io);
+    socketSpinner.succeed('Socket.IO ready for real-time connections');
+    startupStatus.socketIO = true;
+
+    // Req 14: startup summary logging goes in the 'listening' event handler
+    server.on('listening', () => {
       const url = `http://${host}:${port}/`;
       serverSpinner.succeed(`Server is listening at ${url}`);
 
       // Store server info
       startupStatus.server = { url, host, port };
-
-      // Initialize Socket.IO
-      const socketSpinner = createSpinner({
-        text: 'Initializing Socket.IO server...',
-        color: 'cyan'
-      });
-
-      const io = new Server(server, {
-        pingTimeout: 60000,
-        cors: {
-          origin: '*',
-        },
-      });
-      socketHelper.socket(io);
-      SocketManager.init(io);
-      socketSpinner.succeed('Socket.IO ready for real-time connections');
-      startupStatus.socketIO = true;
 
       // Add timestamp
       startupStatus.timestamp = new Date().toLocaleString('en-US', {

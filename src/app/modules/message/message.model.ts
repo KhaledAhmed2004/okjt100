@@ -38,7 +38,7 @@ const messageSchema = new Schema<IMessage, MessageModel>(
     text: {
       type: String,
       required: false,
-      maxlength: 4000,
+      maxlength: 10000,
       trim: true,
       validate: {
         validator: function (this: IMessage, value: string | undefined): boolean {

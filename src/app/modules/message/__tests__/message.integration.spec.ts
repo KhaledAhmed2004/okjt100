@@ -266,8 +266,11 @@ describe('MessageService — send → getHistory round-trip', () => {
   });
 
   /**
-   * Requirement 6.1 — cursor-based pagination: getHistory with a cursor only
-   * returns messages after that cursor.
+   * Requirement 6.1 / 13.1–13.3 — cursor-based pagination: getHistory with a
+   * compound cursor only returns messages after that cursor position.
+   *
+   * The cursor is obtained from the first page's nextCursor (compound base64
+   * format), not constructed manually.
    */
   it('getHistory with cursor returns only messages after the cursor timestamp', async () => {
     // ── Arrange ──────────────────────────────────────────────────────────────
@@ -286,10 +289,15 @@ describe('MessageService — send → getHistory round-trip', () => {
       { chatId: chat._id, sender: userA, text: 'Msg 3', type: 'text', createdAt: new Date(base + 200) },
     ]);
 
-    // Use the timestamp of Msg 1 as the cursor
-    const cursor = new Date(base).toISOString();
+    // Fetch the first page with limit=1 to get a valid compound cursor
+    const firstPage = await MessageService.getHistory(chatId, userA.toString(), undefined, 1);
+    expect(firstPage.messages).toHaveLength(1);
+    expect((firstPage.messages[0] as any).text).toBe('Msg 1');
+    expect(firstPage.pagination.nextCursor).not.toBeNull();
 
-    // ── Act ───────────────────────────────────────────────────────────────────
+    const cursor = firstPage.pagination.nextCursor!;
+
+    // ── Act: fetch the next page using the compound cursor ────────────────────
     const history = await MessageService.getHistory(
       chatId,
       userA.toString(),

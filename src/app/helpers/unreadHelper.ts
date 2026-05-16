@@ -85,10 +85,3 @@ export const batchGetUnreadCounts = async (
   });
 };
 
-export const UnreadHelper = {
-  getUnreadCountCached,
-  setUnreadCount,
-  incrementUnreadCount,
-  clearUnreadCount,
-  batchGetUnreadCounts,
-};
