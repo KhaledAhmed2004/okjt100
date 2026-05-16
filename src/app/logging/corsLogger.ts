@@ -28,6 +28,8 @@ export const allowedOrigins: string[] = [
   'http://127.0.0.1:5001',
   'http://10.10.7.33:5001',
   // Dev server alternate ports
+  'http://localhost:5002',
+  'http://127.0.0.1:5002',
   'http://localhost:5003',
   'http://127.0.0.1:5003',
   'http://localhost:5005',

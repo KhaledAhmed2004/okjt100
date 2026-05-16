@@ -293,11 +293,17 @@ const send = async (
   // Determine the receiver: the participant whose ID is NOT senderId (Req 5.7)
   const receiverId = participantIds.find(id => id !== String(senderId)) ?? null;
 
-  // Side-effect 1: Emit MESSAGE_SENT to the chat room (Req 5.6)
+  // Side-effect 1: Emit MESSAGE_SENT to the chat room AND each participant's
+  // user room. Emitting to user rooms ensures delivery even when the client
+  // has not yet called JOIN_CHAT (e.g. chat list view, background tab).
   try {
-    SocketManager.getIO()
-      .to(`chat::${chatId}`)
-      .emit('MESSAGE_SENT', { message: populatedMessage });
+    const io = SocketManager.getIO();
+    // Chat room — for clients that have joined via JOIN_CHAT
+    io.to(`chat::${chatId}`).emit('MESSAGE_SENT', { message: populatedMessage });
+    // User rooms — guaranteed delivery regardless of JOIN_CHAT state
+    for (const participantId of participantIds) {
+      io.to(`user::${participantId}`).emit('MESSAGE_SENT', { message: populatedMessage });
+    }
   } catch (err) {
     errorLogger.error(`[send] Failed to emit MESSAGE_SENT for chat ${chatId}: ${err}`);
   }
