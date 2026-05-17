@@ -1,30 +1,35 @@
 import { Schema, model } from 'mongoose';
 import { IAskQuestion } from './ask-question.interface';
 
+const AnswerVersionSchema = new Schema(
+  {
+    version:  { type: Number,  required: true },
+    text:     { type: String,  required: true },
+    isActive: { type: Boolean, required: true, default: true },
+    createdAt:{ type: Date,    required: true },
+  },
+  { _id: false }, // subdocuments don't need their own _id
+);
+
 const AskQuestionSchema = new Schema<IAskQuestion>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    userRole: { type: String, required: true },
+    userId:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
     question: { type: String, required: true },
     imageUrl: { type: String },
     status: {
-      type: String,
-      enum: ['pending', 'answered'],
-      default: 'pending',
+      type:     String,
+      enum:     ['pending', 'answered'],
+      default:  'pending',
       required: true,
     },
-    answer: { type: String },
-    answeredAt: { type: Date },
+    answers: { type: [AnswerVersionSchema], default: [] },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
 // Indexes
 AskQuestionSchema.index({ question: 'text' });
 AskQuestionSchema.index({ userId: 1 });
-AskQuestionSchema.index({ userRole: 1 });
 AskQuestionSchema.index({ status: 1 });
 AskQuestionSchema.index({ createdAt: -1 });
 

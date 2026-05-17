@@ -2,14 +2,20 @@ import { Schema, Document } from 'mongoose';
 
 export type TQuestionStatus = 'pending' | 'answered';
 
+export interface IAnswerVersion {
+  version: number;
+  text: string;
+  isActive: boolean;
+  createdAt: Date;
+}
+
 export interface IAskQuestion extends Document {
   userId: Schema.Types.ObjectId;
-  userRole: string;
   question: string;
   imageUrl?: string;
   status: TQuestionStatus;
-  answer?: string;
-  answeredAt?: Date;
+  /** Full answer history. Active answer is always answers.find(a => a.isActive). */
+  answers: IAnswerVersion[];
   createdAt: Date;
   updatedAt: Date;
 }

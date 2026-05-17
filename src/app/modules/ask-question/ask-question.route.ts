@@ -17,6 +17,10 @@ router.post(
   AskQuestionController.submitQuestion,
 );
 
+// IMPORTANT: /my-questions MUST remain above any GET /:questionId route.
+// Express matches routes in registration order — a dynamic segment like /:questionId
+// would capture the literal string "my-questions" as a param value if registered first.
+// If you add GET /:questionId in the future, register it BELOW this route.
 router.get(
   '/my-questions',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
