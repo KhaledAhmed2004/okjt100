@@ -11,8 +11,6 @@ const router = express.Router();
 const ATTACHMENT_FIELDS = [{ name: 'attachments', maxCount: 5 }];
 const FILE_OPTS = { maxFileSizeMB: 25 };
 
-// ============ Admin routes (fixed prefix — declared BEFORE /:ticketId) ============
-
 router.get(
   '/admin/list',
   auth(USER_ROLES.SUPER_ADMIN),
@@ -45,8 +43,6 @@ router.patch(
   validateRequest(SupportTicketValidation.assignTicketZodSchema),
   SupportTicketController.assignTicket,
 );
-
-// ============ User routes ============
 
 // Create a new ticket (with optional attachments)
 router.post(
