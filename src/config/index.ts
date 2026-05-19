@@ -6,6 +6,7 @@ export default {
   ip_address: process.env.IP_ADDRESS,
   database_url: process.env.DATABASE_URL,
   node_env: process.env.NODE_ENV,
+  disable_logs: String(process.env.DISABLE_LOGS).trim() === 'true',
   port: process.env.PORT,
   redis_url: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
   bcrypt_salt_rounds: process.env.BCRYPT_SALT_ROUNDS,

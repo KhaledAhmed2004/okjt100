@@ -13,7 +13,7 @@ const router = express.Router();
 router.get(
   '/me',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
-  SubscriptionController.getMySubscriptionController,
+  SubscriptionController.getMySubscriptionController
 );
 
 // POST /subscriptions/apple/verify
@@ -28,14 +28,17 @@ router.post(
     routeName: 'subscription-apple-verify',
   }),
   validateRequest(SubscriptionValidation.appleVerifySchema),
-  SubscriptionController.verifyApplePurchaseController,
+  SubscriptionController.verifyApplePurchaseController
 );
 
 // POST /subscriptions/apple/webhook
 // Apple App Store Server Notifications V2 — no auth middleware because
 // Apple's JWS signature is verified inside the controller/service.
 // Raw body parsing for this route is configured in src/app.ts.
-router.post('/apple/webhook', SubscriptionController.appleWebhookController);
+router.post(
+  '/apple/webhook',
+  SubscriptionController.appleWebhookController
+);
 
 // POST /subscriptions/google/verify
 // Android client passes the Google Play purchase token + productId from
@@ -43,17 +46,14 @@ router.post('/apple/webhook', SubscriptionController.appleWebhookController);
 // upserts the subscription record.
 router.post(
   '/google/verify',
-  auth(
-    USER_ROLES.BROTHER,
-    USER_ROLES.SISTER,
-  ),
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
   rateLimitMiddleware({
     windowMs: 60_000,
     max: 30,
     routeName: 'subscription-google-verify',
   }),
   validateRequest(SubscriptionValidation.googleVerifySchema),
-  SubscriptionController.verifyGooglePurchaseController,
+  SubscriptionController.verifyGooglePurchaseController
 );
 
 // POST /subscriptions/google/webhook
@@ -61,18 +61,17 @@ router.post(
 // No app-level auth: the service verifies the bearer JWT signed by
 // Google Cloud Pub/Sub against the configured audience.
 // Raw body parsing for this route is configured in src/app.ts.
-router.post('/google/webhook', SubscriptionController.googleWebhookController);
+router.post(
+  '/google/webhook',
+  SubscriptionController.googleWebhookController
+);
 
 // POST /subscriptions/choose/free
 // লোকালি Free প্ল্যানে সুইচ করে
 router.post(
   '/choose/free',
-  auth(
-    USER_ROLES.BROTHER,
-    USER_ROLES.SISTER,
-
-  ),
-  SubscriptionController.chooseFreePlanController,
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
+  SubscriptionController.chooseFreePlanController
 );
 
 // --- Admin Routes ---
@@ -80,45 +79,45 @@ router.post(
 router.get(
   '/admin',
   auth(USER_ROLES.SUPER_ADMIN),
-  SubscriptionController.getAllSubscriptionsController,
+  SubscriptionController.getAllSubscriptionsController
 );
 
 router.get(
   '/admin/analytics',
   auth(USER_ROLES.SUPER_ADMIN),
-  SubscriptionController.getSubscriptionAnalyticsController,
+  SubscriptionController.getSubscriptionAnalyticsController
 );
 
 router.get(
   '/admin/pending-webhooks',
   auth(USER_ROLES.SUPER_ADMIN),
-  SubscriptionController.getPendingWebhooksController,
+  SubscriptionController.getPendingWebhooksController
 );
 
 router.get(
   '/admin/:subscriptionId',
   auth(USER_ROLES.SUPER_ADMIN),
-  SubscriptionController.getSubscriptionByIdController,
+  SubscriptionController.getSubscriptionByIdController
 );
 
 router.get(
   '/admin/events/:userId',
   auth(USER_ROLES.SUPER_ADMIN),
-  SubscriptionController.getSubscriptionEventsController,
+  SubscriptionController.getSubscriptionEventsController
 );
 
 router.post(
   '/admin/grant',
   auth(USER_ROLES.SUPER_ADMIN),
   validateRequest(SubscriptionValidation.adminGrantPlanSchema),
-  SubscriptionController.adminGrantPlanController,
+  SubscriptionController.adminGrantPlanController
 );
 
 router.post(
   '/admin/reset/:userId',
   auth(USER_ROLES.SUPER_ADMIN),
   validateRequest(SubscriptionValidation.adminResetPlanSchema),
-  SubscriptionController.adminResetPlanController,
+  SubscriptionController.adminResetPlanController
 );
 
 // --- End Admin Routes ---

@@ -60,12 +60,14 @@ const logger = createLogger({
   level: config.node_env === 'development' ? 'debug' : 'info',
   format: combine(label({ label: 'Task Titans' }), timestamp(), myFormat),
   transports: baseTransports,
+  silent: config.disable_logs,
 });
 
 const errorLogger = createLogger({
   level: 'error',
   format: combine(label({ label: 'Task Titans' }), timestamp(), myFormat),
   transports: errorTransports,
+  silent: config.disable_logs,
 });
 
 // Optional desktop notification for critical failures in development

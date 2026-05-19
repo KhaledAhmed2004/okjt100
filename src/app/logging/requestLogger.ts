@@ -430,6 +430,11 @@ export const requestLogger = (
   res: Response,
   next: NextFunction
 ) => {
+  // 🛑 Skip all logging when explicitly disabled in .env
+  if (config.disable_logs) {
+    return next();
+  }
+
   const start = Date.now();
   const requestId = (typeof req.headers['x-request-id'] === 'string' && req.headers['x-request-id']) || randomUUID();
   res.setHeader('X-Request-Id', requestId);
