@@ -291,6 +291,28 @@ Short-lived password reset tokens. One row per outstanding reset request.
 
 ---
 
+### 11. Mosque Model (`mosques`)
+Mosque information with GeoJSON location and prayer times.
+
+| Field | Type | Required | Description |
+| :--- | :--- | :---: | :--- |
+| `mosqueName` | String | ✅ | Name of the mosque |
+| `address` | String | ✅ | Full address |
+| `area` | String | ✅ | Area/Neighborhood |
+| `phoneNumber` | String | ✅ | Contact number |
+| `website` | String | ❌ | Optional website URL |
+| `description` | String | ❌ | Optional mosque description |
+| `image` | String | ❌ | Optional mosque image URL |
+| `location` | Object | ✅ | GeoJSON Point: `{ type: "Point", coordinates: [longitude, latitude] }` |
+| `prayerTimes` | Object | ✅ | Nested timings: `{ fajr, dhuhr, asr, maghrib, isha, jummah? }` |
+
+**Indexes**:
+- `{ mosqueName: 'text', area: 'text', address: 'text', description: 'text' }` — multi-field text search
+- `{ area: 1 }` — fast filtering by area
+- `{ 'location.coordinates': '2dsphere' }` — native geospatial index for proximity search
+
+---
+
 ## States & Roles Explanation (Banglish)
 
 - **User Roles**: 
@@ -331,3 +353,4 @@ Short-lived password reset tokens. One row per outstanding reset request.
 | **ResetToken** | [resetToken.model.ts](file:///src/app/modules/auth/resetToken/resetToken.model.ts) |
 | **Legal** | [legal.model.ts](file:///src/app/modules/legal/legal.model.ts) |
 | **Dua** | [dua.model.ts](file:///src/app/modules/dua/dua.model.ts) |
+| **Mosque** | [mosque.model.ts](file:///src/app/modules/mosque/mosque.model.ts) |

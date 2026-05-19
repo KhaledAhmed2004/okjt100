@@ -35,6 +35,7 @@ const getAllMosquesFromDB = async (query: Record<string, unknown>) => {
       { mosqueName: { $regex: searchTerm, $options: 'i' } },
       { area: { $regex: searchTerm, $options: 'i' } },
       { address: { $regex: searchTerm, $options: 'i' } },
+      { description: { $regex: searchTerm, $options: 'i' } },
     ];
   }
 
@@ -73,12 +74,28 @@ const getAllMosquesFromDB = async (query: Record<string, unknown>) => {
   // 2. Projection (Flatten for UI)
   pipeline.push({
     $project: {
+      _id: 1,
+      id: '$_id',
       mosqueName: 1,
       address: 1,
       area: 1,
+      phoneNumber: { $ifNull: ['$phoneNumber', ''] },
+      website: { $ifNull: ['$website', ''] },
+      description: { $ifNull: ['$description', ''] },
+      image: { $ifNull: ['$image', ''] },
       prayerTimes: 1,
       distanceInKm: 1,
       updatedAt: 1,
+      latitude: { $ifNull: [{ $arrayElemAt: ['$location.coordinates', 1] }, 0] },
+      longitude: { $ifNull: [{ $arrayElemAt: ['$location.coordinates', 0] }, 0] },
+      mapLink: {
+        $concat: [
+          'https://www.google.com/maps/search/?api=1&query=',
+          { $toString: { $ifNull: [{ $arrayElemAt: ['$location.coordinates', 1] }, 0] } },
+          ',',
+          { $toString: { $ifNull: [{ $arrayElemAt: ['$location.coordinates', 0] }, 0] } },
+        ],
+      },
     },
   });
 
@@ -112,11 +129,25 @@ const getSingleMosqueFromDB = async (id: string) => {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Mosque not found');
   }
 
+  // Ensure fields exist for consistency
+  (result as any).id = result._id;
+  (result as any).phoneNumber = result.phoneNumber || '';
+  (result as any).website = result.website || '';
+  (result as any).description = result.description || '';
+  (result as any).image = result.image || '';
+
   // Flatten location for consistency with list API
   if (result.location && result.location.coordinates) {
-    (result as any).latitude = result.location.coordinates[1];
-    (result as any).longitude = result.location.coordinates[0];
+    const latitude = result.location.coordinates[1];
+    const longitude = result.location.coordinates[0];
+    (result as any).latitude = latitude;
+    (result as any).longitude = longitude;
+    (result as any).mapLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
     delete (result as any).location;
+  } else {
+    (result as any).latitude = 0;
+    (result as any).longitude = 0;
+    (result as any).mapLink = `https://www.google.com/maps/search/?api=1&query=0,0`;
   }
 
   return result;

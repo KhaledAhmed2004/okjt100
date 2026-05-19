@@ -1,4 +1,7 @@
 import { StatusCodes } from 'http-status-codes';
+import { generateConnectionKey } from './connection.utils';
+import { CONNECTION_STATUS, CONNECTION_ACTION } from './connection.constants';
+import config from '../../../config';
 import mongoose from 'mongoose';
 import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
@@ -7,10 +10,10 @@ import { ChatService } from '../chat/chat.service';
 import { Chat } from '../chat/chat.model';
 import { USER_STATUS } from '../../../enums/user';
 import QueryBuilder from '../../builder/QueryBuilder';
-import { IConnection } from './connection.interface';
+import { IConnection, ConnectionAction } from './connection.interface';
 import { sendNotifications } from '../notification/notificationsHelper';
 
-const sendRequest = async (senderId: string, receiverId: string) => {
+const sendConnectionRequest = async (senderId: string, receiverId: string) => {
   if (senderId === receiverId) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'You cannot connect with yourself');
   }
@@ -20,22 +23,31 @@ const sendRequest = async (senderId: string, receiverId: string) => {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Receiver not found or inactive');
   }
 
-  // Check if connection already exists (either direction)
-  const existingConnection = await Connection.findOne({
-    $or: [
-      { sender: senderId, receiver: receiverId },
-      { sender: receiverId, receiver: senderId },
-    ],
-  });
+  // Check pending limit to prevent spam
+  const pendingCount = await Connection.countDocuments({ sender: senderId, status: CONNECTION_STATUS.PENDING });
+  const maxRequests = config.connection.max_pending_requests;
+  if (pendingCount >= maxRequests) {
+    throw new ApiError(StatusCodes.TOO_MANY_REQUESTS, `You have reached the maximum number of pending requests (${maxRequests})`);
+  }
+
+  // Generate deterministic connectionKey to prevent A->B and B->A race condition
+  const connectionKey = generateConnectionKey(senderId, receiverId);
+
+  // Check if connection already exists (either direction) using connectionKey
+  const existingConnection = await Connection.findOne({ connectionKey });
 
   if (existingConnection) {
+    if (existingConnection.status === CONNECTION_STATUS.ACCEPTED) {
+      throw new ApiError(StatusCodes.CONFLICT, 'You are already connected with this user');
+    }
     throw new ApiError(StatusCodes.CONFLICT, 'Connection request already exists');
   }
 
   const connection = await Connection.create({
     sender: senderId,
     receiver: receiverId,
-    status: 'PENDING',
+    connectionKey,
+    status: CONNECTION_STATUS.PENDING,
   });
 
   const senderUser = await User.findById(senderId).select('name profileImage');
@@ -63,75 +75,88 @@ const sendRequest = async (senderId: string, receiverId: string) => {
   return connection;
 };
 
-const respondToRequest = async (connectionId: string, userId: string, action: 'ACCEPT' | 'REJECT') => {
-  const connection = await Connection.findById(connectionId);
-  
-  if (!connection) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Connection request not found');
-  }
+const respondToConnectionRequest = async (connectionId: string, userId: string, action: ConnectionAction) => {
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
 
-  if (String(connection.receiver) !== userId) {
-    throw new ApiError(StatusCodes.FORBIDDEN, 'Only the receiver can respond to this request');
-  }
+    const connection = await Connection.findById(connectionId).session(session);
 
-  if (connection.status !== 'PENDING') {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'This request is no longer pending');
-  }
+    if (!connection) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Connection request not found');
+    }
 
-  // @ts-ignore
-  const io = global.io;
+    if (String(connection.receiver) !== userId) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'Only the receiver can respond to this request');
+    }
 
-  if (action === 'REJECT') {
-    // Delete the connection
-    await Connection.findByIdAndDelete(connectionId);
-    
+    if (connection.status !== CONNECTION_STATUS.PENDING) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'This request is no longer pending');
+    }
+
+    // @ts-ignore
+    const io = global.io;
+
+    if (action === CONNECTION_ACTION.REJECT) {
+      // Delete the connection
+      await Connection.findByIdAndDelete(connectionId).session(session);
+      await session.commitTransaction();
+
+      if (io) {
+        io.to(`user::${String(connection.sender)}`).emit('CONNECTION_REJECTED', {
+          connectionId: connection._id,
+        });
+      }
+
+      return null;
+    }
+
+    // Action is ACCEPT
+    const participants = [String(connection.sender), String(connection.receiver)];
+
+    // Create or get chat using ChatService
+    const chat = await ChatService.createOrGet(participants[0], participants[1]);
+
+    connection.status = CONNECTION_STATUS.ACCEPTED;
+    connection.chatId = (chat as any)._id;
+    connection.respondedAt = new Date();
+    await connection.save({ session });
+
+    await session.commitTransaction();
+
+    const receiverUser = await User.findById(userId).select('name profileImage');
+
+    // Notify sender
+    await sendNotifications({
+      receiver: new mongoose.Types.ObjectId(String(connection.sender)),
+      type: 'SYSTEM',
+      title: 'Connection Accepted',
+      text: `${receiverUser?.name} accepted your connection request`,
+      resourceType: 'User',
+      resourceId: userId,
+      userId: String(connection.sender), // passed for push/socket helper compatibility
+    } as any);
+
     if (io) {
-      io.to(`user::${String(connection.sender)}`).emit('CONNECTION_REJECTED', {
+      io.to(`user::${String(connection.sender)}`).emit('CONNECTION_ACCEPTED', {
         connectionId: connection._id,
+        chatId: (chat as any)._id,
+        user: receiverUser,
       });
     }
 
-    return null;
+    return connection;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
   }
-
-  // Action is ACCEPT
-  const participants = [String(connection.sender), String(connection.receiver)];
-  
-  // Create or get chat using ChatService
-  const chat = await ChatService.createOrGet(participants[0], participants[1]);
-
-  connection.status = 'ACCEPTED';
-  connection.chatId = (chat as any)._id;
-  connection.respondedAt = new Date();
-  await connection.save();
-
-  const receiverUser = await User.findById(userId).select('name profileImage');
-
-  // Notify sender
-  await sendNotifications({
-    receiver: new mongoose.Types.ObjectId(String(connection.sender)),
-    type: 'SYSTEM',
-    title: 'Connection Accepted',
-    text: `${receiverUser?.name} accepted your connection request`,
-    resourceType: 'User',
-    resourceId: userId,
-    userId: String(connection.sender), // passed for push/socket helper compatibility
-  } as any);
-
-  if (io) {
-    io.to(`user::${String(connection.sender)}`).emit('CONNECTION_ACCEPTED', {
-      connectionId: connection._id,
-      chatId: (chat as any)._id,
-      user: receiverUser,
-    });
-  }
-
-  return connection;
 };
 
-const cancelRequest = async (connectionId: string, userId: string) => {
+const cancelConnectionRequest = async (connectionId: string, userId: string) => {
   const connection = await Connection.findById(connectionId);
-  
+
   if (!connection) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Connection request not found');
   }
@@ -140,7 +165,7 @@ const cancelRequest = async (connectionId: string, userId: string) => {
     throw new ApiError(StatusCodes.FORBIDDEN, 'Only the sender can cancel this request');
   }
 
-  if (connection.status !== 'PENDING') {
+  if (connection.status !== CONNECTION_STATUS.PENDING) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'This request is no longer pending');
   }
 
@@ -149,42 +174,49 @@ const cancelRequest = async (connectionId: string, userId: string) => {
 };
 
 const removeConnection = async (connectionId: string, userId: string) => {
-  const connection = await Connection.findById(connectionId);
-  
-  if (!connection) {
-    throw new ApiError(StatusCodes.NOT_FOUND, 'Connection not found');
+  const session = await mongoose.startSession();
+  try {
+    session.startTransaction();
+
+    const connection = await Connection.findById(connectionId).session(session);
+
+    if (!connection) {
+      throw new ApiError(StatusCodes.NOT_FOUND, 'Connection not found');
+    }
+
+    if (String(connection.sender) !== userId && String(connection.receiver) !== userId) {
+      throw new ApiError(StatusCodes.FORBIDDEN, 'You are not part of this connection');
+    }
+
+    const otherUserId = String(connection.sender) === userId ? String(connection.receiver) : String(connection.sender);
+
+    await Connection.findByIdAndDelete(connectionId).session(session);
+
+    await session.commitTransaction();
+
+    // @ts-ignore
+    const io = global.io;
+    if (io) {
+      io.to(`user::${otherUserId}`).emit('CONNECTION_REMOVED', {
+        connectionId: connection._id,
+        chatId: connection.chatId,
+      });
+    }
+
+    return null;
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
   }
-
-  if (String(connection.sender) !== userId && String(connection.receiver) !== userId) {
-    throw new ApiError(StatusCodes.FORBIDDEN, 'You are not part of this connection');
-  }
-
-  // Mark chat as inactive
-  if (connection.chatId) {
-    await Chat.findByIdAndUpdate(connection.chatId, { status: false });
-  }
-
-  const otherUserId = String(connection.sender) === userId ? String(connection.receiver) : String(connection.sender);
-  
-  await Connection.findByIdAndDelete(connectionId);
-
-  // @ts-ignore
-  const io = global.io;
-  if (io) {
-    io.to(`user::${otherUserId}`).emit('CONNECTION_REMOVED', {
-      connectionId: connection._id,
-      chatId: connection.chatId,
-    });
-  }
-
-  return null;
 };
 
 const getMyConnections = async (userId: string, query: Record<string, unknown>) => {
   const connectionQuery = new QueryBuilder<IConnection>(
     Connection.find({
       $or: [{ sender: userId }, { receiver: userId }],
-      status: 'ACCEPTED',
+      status: CONNECTION_STATUS.ACCEPTED,
     }).populate([
       { path: 'sender', select: 'name profileImage role' },
       { path: 'receiver', select: 'name profileImage role' }
@@ -218,8 +250,8 @@ const getMyConnections = async (userId: string, query: Record<string, unknown>) 
   };
 };
 
-const getPendingRequests = async (userId: string, type: 'sent' | 'received', query: Record<string, unknown>) => {
-  const filter = type === 'sent' ? { sender: userId, status: 'PENDING' } : { receiver: userId, status: 'PENDING' };
+const getPendingConnectionRequests = async (userId: string, type: 'sent' | 'received', query: Record<string, unknown>) => {
+  const filter = type === 'sent' ? { sender: userId, status: CONNECTION_STATUS.PENDING } : { receiver: userId, status: CONNECTION_STATUS.PENDING };
   const populateField = type === 'sent' ? 'receiver' : 'sender';
 
   const connectionQuery = new QueryBuilder<IConnection>(
@@ -241,26 +273,23 @@ const getPendingRequests = async (userId: string, type: 'sent' | 'received', que
 };
 
 const getConnectionStatus = async (userId: string, otherUserId: string) => {
-  const connection = await Connection.findOne({
-    $or: [
-      { sender: userId, receiver: otherUserId },
-      { sender: otherUserId, receiver: userId },
-    ],
-  });
+  const connectionKey = generateConnectionKey(userId, otherUserId);
+
+  const connection = await Connection.findOne({ connectionKey });
 
   if (!connection) {
     return { status: 'NONE' };
   }
 
-  if (connection.status === 'ACCEPTED') {
-    return { 
-      status: 'CONNECTED', 
+  if (connection.status === CONNECTION_STATUS.ACCEPTED) {
+    return {
+      status: 'CONNECTED',
       connectionId: connection._id,
-      chatId: connection.chatId 
+      chatId: connection.chatId
     };
   }
 
-  if (connection.status === 'PENDING') {
+  if (connection.status === CONNECTION_STATUS.PENDING) {
     if (String(connection.sender) === userId) {
       return { status: 'PENDING_SENT', connectionId: connection._id };
     } else {
@@ -272,11 +301,11 @@ const getConnectionStatus = async (userId: string, otherUserId: string) => {
 };
 
 export const ConnectionService = {
-  sendRequest,
-  respondToRequest,
-  cancelRequest,
+  sendConnectionRequest,
+  respondToConnectionRequest,
+  cancelConnectionRequest,
   removeConnection,
   getMyConnections,
-  getPendingRequests,
+  getPendingConnectionRequests,
   getConnectionStatus,
 };

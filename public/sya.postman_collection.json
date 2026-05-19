@@ -2379,7 +2379,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
+                "value": "multipart/form-data",
                 "type": "text"
               }
             ],
@@ -2392,18 +2392,68 @@
                 "mosques"
               ]
             },
-            "description": "Adds a new mosque to the database with location and prayer times.",
+            "description": "Adds a new mosque to the database with location, prayer times, and an optional image.",
             "auth": {
               "type": "noauth"
             },
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"mosqueName\": \"Baitul Mukarram\", // Name of the mosque\n  \"address\": \"Topkhana Road, Dhaka\", // Full address\n  \"area\": \"Motijheel\", // Area/Neighborhood\n  \"phoneNumber\": \"+880123456789\", // Contact number\n  \"website\": \"https://baitulmukarram.org\",\n  \"location\": {, // Latitude and Longitude\n    \"type\": \"Point\",\n    \"coordinates\": [90.4125, 23.7298]\n  },\n  \"prayerTimes\": {, // 5 daily prayer times (HH:MM) and optional Jummah\n    \"fajr\": \"04:30\",\n    \"dhuhr\": \"12:15\",\n    \"asr\": \"16:45\",\n    \"maghrib\": \"18:30\",\n    \"isha\": \"20:00\",\n    \"jummah\": \"13:30\"\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "mosqueName",
+                  "value": "Baitul Mukarram",
+                  "type": "text",
+                  "description": "Name of the mosque"
+                },
+                {
+                  "key": "address",
+                  "value": "Topkhana Road, Dhaka",
+                  "type": "text",
+                  "description": "Full address"
+                },
+                {
+                  "key": "area",
+                  "value": "Motijheel",
+                  "type": "text",
+                  "description": "Area/Neighborhood"
+                },
+                {
+                  "key": "phoneNumber",
+                  "value": "+880123456789",
+                  "type": "text",
+                  "description": "Contact number"
+                },
+                {
+                  "key": "website",
+                  "value": "https://baitulmukarram.org",
+                  "type": "text",
+                  "description": "(Optional) Valid URL"
+                },
+                {
+                  "key": "description",
+                  "value": "The National Mosque of Bangladesh",
+                  "type": "text",
+                  "description": "(Optional) Mosque description"
+                },
+                {
+                  "key": "location",
+                  "value": "{\"type\": \"Point\", \"coordinates\": [90.4125, 23.7298]}",
+                  "type": "text",
+                  "description": "GeoJSON Point"
+                },
+                {
+                  "key": "prayerTimes",
+                  "value": "{\"fajr\": \"04:30\", \"dhuhr\": \"12:15\", \"asr\": \"16:45\", \"maghrib\": \"18:30\", \"isha\": \"20:00\", \"jummah\": \"13:30\"}",
+                  "type": "text",
+                  "description": "5 daily prayer times (HH:MM)"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Mosque image (max 1)"
                 }
-              }
+              ]
             }
           },
           "response": []
@@ -2420,7 +2470,7 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/mosques?page=1&limit=10&searchTerm=Baitul&area=Motijheel",
+              "raw": "{{baseUrl}}/mosques",
               "host": [
                 "{{baseUrl}}"
               ],
@@ -2430,34 +2480,38 @@
               "query": [
                 {
                   "key": "page",
-                  "value": "1"
+                  "value": "1",
+                  "description": "Page number (default: 1)"
                 },
                 {
                   "key": "limit",
-                  "value": "10"
+                  "value": "10",
+                  "description": "Items per page (default: 10)"
                 },
                 {
                   "key": "searchTerm",
-                  "value": "Baitul"
+                  "value": "Baitul",
+                  "description": "Search by name, area, address, or description"
                 },
                 {
                   "key": "area",
-                  "value": "Motijheel"
+                  "value": "Motijheel",
+                  "description": "Filter by specific area"
                 },
                 {
                   "key": "latitude",
-                  "value": "",
+                  "value": "23.7298",
                   "description": "User's latitude for distance calculation"
                 },
                 {
                   "key": "longitude",
-                  "value": "",
+                  "value": "90.4125",
                   "description": "User's longitude for distance calculation"
                 },
                 {
                   "key": "filter",
-                  "value": "",
-                  "description": "Use `nearby-me` to sort by distance. Otherwise, default sorting is by `createdAt`."
+                  "value": "nearby-me",
+                  "description": "Use `nearby-me` to sort by distance"
                 }
               ]
             },
@@ -2509,7 +2563,7 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
+                "value": "multipart/form-data",
                 "type": "text"
               }
             ],
@@ -2529,18 +2583,68 @@
                 }
               ]
             },
-            "description": "Updates specific fields of an existing mosque entry.",
+            "description": "Updates specific fields of an existing mosque entry. Supports partial updates and optional image replacement.",
             "auth": {
               "type": "noauth"
             },
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"location\": {\n    \"type\": \"Point\",\n    \"coordinates\": [90.4125, 23.7298]\n  },\n  \"prayerTimes\": {, // (Optional) Updated prayer times\n    \"fajr\": \"04:45\"\n  }\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "mosqueName",
+                  "value": "Baitul Mukarram New",
+                  "type": "text",
+                  "description": "(Optional) Updated name"
+                },
+                {
+                  "key": "address",
+                  "value": "Street 123, Dhaka",
+                  "type": "text",
+                  "description": "(Optional) Updated address"
+                },
+                {
+                  "key": "area",
+                  "value": "Gulshan",
+                  "type": "text",
+                  "description": "(Optional) Updated area"
+                },
+                {
+                  "key": "phoneNumber",
+                  "value": "+880987654321",
+                  "type": "text",
+                  "description": "(Optional) Updated phone"
+                },
+                {
+                  "key": "website",
+                  "value": "https://new-website.org",
+                  "type": "text",
+                  "description": "(Optional) Updated website"
+                },
+                {
+                  "key": "description",
+                  "value": "Revised description.",
+                  "type": "text",
+                  "description": "(Optional) Updated description"
+                },
+                {
+                  "key": "location",
+                  "value": "{\"type\": \"Point\", \"coordinates\": [90.4125, 23.7298]}",
+                  "type": "text",
+                  "description": "(Optional) Updated GeoJSON Point"
+                },
+                {
+                  "key": "prayerTimes",
+                  "value": "{\"fajr\": \"04:45\", \"dhuhr\": \"12:30\"}",
+                  "type": "text",
+                  "description": "(Optional) Updated prayer times"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "(Optional) New mosque image"
                 }
-              }
+              ]
             }
           },
           "response": []
@@ -2572,7 +2676,7 @@
                 }
               ]
             },
-            "description": "Permanently removes a mosque entry from the database.",
+            "description": "Permanently removes a mosque entry and its associated image from the database.",
             "auth": {
               "type": "noauth"
             }

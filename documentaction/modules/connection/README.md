@@ -18,12 +18,13 @@ Stores connection requests and established connections between users.
 | :--- | :--- | :--- | :--- |
 | `sender` | ObjectId | ✅ | Reference to the user who sent the request (ref `User`) |
 | `receiver` | ObjectId | ✅ | Reference to the user who receives the request (ref `User`) |
+| `connectionKey` | String | ✅ | Deterministic key `min(userId, otherUserId)_max(userId, otherUserId)` |
 | `status` | String | ✅ | Enum: `PENDING`, `ACCEPTED` |
 | `chatId` | ObjectId | ❌ | Reference to the created Chat (ref `Chat`) |
 | `respondedAt` | Date | ❌ | Timestamp when the request was accepted |
 
 **Indexes**:
-- `{ sender: 1, receiver: 1 }` (Unique) — Prevents duplicate requests/connections
+- `{ connectionKey: 1 }` (Unique) — Prevents duplicate A->B and B->A requests
 - `{ receiver: 1, status: 1 }` — Fast lookup for incoming pending requests
 - `{ sender: 1, status: 1 }` — Fast lookup for outgoing pending requests
 

@@ -10,10 +10,7 @@ import { IErrorMessage } from '../../types/errors.types';
 import { trace } from '@opentelemetry/api';
 
 const globalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
-  // config.node_env === 'development'
-  //   ? console.log('🚨 globalErrorHandler ~~ ', error)
-  //   : errorLogger.error('🚨 globalErrorHandler ~~ ', error);
-  errorLogger.error('🚨 globalErrorHandler ~~ ', error);
+  // (disabled) redundant separate console log - now beautifully captured and handled by OTel & custom requestLogger
 
   // OpenTelemetry: start Error Handler span
   const tracer = trace.getTracer('app');
@@ -98,6 +95,7 @@ const globalErrorHandler: ErrorRequestHandler = (error, req, res, next) => {
         : [];
     }
 
+    res.locals.errorHandledBy = 'globalErrorHandler';
     res.locals.responsePayload = {
       success: false,
       statusCode,

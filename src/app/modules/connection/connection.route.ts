@@ -2,8 +2,8 @@ import express from 'express';
 import { USER_ROLES } from '../../../enums/user';
 import auth from '../../middlewares/auth';
 import validateRequest from '../../middlewares/validateRequest';
-import { ConnectionValidation } from './connection.validation';
 import { ConnectionController } from './connection.controller';
+import { ConnectionValidation } from './connection.validation';
 
 const router = express.Router();
 
@@ -11,7 +11,7 @@ const router = express.Router();
 router.get(
   '/status/:userId',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.statusCheckZodSchema),
+  validateRequest(ConnectionValidation.checkConnectionStatusParamsSchema),
   ConnectionController.getConnectionStatus
 );
 
@@ -19,7 +19,7 @@ router.get(
 router.get(
   '/pending',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  ConnectionController.getPendingRequests
+  ConnectionController.getPendingConnectionRequests
 );
 
 // List my accepted connections
@@ -33,31 +33,31 @@ router.get(
 router.post(
   '/request/:userId',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.sendRequestZodSchema),
-  ConnectionController.sendRequest
+  validateRequest(ConnectionValidation.sendConnectionRequestSchema),
+  ConnectionController.sendConnectionRequest
 );
 
 // Accept or reject request
 router.patch(
   '/:connectionId',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.respondToRequestZodSchema),
-  ConnectionController.respondToRequest
+  validateRequest(ConnectionValidation.respondToConnectionRequestSchema),
+  ConnectionController.respondToConnectionRequest
 );
 
 // Cancel pending request (DELETE = undo the sent request)
 router.delete(
   '/:connectionId/request',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.connectionIdParamSchema),
-  ConnectionController.cancelRequest
+  validateRequest(ConnectionValidation.getConnectionByIdParamsSchema),
+  ConnectionController.cancelConnectionRequest
 );
 
 // Remove accepted connection
 router.delete(
   '/:connectionId',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.connectionIdParamSchema),
+  validateRequest(ConnectionValidation.getConnectionByIdParamsSchema),
   ConnectionController.removeConnection
 );
 

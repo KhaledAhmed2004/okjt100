@@ -1,6 +1,7 @@
 import express from 'express';
 import { USER_ROLES } from '../../../enums/user';
 import auth from '../../middlewares/auth';
+import { fileHandler } from '../../middlewares/fileHandler';
 import validateRequest from '../../middlewares/validateRequest';
 import { MosqueController } from './mosque.controller';
 import { MosqueValidation } from './mosque.validation';
@@ -14,6 +15,7 @@ router.get('/:mosqueId', MosqueController.getSingleMosque);
 router.post(
   '/',
   auth(USER_ROLES.SUPER_ADMIN),
+  fileHandler([{ name: 'image', maxCount: 1 }]),
   validateRequest(MosqueValidation.createMosqueZodSchema),
   MosqueController.createMosque,
 );
@@ -21,6 +23,7 @@ router.post(
 router.patch(
   '/:mosqueId',
   auth(USER_ROLES.SUPER_ADMIN),
+  fileHandler([{ name: 'image', maxCount: 1 }]),
   validateRequest(MosqueValidation.updateMosqueZodSchema),
   MosqueController.updateMosque,
 );

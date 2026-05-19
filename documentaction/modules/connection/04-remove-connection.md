@@ -20,8 +20,9 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER)
 
 ## Business Rules
 - **Either user** (sender or receiver) can remove an accepted connection.
-- The associated `Chat` document is marked **inactive** (`status: false`) — message history is preserved but new messages are blocked.
 - The connection document is **permanently deleted**. Users can re-connect later by sending a new request.
+- The associated `Chat` session is kept intact so message history is preserved.
+- The deletion is wrapped in a **Mongoose Transaction** for database integrity.
 - A real-time `CONNECTION_REMOVED` socket event is emitted to the other user.
 
 ## Socket Event Emitted
@@ -66,5 +67,5 @@ Payload: { connectionId, chatId }
 |---|---|---|
 | **Status required** | `ACCEPTED` | `PENDING` |
 | **Who can call** | Either user | Sender only |
-| **Chat effect** | Chat marked inactive | No effect |
+| **Chat effect** | Preserved | No effect |
 | **Socket event** | `CONNECTION_REMOVED` | None |

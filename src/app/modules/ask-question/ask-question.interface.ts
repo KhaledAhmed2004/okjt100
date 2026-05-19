@@ -11,6 +11,7 @@ export interface IAnswerVersion {
 
 export interface IAskQuestion extends Document {
   userId: Schema.Types.ObjectId;
+  userRole: 'BROTHER' | 'SISTER';
   question: string;
   imageUrl?: string;
   status: TQuestionStatus;

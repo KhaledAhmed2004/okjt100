@@ -24,9 +24,7 @@ import { allowedOrigins, maybeLogCors } from './app/logging/corsLogger';
 const app = express();
 
 
-// Morgan logging
-app.use(Morgan.successHandler);
-app.use(Morgan.errorHandler);
+// (disabled) Morgan logging - now integrated beautifully within our custom requestLogger
 
 // Client Hints: request OS/device info from browsers without frontend changes
 app.use((req, res, next) => {
@@ -81,24 +79,27 @@ app.use(otelExpressMiddleware);
 // CORS setup moved to logging/corsLogger.ts (allowedOrigins, maybeLogCors)
 
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, Postman)
-      if (!origin) {
-        maybeLogCors(origin, true);
-        return callback(null, true);
-      }
-      if (allowedOrigins.includes(origin)) {
-        maybeLogCors(origin, true);
-        callback(null, true);
-      } else {
-        maybeLogCors(origin, false);
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    credentials: true, // allow cookies/auth headers
-  }),
+  cors((req, callback) => {
+    const origin = req.header('Origin');
+    const allowed = !origin || allowedOrigins.includes(origin);
+
+    // Attach CORS metadata to request object for our custom logger
+    (req as any).corsStatus = !origin
+      ? 'Allowed (no Origin header - Postman/mobile/native)'
+      : allowed
+        ? `Allowed (${origin})`
+        : `Blocked (${origin})`;
+    (req as any).corsAllowed = allowed;
+
+    // Track rate-limited blocks if any
+    maybeLogCors(origin, allowed);
+
+    callback(null, {
+      origin: allowed,
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      credentials: true,
+    });
+  })
 );
 
 // Explicitly handle preflight OPTIONS requests

@@ -5,11 +5,11 @@ import sendResponse from '../../../shared/sendResponse';
 import { ConnectionService } from './connection.service';
 import { JwtPayload } from 'jsonwebtoken';
 
-const sendRequest = catchAsync(async (req: Request, res: Response) => {
+const sendConnectionRequest = catchAsync(async (req: Request, res: Response) => {
   const senderId = (req.user as JwtPayload).id;
   const receiverId = req.params.userId;
 
-  const result = await ConnectionService.sendRequest(senderId, receiverId);
+  const result = await ConnectionService.sendConnectionRequest(senderId, receiverId);
 
   sendResponse(res, {
     statusCode: StatusCodes.CREATED,
@@ -19,12 +19,12 @@ const sendRequest = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const respondToRequest = catchAsync(async (req: Request, res: Response) => {
+const respondToConnectionRequest = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as JwtPayload).id;
   const connectionId = req.params.connectionId;
   const action = req.body.action;
 
-  const result = await ConnectionService.respondToRequest(connectionId, userId, action);
+  const result = await ConnectionService.respondToConnectionRequest(connectionId, userId, action);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
@@ -34,11 +34,11 @@ const respondToRequest = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const cancelRequest = catchAsync(async (req: Request, res: Response) => {
+const cancelConnectionRequest = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as JwtPayload).id;
   const connectionId = req.params.connectionId;
 
-  await ConnectionService.cancelRequest(connectionId, userId);
+  await ConnectionService.cancelConnectionRequest(connectionId, userId);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
@@ -73,11 +73,15 @@ const getMyConnections = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-const getPendingRequests = catchAsync(async (req: Request, res: Response) => {
+const getPendingConnectionRequests = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as JwtPayload).id;
   const type = (req.query.type as 'sent' | 'received') || 'received';
-  
-  const result = await ConnectionService.getPendingRequests(userId, type, req.query);
+
+  // Clone query and remove 'type' so QueryBuilder doesn't try to filter the DB by it
+  const queryObj = { ...req.query };
+  delete queryObj.type;
+
+  const result = await ConnectionService.getPendingConnectionRequests(userId, type, queryObj);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
@@ -103,11 +107,11 @@ const getConnectionStatus = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const ConnectionController = {
-  sendRequest,
-  respondToRequest,
-  cancelRequest,
+  sendConnectionRequest,
+  respondToConnectionRequest,
+  cancelConnectionRequest,
   removeConnection,
   getMyConnections,
-  getPendingRequests,
+  getPendingConnectionRequests,
   getConnectionStatus,
 };

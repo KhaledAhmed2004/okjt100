@@ -12,6 +12,7 @@ const submitQuestion = catchAsync(async (req: Request, res: Response) => {
   const result = await AskQuestionService.submitQuestionIntoDB({
     ...rest,
     userId: user.id as string,
+    userRole: user.role as 'BROTHER' | 'SISTER',
     imageUrl: image,
   });
 

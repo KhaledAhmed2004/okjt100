@@ -5,12 +5,11 @@ import config from '../config';
 const { createLogger, format, transports } = require('winston');
 const { combine, timestamp, label, printf } = format;
 
-// Format timestamp in BD timezone as "YYYY-MM-DD HH:MM:SS AM/PM"
 const bdTime = (date = new Date()): string => {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'Asia/Dhaka',
     year: 'numeric',
-    month: '2-digit',
+    month: 'short',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
@@ -19,14 +18,14 @@ const bdTime = (date = new Date()): string => {
   }).formatToParts(date);
 
   const get = (type: string) => parts.find(p => p.type === type)?.value || '';
-  const yyyy = get('year');
-  const mm = get('month');
-  const dd = get('day');
-  const hh = get('hour');
-  const min = get('minute');
-  const ss = get('second');
+  const month = get('month');
+  const day = get('day');
+  const year = get('year');
+  const hour = get('hour');
+  const minute = get('minute');
+  const second = get('second');
   const dayPeriod = get('dayPeriod');
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} ${dayPeriod}`;
+  return `${month} ${day}, ${hour}:${minute}:${second} ${dayPeriod}, ${year}`;
 };
 
 const myFormat = printf(

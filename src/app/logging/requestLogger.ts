@@ -32,19 +32,7 @@ import {
   calculateEventLoopMetrics,
 } from './performanceMetrics';
 
-// 🗓️ Format date
-const formatDate = (): string => {
-  const now = new Date();
-  const options: Intl.DateTimeFormatOptions = {
-    month: 'short',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: true,
-  };
-  const datePart = now.toLocaleString('en-US', options);
-  return `${datePart} , ${now.getFullYear()}`;
-};
+
 
 // 🧾 Status text
 const statusText = (code: number): string => {
@@ -282,11 +270,18 @@ const renderQueryMultiLine = (q: any, index: number): string[] => {
 
   // Last line: Suggestion
   const suggestion = q?.suggestion;
-  const suggestionDisplay = suggestion && suggestion !== 'n/a'
-    ? `${colors.magenta.bold('💡')} ${colors.magenta.bold(suggestion)}`
-    : colors.dim('n/a');
-
-  lines.push(`      └─ ${colors.cyan('Suggestion:')} ${suggestionDisplay}`);
+  if (suggestion && suggestion !== 'n/a') {
+    const suggestionDisplay = `${colors.magenta.bold('💡')} ${colors.magenta.bold(suggestion)}`;
+    lines.push(`      └─ ${colors.cyan('Suggestion:')} ${suggestionDisplay}`);
+  } else {
+    // Post-process the last pushed line in the tree to terminate with '└─' instead of '├─'
+    if (lines.length > 1) {
+      const lastIdx = lines.length - 1;
+      if (lines[lastIdx].includes('      ├─ ')) {
+        lines[lastIdx] = lines[lastIdx].replace('      ├─ ', '      └─ ');
+      }
+    }
+  }
 
   return lines;
 };
@@ -440,6 +435,54 @@ export const requestLogger = (
   res.setHeader('X-Request-Id', requestId);
   (res.locals as any).requestId = requestId;
 
+  // Intercept response methods to capture response payload
+  const originalJson = res.json;
+  res.json = function (body) {
+    try {
+      res.locals.responsePayload = body;
+    } catch {}
+    return originalJson.call(this, body);
+  };
+
+  const originalSend = res.send;
+  res.send = function (body) {
+    try {
+      if (typeof body === 'string' && (body.trim().startsWith('{') || body.trim().startsWith('['))) {
+        res.locals.responsePayload = JSON.parse(body);
+      } else if (body && typeof body === 'object') {
+        res.locals.responsePayload = body;
+      }
+    } catch {}
+    return originalSend.call(this, body);
+  };
+
+  // Capture route params dynamically as they are matched by Express routers
+  const capturedParams: Record<string, any> = {};
+  const proxyHandler = {
+    get(target: any, prop: string) {
+      return capturedParams[prop];
+    },
+    set(target: any, prop: string, value: any) {
+      capturedParams[prop] = value;
+      return true;
+    },
+  };
+  const proxy = new Proxy({}, proxyHandler);
+  Object.defineProperty(req, 'params', {
+    get() {
+      return proxy;
+    },
+    set(val) {
+      if (val && typeof val === 'object') {
+        if (Object.keys(val).length > 0) {
+          Object.assign(capturedParams, val);
+        }
+      }
+    },
+    configurable: true,
+    enumerable: true,
+  });
+
   // 🆕 NEW: Capture performance baseline (memory, CPU)
   try {
     if (config.tracing?.performance?.enabled) {
@@ -469,7 +512,7 @@ export const requestLogger = (
     const isObservabilityRoute = Boolean(req.originalUrl?.includes('/api/v1/observability'));
 
     const details = {
-      params: req.params || {},
+      params: capturedParams,
       query: req.query || {},
       body: normalizeBody(req),
       files: extractFilesInfo(req),
@@ -549,7 +592,13 @@ export const requestLogger = (
     }
 
     const lines: string[] = [];
-    lines.push(colors.blue.bold(`[${formatDate()}]  🧩 Req-ID: ${requestId}`));
+    lines.push(colors.blue.bold(`🧩 Req-ID: ${requestId}`));
+
+    const statusTextColored = status >= 400 ? colors.red.bold(String(status)) : colors.green.bold(String(status));
+    const methodColored = req.method === 'GET' ? colors.green.bold(req.method) : req.method === 'POST' ? colors.blue.bold(req.method) : req.method === 'PUT' ? colors.yellow.bold(req.method) : req.method === 'DELETE' ? colors.red.bold(req.method) : colors.cyan.bold(req.method);
+    const morganStyleLine = `${methodColored} ${colors.white(req.originalUrl)} ${statusTextColored} - ${colors.white(`${processedMs.toFixed(3)} ms`)}`;
+    lines.push(colors.blue(`     📝 Summary: ${morganStyleLine}`));
+
     lines.push(`📥 Request: ${methodColor} ${routeColor} from IP:${ipColor}`);
     lines.push(colors.blue(`     🛰️ Client: ua="${ua}" referer="${referer || 'n/a'}" ct="${contentType || 'n/a'}"`));
     // Enriched device/OS/browser info (if available)
@@ -561,8 +610,16 @@ export const requestLogger = (
       const arch = info.arch ? `, Arch: ${info.arch}` : '';
       const bits = info.bitness ? `, ${info.bitness}-bit` : '';
       const br = info.browser ? `, Browser: ${info.browser}${info.browserVersion ? ' ' + info.browserVersion : ''}` : '';
-      lines.push(colors.blue(`     💻 Device: ${info.deviceType}, OS: ${osLabel}${osRaw}${model}${arch}${bits}${br}`));
     }
+
+    // 🌐 CORS details
+    if ((req as any).corsStatus) {
+      const corsAllowed = (req as any).corsAllowed;
+      const corsColor = corsAllowed ? colors.green.bold : colors.red.bold;
+      const statusColor = corsAllowed ? colors.green : colors.red;
+      lines.push(colors.blue(`     🌐 CORS: ${corsColor(corsAllowed ? '✅' : '❌')} ${statusColor((req as any).corsStatus)}`));
+    }
+
     if (controllerLabel || serviceLabel) {
       const parts: string[] = [];
       if (controllerLabel) parts.push(`controller: ${controllerLabel}`);
@@ -614,7 +671,7 @@ export const requestLogger = (
       }
     }
 
-    if (config.node_env === 'development') {
+    if (config.node_env === 'development' || config.node_env === 'test') {
       lines.push(colors.yellow('     🔎 Request details:'));
       lines.push(
         colors.white(indentBlock(JSON.stringify(maskedDetails, null, 2)))
@@ -626,21 +683,31 @@ export const requestLogger = (
     const respSize = typeof respSizeHeader === 'string' ? respSizeHeader : Array.isArray(respSizeHeader) ? respSizeHeader[0] : (respSizeHeader as any);
     lines.push(`${respLabel} ${statusColor(` ${status} ${statusMsg} `)} ${colors.blue(respSize ? `(size: ${respSize} bytes)` : '')}`);
 
+    const errorHandledBy = (res.locals as any)?.errorHandledBy;
+    if (errorHandledBy) {
+      lines.push(colors.red(`     💥 Error Handler: ${errorHandledBy}`));
+    }
+
     // 💬 Message with bg only on message text
     if (responseMessage) {
       lines.push(`💬 Message: ${messageBg(` ${responseMessage} `)}`);
     }
 
-    if (
-      responseErrors &&
-      Array.isArray(responseErrors) &&
-      responseErrors.length
-    ) {
-      lines.push(colors.red('📌 Details:'));
-      lines.push(
-        colors.white(indentBlock(JSON.stringify(responseErrors, null, 2)))
-      );
+    if (config.node_env === 'development' || config.node_env === 'test') {
+      if (responsePayload && Object.keys(responsePayload).length > 0) {
+        const stringified = JSON.stringify(maskSensitive(responsePayload), null, 2);
+        if (stringified.length > 5000) {
+          lines.push(colors.yellow('     📥 Response Payload:'));
+          lines.push(colors.gray(`     [Payload size ${stringified.length} chars exceeds display limit; truncated]`));
+          lines.push(colors.white(indentBlock(stringified.substring(0, 1000) + '\n...')));
+        } else {
+          lines.push(colors.yellow('     📥 Response Payload:'));
+          lines.push(colors.white(indentBlock(stringified)));
+        }
+      }
     }
+
+
 
     // 🆕 NEW: Capture performance end state (memory, CPU)
     try {
@@ -704,7 +771,10 @@ export const requestLogger = (
           if (!slow && !noIdx) return 'n/a';
           if (isAgg && typeof q?.pipeline === 'string') {
             const m = /\$match\(([^=]+)=/.exec(q.pipeline);
-            if (m && m[1]) return `createIndex({ ${m[1]}: 1 })`;
+            if (m && m[1]) {
+              if (m[1] === '_id') return 'n/a';
+              return `createIndex({ ${m[1]}: 1 })`;
+            }
           }
           return 'add indexes on frequent filter fields';
         };

@@ -25,7 +25,7 @@ Allows the `SUPER_ADMIN` to retrieve a paginated list of all questions submitted
 ---
 
 ### 2.3 Data Population
-- The `userId` field is automatically populated with the user's `name` and `email` for administrative context.
+- The `userId` field is automatically populated with the user's `name`, `email`, and `role` for administrative context.
 
 ---
 
@@ -68,7 +68,8 @@ Allows the `SUPER_ADMIN` to retrieve a paginated list of all questions submitted
       "userId": {
         "_id": "664a1b2c3d4e5f6a7b8c9d0f",
         "name": "John Doe",
-        "email": "john@example.com"
+        "email": "john@example.com",
+        "role": "BROTHER"
       },
       "userRole": "BROTHER",
       "question": "How to perform Wudu correctly?",

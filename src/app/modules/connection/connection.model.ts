@@ -1,5 +1,6 @@
 import { model, Schema } from 'mongoose';
 import { IConnection, ConnectionModel } from './connection.interface';
+import { CONNECTION_STATUS } from './connection.constants';
 
 const connectionSchema = new Schema<IConnection, ConnectionModel>(
   {
@@ -13,10 +14,15 @@ const connectionSchema = new Schema<IConnection, ConnectionModel>(
       ref: 'User',
       required: true,
     },
+    connectionKey: {
+      type: String,
+      required: true,
+      unique: true,
+    },
     status: {
       type: String,
-      enum: ['PENDING', 'ACCEPTED'],
-      default: 'PENDING',
+      enum: Object.values(CONNECTION_STATUS),
+      default: CONNECTION_STATUS.PENDING,
     },
     chatId: {
       type: Schema.Types.ObjectId,
@@ -31,9 +37,8 @@ const connectionSchema = new Schema<IConnection, ConnectionModel>(
   }
 );
 
-// Compound unique index to prevent duplicate connection requests between the same two users
-// We handle direction logic in the service (A->B and B->A are both blocked if one exists)
-connectionSchema.index({ sender: 1, receiver: 1 }, { unique: true });
+// Deterministic unique index using connectionKey to prevent A->B and B->A race condition
+connectionSchema.index({ connectionKey: 1 }, { unique: true });
 
 // Indexes for fast pending request lookups
 connectionSchema.index({ receiver: 1, status: 1 });

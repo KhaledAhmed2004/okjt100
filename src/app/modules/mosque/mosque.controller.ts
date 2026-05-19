@@ -3,8 +3,16 @@ import { StatusCodes } from 'http-status-codes';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { MosqueService } from './mosque.service';
+import { getSingleFilePath } from '../../../shared/getFilePath';
 
 const createMosque = catchAsync(async (req: Request, res: Response) => {
+  if (req.files) {
+    const image = getSingleFilePath(req.files, 'image');
+    if (image) {
+      req.body.image = image;
+    }
+  }
+
   const result = await MosqueService.createMosqueIntoDB(req.body);
 
   sendResponse(res, {
@@ -41,6 +49,14 @@ const getSingleMosque = catchAsync(async (req: Request, res: Response) => {
 
 const updateMosque = catchAsync(async (req: Request, res: Response) => {
   const { mosqueId } = req.params;
+
+  if (req.files) {
+    const image = getSingleFilePath(req.files, 'image');
+    if (image) {
+      req.body.image = image;
+    }
+  }
+
   const result = await MosqueService.updateMosqueIntoDB(mosqueId, req.body);
 
   sendResponse(res, {

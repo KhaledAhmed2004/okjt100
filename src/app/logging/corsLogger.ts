@@ -50,22 +50,18 @@ export const isOriginAllowed = (origin?: string): boolean => {
 };
 
 // Rate-limited CORS decision logging
+// Rate-limited CORS decision logging (only for blocks to avoid log spam)
 export const maybeLogCors = (
   origin: string | undefined,
   allowed: boolean,
 ): void => {
   if (!CORS_DEBUG) return;
-  const key = origin || 'no-origin';
-  const now = Date.now();
-  const last = corsLogMap.get(key) || 0;
-  if (now - last < CORS_LOG_WINDOW_MS) return;
-  corsLogMap.set(key, now);
-  if (!origin) {
-    logger.info(
-      'CORS allow: request without Origin header (Postman/mobile/native)',
-    );
-    return;
+  if (!allowed) {
+    const key = origin || 'no-origin';
+    const now = Date.now();
+    const last = corsLogMap.get(key) || 0;
+    if (now - last < CORS_LOG_WINDOW_MS) return;
+    corsLogMap.set(key, now);
+    errorLogger.warn(`CORS block: ${origin}`);
   }
-  if (allowed) logger.info(`CORS allow: ${origin}`);
-  else errorLogger.warn(`CORS block: ${origin}`);
 };

@@ -69,6 +69,7 @@ Every feature: `src/app/modules/[feature]/` with `interface.ts`, `model.ts`, `co
 - `camelCase` vars/functions, `PascalCase` classes/interfaces
 - Files: `[feature].route.ts` (singular). Paths: plural kebab-case (`/api/v1/users`)
 - Functions < 30 lines, `async/await` only, object destructuring
+- **No Magic Strings**: NEVER use magic strings (e.g. 'PENDING'). ALWAYS create a `[feature].constants.ts` file.
 - Zod in `[feature].validation.ts`, `.lean()` for read-only queries, index search/filter fields
 
 ---

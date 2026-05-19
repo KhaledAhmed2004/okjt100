@@ -13,7 +13,8 @@ Allows a user to send a connection request to another user. If the request is su
 ## 2. Business Rules
 - **Self-Connect**: Users cannot send requests to themselves.
 - **Receiver Status**: The receiver must exist and have an `ACTIVE` status.
-- **Duplicates**: Only one connection/request can exist between two users at a time (regardless of direction).
+- **Pending Limit**: A user can have a maximum of **50** outgoing pending requests at any time to prevent spam.
+- **Duplicates**: Only one connection/request can exist between two users at a time (prevented by `connectionKey` unique index). If a connection is already `ACCEPTED`, returns "You are already connected with this user".
 - **Notifications**: 
   - Emits `CONNECTION_REQUEST` to the receiver's room.
   - Sends a `SYSTEM` type in-app notification to the receiver.
@@ -48,5 +49,14 @@ Allows a user to send a connection request to another user. If the request is su
     "createdAt": "2026-05-14T10:00:00.000Z",
     "updatedAt": "2026-05-14T10:00:00.000Z"
   }
+}
+```
+
+### Rate Limited (429)
+```json
+{
+  "success": false,
+  "statusCode": 429,
+  "message": "You have reached the maximum number of pending requests (50)"
 }
 ```

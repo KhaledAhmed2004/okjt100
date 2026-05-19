@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { StatusCodes } from 'http-status-codes';
 import ApiError from '../../../errors/ApiError';
 import QueryBuilder from '../../builder/QueryBuilder';
@@ -14,8 +15,19 @@ const submitQuestionIntoDB = async (payload: Partial<IAskQuestion>) => {
 };
 
 const getAllQuestionsFromDB = async (query: Record<string, unknown>) => {
+  // Fix for existing data: Sync userRole if missing
+  const questionsToSync = await AskQuestion.find({ userRole: { $exists: false } });
+  if (questionsToSync.length > 0) {
+    for (const question of questionsToSync) {
+      const user = await mongoose.model('User').findById(question.userId);
+      if (user) {
+        await AskQuestion.findByIdAndUpdate(question._id, { userRole: user.role });
+      }
+    }
+  }
+
   const questionQuery = new QueryBuilder(
-    AskQuestion.find().populate('userId', 'name email'),
+    AskQuestion.find().populate('userId', 'name email role'),
     query,
   )
     .textSearch()

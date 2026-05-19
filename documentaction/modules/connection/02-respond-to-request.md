@@ -14,7 +14,7 @@ Allows the receiver of a connection request to either `ACCEPT` or `REJECT` it.
 ## 2. Business Rules
 - **Authorization**: Only the `receiver` of the request can respond.
 - **Status Check**: The request must currently be in `PENDING` status.
-- **Action: ACCEPT**:
+- **Action: ACCEPT** (Wrapped in Mongoose Transaction for Atomicity):
   - Updates status to `ACCEPTED`.
   - Automatically creates a `Chat` between the two users (or reactivates an existing one).
   - Emits `CONNECTION_ACCEPTED` to the sender.

@@ -21,18 +21,15 @@ Stores details and prayer times for mosques.
 | `area` | String | ✅ | Area or neighborhood |
 | `phoneNumber` | String | ✅ | Contact number |
 | `website` | String | ❌ | Official website (optional) |
-| `location.latitude` | Number | ✅ | Latitude for mapping |
-| `location.longitude`| Number | ✅ | Longitude for mapping |
-| `prayerTimes.fajr` | String | ✅ | Fajr time (HH:MM) |
-| `prayerTimes.dhuhr` | String | ✅ | Dhuhr time (HH:MM) |
-| `prayerTimes.asr` | String | ✅ | Asr time (HH:MM) |
-| `prayerTimes.maghrib`| String | ✅ | Maghrib time (HH:MM) |
-| `prayerTimes.isha` | String | ✅ | Isha time (HH:MM) |
-| `prayerTimes.jummah`| String | ❌ | Optional Jummah time |
+| `description` | String | ❌ | Optional description |
+| `image` | String | ❌ | URL for the mosque image |
+| `location` | Object | ✅ | GeoJSON Point (coordinates: [lng, lat]) |
+| `prayerTimes` | Object | ✅ | 5 daily prayer times (HH:MM) |
 
 **Indexes**:
-- `{ mosqueName: 'text', area: 'text', address: 'text' }` — Supports search
+- `{ mosqueName: 'text', area: 'text', address: 'text', description: 'text' }` — Supports global search
 - `{ area: 1 }` — Fast filtering by area
+- `{ 'location.coordinates': '2dsphere' }` — Geospatial indexing for proximity search
 
 ---
 
@@ -40,8 +37,8 @@ Stores details and prayer times for mosques.
 
 | # | Method | Endpoint | Auth | Purpose & Status | Documentation |
 |---|---|---|---|---|---|
-| 01 | POST | `/mosques` | Admin | **Pending**: Creates a new mosque entry. | [01-create-mosque.md](./01-create-mosque.md) |
-| 02 | GET | `/mosques` | None | **Pending**: Fetches paginated mosques with search/filter. | [02-get-all-mosques.md](./02-get-all-mosques.md) |
-| 03 | GET | `/mosques/:mosqueId` | None | **Pending**: Retrieves full details of a single mosque. | [03-get-single-mosque.md](./03-get-single-mosque.md) |
-| 04 | PATCH | `/mosques/:mosqueId`| Admin | **Pending**: Updates mosque details or prayer times. | [04-update-mosque.md](./04-update-mosque.md) |
-| 05 | DELETE | `/mosques/:mosqueId`| Admin | **Pending**: Deletes a mosque entry. | [05-delete-mosque.md](./05-delete-mosque.md) |
+| 01 | POST | `/mosques` | Admin | **Done**: Creates a new mosque entry with optional image upload. | [01-create-mosque.md](./01-create-mosque.md) |
+| 02 | GET | `/mosques` | None | **Done**: Fetches paginated mosques with search/filter/proximity. | [02-get-all-mosques.md](./02-get-all-mosques.md) |
+| 03 | GET | `/mosques/:mosqueId` | None | **Done**: Retrieves full details of a single mosque. | [03-get-single-mosque.md](./03-get-single-mosque.md) |
+| 04 | PATCH | `/mosques/:mosqueId`| Admin | **Done**: Updates mosque details or replaces the image. | [04-update-mosque.md](./04-update-mosque.md) |
+| 05 | DELETE | `/mosques/:mosqueId`| Admin | **Done**: Deletes a mosque entry and its image. | [05-delete-mosque.md](./05-delete-mosque.md) |

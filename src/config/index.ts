@@ -149,4 +149,9 @@ export default {
       },
     },
   },
+
+  // Connection module configuration
+  connection: {
+    max_pending_requests: parseInt(process.env.MAX_PENDING_REQUESTS || '50'),
+  },
 };

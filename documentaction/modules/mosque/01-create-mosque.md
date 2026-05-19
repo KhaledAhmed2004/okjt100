@@ -2,56 +2,36 @@
 
 ```http
 POST /mosques
-Content-Type: application/json
+Content-Type: multipart/form-data
 Auth: Admin
 ```
 
-> Adds a new mosque to the database with location and prayer times.
+> Adds a new mosque to the database with location, prayer times, and an optional image.
 
-## Request Body
+## Request Body (Form Data)
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `mosqueName` | `string` | Name of the mosque |
-| `address` | `string` | Full address |
-| `area` | `string` | Area/Neighborhood |
-| `phoneNumber` | `string` | Contact number |
-| `website` | `string` | (Optional) Valid URL |
-| `location` | `object` | Latitude and Longitude |
-| `prayerTimes` | `object` | 5 daily prayer times (HH:MM) and optional Jummah |
-
-### Example Body
-```json
-{
-  "mosqueName": "Baitul Mukarram",
-  "address": "Topkhana Road, Dhaka",
-  "area": "Motijheel",
-  "phoneNumber": "+880123456789",
-  "website": "https://baitulmukarram.org",
-  "location": {
-    "type": "Point",
-    "coordinates": [90.4125, 23.7298]
-  },
-  "prayerTimes": {
-    "fajr": "04:30",
-    "dhuhr": "12:15",
-    "asr": "16:45",
-    "maghrib": "18:30",
-    "isha": "20:00",
-    "jummah": "13:30"
-  }
-}
-```
+| Field | Type | Description | Example |
+| :--- | :--- | :--- | :--- |
+| `mosqueName` | `string` | Name of the mosque | `Baitul Mukarram` |
+| `address` | `string` | Full address | `Topkhana Road, Dhaka` |
+| `area` | `string` | Area/Neighborhood | `Motijheel` |
+| `phoneNumber` | `string` | Contact number | `+880123456789` |
+| `website` | `string` | (Optional) Valid URL | `https://baitulmukarram.org` |
+| `description` | `string` | (Optional) Mosque description | `The National Mosque of Bangladesh` |
+| `location` | `object` | GeoJSON Point | `{"type": "Point", "coordinates": [90.4125, 23.7298]}` |
+| `prayerTimes` | `object` | 5 daily prayer times (HH:MM) | `{"fajr": "04:30", "dhuhr": "12:15", "asr": "16:45", "maghrib": "18:30", "isha": "20:00", "jummah": "13:30"}` |
+| `image` | `file` | Mosque image (max 1) | `mosque.jpg` |
 
 ## Implementation
 
-- **Route**: `mosque.route.ts`
-- **Controller**: `mosque.controller.ts` — `createMosque`
-- **Service**: `mosque.service.ts` — `createMosqueIntoDB`
+- **Route**: [mosque.route.ts](file:///d:/Khaled/re-factor/okjt100/src/app/modules/mosque/mosque.route.ts)
+- **Controller**: [mosque.controller.ts](file:///d:/Khaled/re-factor/okjt100/src/app/modules/mosque/mosque.controller.ts) — `createMosque`
+- **Service**: [mosque.service.ts](file:///d:/Khaled/re-factor/okjt100/src/app/modules/mosque/mosque.service.ts) — `createMosqueIntoDB`
 
 ### Business Logic
-1. **Validation**: Validates input using Zod (required fields, phone format, URL format, time format).
-2. **Database Insertion**: Saves the mosque record.
+1. **File Upload**: `fileHandler` processes the `image` file and updates `req.body.image` with the URL.
+2. **Data Validation**: Validates text fields and objects using Zod schema.
+3. **Database Insertion**: Saves the mosque record with GeoJSON location and prayer times.
 
 ## Responses
 
@@ -69,6 +49,8 @@ Auth: Admin
     "area": "Motijheel",
     "phoneNumber": "+880123456789",
     "website": "https://baitulmukarram.org",
+    "description": "The National Mosque of Bangladesh",
+    "image": "https://example.com/mosque-image.jpg",
     "location": {
       "type": "Point",
       "coordinates": [90.4125, 23.7298]

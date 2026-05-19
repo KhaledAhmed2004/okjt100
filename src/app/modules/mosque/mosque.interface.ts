@@ -20,6 +20,8 @@ export interface IMosque extends Document {
   area: string;
   phoneNumber: string;
   website?: string;
+  description?: string;
+  image?: string;
   location: ILocation;
   prayerTimes: IPrayerTimes;
   distanceInKm?: number;

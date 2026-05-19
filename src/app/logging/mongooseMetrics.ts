@@ -50,10 +50,10 @@ function getCallerLocation(): string | undefined {
     // Find the first line that's NOT in mongooseMetrics.ts or node_modules
     for (const line of lines) {
       if (line.includes('mongooseMetrics.ts') ||
-          line.includes('node_modules') ||
-          line.includes('at Object.') ||
-          line.includes('at Function.') ||
-          !line.includes('at ')) {
+        line.includes('node_modules') ||
+        line.includes('at Object.') ||
+        line.includes('at Function.') ||
+        !line.includes('at ')) {
         continue;
       }
 
@@ -86,7 +86,7 @@ const preStart = (op: string) =>
       const model = getModelName(this) || 'UnknownModel';
       const span = tracer.startSpan(`🗄️  Database: ${model}.${op}`);
       this.__otelSpan = span;
-    } catch {}
+    } catch { }
     next();
   };
 
@@ -119,7 +119,7 @@ const postEnd = (op: string) =>
         const count = _res.modifiedCount || 0;
         completionMessage = `Updated ${count} document(s)`;
       }
-    } catch {}
+    } catch { }
 
     // 🆕 NEW: Capture query details (filter, sort, projection, limit, skip)
     let filterStr: string | undefined;
@@ -173,7 +173,7 @@ const postEnd = (op: string) =>
       try {
         const pl = this.pipeline();
         if (Array.isArray(pl)) pipeline = summarizePipeline(pl);
-      } catch {}
+      } catch { }
     }
     // Derive nReturned for common ops from the result
     let nReturned: number | undefined;
@@ -189,7 +189,7 @@ const postEnd = (op: string) =>
       } else if (op === 'save') {
         nReturned = 1;
       }
-    } catch {}
+    } catch { }
     // Try explain('executionStats') via native driver for accurate metrics
     let docsExamined: number | undefined;
     let indexUsed: string | undefined;
@@ -223,7 +223,7 @@ const postEnd = (op: string) =>
           nReturned = stats.nReturned;
         }
       }
-    } catch {}
+    } catch { }
     // 🆕 ENHANCED: Index suggestion with exact MongoDB command
     let suggestion: string | undefined;
     try {
@@ -235,7 +235,7 @@ const postEnd = (op: string) =>
       const sortKeys = sort && typeof sort === 'object' ? Object.keys(sort) : [];
 
       // Combine filter keys and sort keys for compound index
-      const allKeys = Array.from(new Set([...keys, ...sortKeys])); // Remove duplicates
+      const allKeys = Array.from(new Set([...keys, ...sortKeys])).filter(k => k !== '_id'); // Remove duplicates and skip '_id'
       const idxFields = allKeys.slice(0, 3).map(k => {
         // Use -1 for descending sort, 1 for ascending or filter fields
         const sortDir = sort && sort[k] === -1 ? -1 : 1;
@@ -270,9 +270,9 @@ const postEnd = (op: string) =>
           }
 
           this.__otelSpan.end();
-        } catch {}
+        } catch { }
       }
-    } catch {}
+    } catch { }
 
     // 🆕 NEW: Include enhanced query details in recordDbQuery
     recordDbQuery(dur, {
@@ -415,7 +415,7 @@ export function registerMongooseMetricsPlugin() {
             this.__otelSpan.recordException(err);
             this.__otelSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(err?.message || err) });
             this.__otelSpan.end();
-          } catch {}
+          } catch { }
         }
       }
       next(err);
@@ -429,7 +429,7 @@ export function registerMongooseMetricsPlugin() {
             this.__otelSpan.recordException(err);
             this.__otelSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(err?.message || err) });
             this.__otelSpan.end();
-          } catch {}
+          } catch { }
         }
       }
       next(err);
@@ -443,7 +443,7 @@ export function registerMongooseMetricsPlugin() {
             this.__otelSpan.recordException(err);
             this.__otelSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(err?.message || err) });
             this.__otelSpan.end();
-          } catch {}
+          } catch { }
         }
       }
       next(err);
@@ -457,7 +457,7 @@ export function registerMongooseMetricsPlugin() {
             this.__otelSpan.recordException(err);
             this.__otelSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(err?.message || err) });
             this.__otelSpan.end();
-          } catch {}
+          } catch { }
         }
       }
       next(err);
@@ -471,7 +471,7 @@ export function registerMongooseMetricsPlugin() {
             this.__otelSpan.recordException(err);
             this.__otelSpan.setStatus({ code: SpanStatusCode.ERROR, message: String(err?.message || err) });
             this.__otelSpan.end();
-          } catch {}
+          } catch { }
         }
       }
       next(err);
@@ -487,7 +487,7 @@ export function registerMongooseMetricsPlugin() {
         try {
           const pl = typeof this?.pipeline === 'function' ? this.pipeline() : undefined;
           if (Array.isArray(pl)) pipeline = summarizePipeline(pl);
-        } catch {}
+        } catch { }
         recordDbQuery(Date.now() - start, { model: getModelName(this), operation: 'aggregate', cacheHit: false, pipeline });
       }
       next(err);

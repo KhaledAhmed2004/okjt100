@@ -55,6 +55,7 @@ Violation causes runtime errors. MANDATORY order:
 - `async/await` only — no raw `.then()`
 - Env vars via `config/index.ts` — NEVER `process.env` directly
 - Throw `ApiError(StatusCode, message)` for all errors
+- **No Magic Strings**: NEVER use magic strings. ALWAYS use a `[feature].constants.ts` file.
 - `.lean()` on read-only Mongoose queries
 - Index all search/filter fields
 

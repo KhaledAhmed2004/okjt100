@@ -14,6 +14,7 @@ const AnswerVersionSchema = new Schema(
 const AskQuestionSchema = new Schema<IAskQuestion>(
   {
     userId:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    userRole: { type: String, enum: ['BROTHER', 'SISTER'], required: true },
     question: { type: String, required: true },
     imageUrl: { type: String },
     status: {
@@ -30,6 +31,7 @@ const AskQuestionSchema = new Schema<IAskQuestion>(
 // Indexes
 AskQuestionSchema.index({ question: 'text' });
 AskQuestionSchema.index({ userId: 1 });
+AskQuestionSchema.index({ userRole: 1 });
 AskQuestionSchema.index({ status: 1 });
 AskQuestionSchema.index({ createdAt: -1 });
 

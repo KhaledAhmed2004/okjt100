@@ -1,35 +1,38 @@
 import { z } from 'zod';
+import { CONNECTION_ACTION } from './connection.constants';
 
-const sendRequestZodSchema = z.object({
+export const sendConnectionRequestSchema = z.object({
   params: z.object({
     userId: z.string({ required_error: 'Receiver user ID is required' }),
   }),
 });
 
-const respondToRequestZodSchema = z.object({
+export const respondToConnectionRequestSchema = z.object({
   params: z.object({
     connectionId: z.string({ required_error: 'Connection ID is required' }),
   }),
   body: z.object({
-    action: z.enum(['ACCEPT', 'REJECT'], { required_error: 'Action must be ACCEPT or REJECT' }),
+    action: z.nativeEnum(CONNECTION_ACTION, {
+      required_error: 'Action must be ACCEPT or REJECT',
+    }),
   }),
 });
 
-const connectionIdParamSchema = z.object({
+export const getConnectionByIdParamsSchema = z.object({
   params: z.object({
     connectionId: z.string({ required_error: 'Connection ID is required' }),
   }),
 });
 
-const statusCheckZodSchema = z.object({
+export const checkConnectionStatusParamsSchema = z.object({
   params: z.object({
     userId: z.string({ required_error: 'User ID is required' }),
   }),
 });
 
 export const ConnectionValidation = {
-  sendRequestZodSchema,
-  respondToRequestZodSchema,
-  connectionIdParamSchema,
-  statusCheckZodSchema,
+  sendConnectionRequestSchema,
+  respondToConnectionRequestSchema,
+  getConnectionByIdParamsSchema,
+  checkConnectionStatusParamsSchema,
 };
