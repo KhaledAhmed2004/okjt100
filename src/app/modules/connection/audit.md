@@ -21,3 +21,7 @@ This document outlines the issues discovered during the architecture audit of th
 ## 5. Inaccurate Error Messaging (Low)
 **Issue:** If a user tried to send a request to someone they were already connected with, they received the generic error: "Connection request already exists".
 **Fix:** Updated the logic to check if the existing connection is `ACCEPTED` and return a clearer message: "You are already connected with this user".
+
+## 6. Asymmetric Mutation Response Shapes (Medium)
+**Issue:** The three "deletion" mutations (`REJECT`, `CANCEL`, `REMOVE`) returned either `data: null` (REJECT) or omitted the `data` key entirely (CANCEL, REMOVE). The `ACCEPT` action, by contrast, returned a rich object `{ id, status, chatId }`. This asymmetry forced front-end clients to either special-case each mutation or perform an additional round-trip fetch just to synchronise their local cache after a deletion.
+**Fix:** All three deletion/rejection operations now return a uniform `{ id: connectionId, status: 'NONE' }` object. `'NONE'` is an **API-layer sentinel** — it is never stored in the database (the record is still physically deleted). The shape gives the client everything it needs to immediately invalidate or transition a cached entry without a second network request, which is the standard pattern expected by cache libraries such as RTK Query and React Query.

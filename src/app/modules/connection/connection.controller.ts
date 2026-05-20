@@ -38,12 +38,13 @@ const cancelConnectionRequest = catchAsync(async (req: Request, res: Response) =
   const userId = (req.user as JwtPayload).id;
   const connectionId = req.params.connectionId;
 
-  await ConnectionService.cancelConnectionRequest(connectionId, userId);
+  const result = await ConnectionService.cancelConnectionRequest(connectionId, userId);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
     message: 'Connection request cancelled successfully',
+    data: result,
   });
 });
 
@@ -51,12 +52,13 @@ const removeConnection = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as JwtPayload).id;
   const connectionId = req.params.connectionId;
 
-  await ConnectionService.removeConnection(connectionId, userId);
+  const result = await ConnectionService.removeConnection(connectionId, userId);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
     message: 'Connection removed successfully',
+    data: result,
   });
 });
 

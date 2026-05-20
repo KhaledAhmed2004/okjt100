@@ -15,6 +15,7 @@ Allows a user to send a connection request to another user. If the request is su
 - **Receiver Status**: The receiver must exist and have an `ACTIVE` status.
 - **Pending Limit**: A user can have a maximum of **50** outgoing pending requests at any time to prevent spam.
 - **Duplicates**: Only one connection/request can exist between two users at a time (prevented by `connectionKey` unique index). If a connection is already `ACCEPTED`, returns "You are already connected with this user".
+- **Re-Request Policy**: If a request is rejected or cancelled, the connection record is physically deleted, restoring the relationship state to `NONE`. Consequently, the sender can immediately re-request connection without any cooldown constraint.
 - **Notifications**: 
   - Emits `CONNECTION_REQUEST` to the receiver's room.
   - Sends a `SYSTEM` type in-app notification to the receiver.

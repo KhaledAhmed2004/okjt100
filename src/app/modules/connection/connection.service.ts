@@ -128,7 +128,9 @@ const respondToConnectionRequest = async (connectionId: string, userId: string, 
         });
       }
 
-      return null;
+      // Return the processed id with a 'NONE' status so the client can
+      // immediately update its local cache without a second request.
+      return { id: connection._id, status: 'NONE' as const };
     }
 
     // Action is ACCEPT
@@ -194,7 +196,10 @@ const cancelConnectionRequest = async (connectionId: string, userId: string) => 
   }
 
   await Connection.findByIdAndDelete(connectionId);
-  return null;
+
+  // Return the processed id with a 'NONE' status so the client can
+  // immediately update its local cache without a second request.
+  return { id: connection._id, status: 'NONE' as const };
 };
 
 const removeConnection = async (connectionId: string, userId: string) => {
@@ -227,7 +232,9 @@ const removeConnection = async (connectionId: string, userId: string) => {
       });
     }
 
-    return null;
+    // Return the processed id with a 'NONE' status so the client can
+    // immediately update its local cache without a second request.
+    return { id: connection._id, status: 'NONE' as const };
   } catch (error) {
     await session.abortTransaction();
     throw error;

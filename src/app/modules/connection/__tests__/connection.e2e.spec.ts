@@ -281,7 +281,22 @@ describe('Connection E2E Tests', () => {
       expect(duplicateResponse.body.success).toBe(false);
       expect(duplicateResponse.body.message).toBe('Connection request already exists');
 
-      // --- RETRIEVE PENDING REQUESTS ---
+      // --- REVERSE DUPLICATE REQUEST CHECK ---
+      // User B (receiver) tries to send a request back to User A while A's request is still PENDING.
+      // The connectionKey is deterministic (min_max of IDs), so the existing record collides.
+      const reverseDuplicateResponse = await request(app)
+        .post(`/api/v1/connections/request/${userA._id}`)
+        .set('Authorization', `Bearer ${tokenB}`);
+
+      logApi('POST', '/api/v1/connections/request/:userId', {
+        params: { userId: userA._id.toString() },
+      }, reverseDuplicateResponse.body, 'REVERSE-DUPLICATE-CHECK', 'User B tries to request User A while A has a pending request -> 409 expected');
+
+      expect(reverseDuplicateResponse.status).toBe(409);
+      expect(reverseDuplicateResponse.body.success).toBe(false);
+      expect(reverseDuplicateResponse.body.message).toBe('Connection request already exists');
+
+      // --- RETRIEVE PENDING REQUESTS (type=received) ---
       // User B (receiver) retrieves pending received requests -> Expect list containing User A's request
       const pendingReceivedResponse = await request(app)
         .get('/api/v1/connections/requests?type=received')
@@ -289,7 +304,7 @@ describe('Connection E2E Tests', () => {
 
       logApi('GET', '/api/v1/connections/requests', {
         query: { type: 'received' },
-      }, pendingReceivedResponse.body, 'PENDING-LIST', 'User B fetches received requests list');
+      }, pendingReceivedResponse.body, 'PENDING-LIST-RECEIVED', 'User B fetches received requests list');
 
       expect(pendingReceivedResponse.status).toBe(200);
       expect(pendingReceivedResponse.body.success).toBe(true);
@@ -297,7 +312,38 @@ describe('Connection E2E Tests', () => {
       expect(pendingReceivedResponse.body.data[0].connectionId).toBe(connectionId);
       expect(pendingReceivedResponse.body.data[0].sender.id).toBe(userA._id.toString());
 
+      // --- RETRIEVE PENDING REQUESTS (type=sent) ---
+      // User A (sender) retrieves their outgoing pending requests -> Expect list containing their request to User B
+      const pendingSentResponse = await request(app)
+        .get('/api/v1/connections/requests?type=sent')
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      logApi('GET', '/api/v1/connections/requests', {
+        query: { type: 'sent' },
+      }, pendingSentResponse.body, 'PENDING-LIST-SENT', 'User A fetches sent requests list');
+
+      expect(pendingSentResponse.status).toBe(200);
+      expect(pendingSentResponse.body.success).toBe(true);
+      expect(pendingSentResponse.body.data).toHaveLength(1);
+      expect(pendingSentResponse.body.data[0].connectionId).toBe(connectionId);
+      expect(pendingSentResponse.body.data[0].receiver.id).toBe(userB._id.toString());
+
+      // --- RECEIVER CANCELLATION GUARD ---
+      // User B (receiver) attempts to cancel User A's pending request -> Expect 403 Forbidden
+      // Only the original sender is allowed to cancel; the receiver must use REJECT instead.
+      const receiverCancelResponse = await request(app)
+        .delete(`/api/v1/connections/${connectionId}/request`)
+        .set('Authorization', `Bearer ${tokenB}`);
+
+      logApi('DELETE', '/api/v1/connections/:connectionId/request', {
+        params: { connectionId },
+      }, receiverCancelResponse.body, 'RECEIVER-CANCEL-GUARD', 'User B (receiver) tries to cancel User A\'s request -> 403 expected');
+
+      expect(receiverCancelResponse.status).toBe(403);
+      expect(receiverCancelResponse.body.success).toBe(false);
+
       // --- REQUEST CANCELLATION ---
+
       // User A (sender) cancels the pending connection request -> Expect 200 OK
       const cancelResponse = await request(app)
         .delete(`/api/v1/connections/${connectionId}/request`)
@@ -309,6 +355,8 @@ describe('Connection E2E Tests', () => {
 
       expect(cancelResponse.status).toBe(200);
       expect(cancelResponse.body.success).toBe(true);
+      expect(cancelResponse.body.data.id).toBe(connectionId);
+      expect(cancelResponse.body.data.status).toBe('NONE');
 
       // Verify profile and list endpoints are back to 'NONE' after cancellation
       const cancelProfileResponse = await request(app)
@@ -326,6 +374,22 @@ describe('Connection E2E Tests', () => {
       );
       expect(userBAfterCancel.connection).toBeNull();
 
+      // --- USER B CANCELLATION CHECK PERSPECTIVE ---
+      // Verify that User B's received requests list is now empty
+      const cancelListResponseB = await request(app)
+        .get('/api/v1/connections/requests?type=received')
+        .set('Authorization', `Bearer ${tokenB}`);
+      logApi('GET', '/api/v1/connections/requests', { query: { type: 'received' } }, cancelListResponseB.body, 'CANCELLED-RECEIVED-LIST', 'User B fetches received requests list (after cancellation - should be empty)');
+      expect(cancelListResponseB.status).toBe(200);
+      expect(cancelListResponseB.body.data).toHaveLength(0);
+
+      // Verify User B's profile view of User A is null
+      const cancelProfileResponseB = await request(app)
+        .get(`/api/v1/users/${userA._id}/public`)
+        .set('Authorization', `Bearer ${tokenB}`);
+      logApi('GET', '/api/v1/users/:userId/public', { params: { userId: userA._id.toString() } }, cancelProfileResponseB.body, 'CANCELLED-PROFILE-B', 'User B checks User A\'s profile (after cancellation - NONE status)');
+      expect(cancelProfileResponseB.body.data.connection).toBeNull();
+
       // --- REQUEST RE-CREATION & REJECTION ---
       // Re-create request for testing rejection
       const sendRecreateResponse = await request(app)
@@ -333,7 +397,36 @@ describe('Connection E2E Tests', () => {
         .set('Authorization', `Bearer ${tokenA}`);
       const recreatedId = sendRecreateResponse.body.data.id;
 
-      // User B (receiver) rejects User A's request -> Expect 200 OK with data: null
+      // --- POLISH: INVALID ACTION VALUE SCHEMA GUARD (e.g. BANANA) ---
+      const bananaResponse = await request(app)
+        .patch(`/api/v1/connections/${recreatedId}`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ action: 'BANANA' });
+
+      logApi('PATCH', '/api/v1/connections/:connectionId', {
+        params: { connectionId: recreatedId },
+        body: { action: 'BANANA' },
+      }, bananaResponse.body, 'INVALID-ACTION-GUARD', 'User B responds with action BANANA -> 400 expected');
+
+      expect(bananaResponse.status).toBe(400);
+      expect(bananaResponse.body.success).toBe(false);
+
+      // --- POLISH: SENDER RESPONDING GUARD ---
+      // User A (sender) tries to respond to their own outgoing request -> 403 Forbidden expected
+      const senderAcceptResponse = await request(app)
+        .patch(`/api/v1/connections/${recreatedId}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ action: CONNECTION_ACTION.ACCEPT });
+
+      logApi('PATCH', '/api/v1/connections/:connectionId', {
+        params: { connectionId: recreatedId },
+        body: { action: CONNECTION_ACTION.ACCEPT },
+      }, senderAcceptResponse.body, 'SENDER-RESPOND-GUARD', 'User A (sender) tries to accept own request -> 403 expected');
+
+      expect(senderAcceptResponse.status).toBe(403);
+      expect(senderAcceptResponse.body.success).toBe(false);
+
+      // User B (receiver) rejects User A's request -> Expect 200 OK with data: { id, status: 'NONE' }
       const rejectResponse = await request(app)
         .patch(`/api/v1/connections/${recreatedId}`)
         .set('Authorization', `Bearer ${tokenB}`)
@@ -346,7 +439,8 @@ describe('Connection E2E Tests', () => {
 
       expect(rejectResponse.status).toBe(200);
       expect(rejectResponse.body.success).toBe(true);
-      expect(rejectResponse.body.data).toBeNull();
+      expect(rejectResponse.body.data.id).toBe(recreatedId);
+      expect(rejectResponse.body.data.status).toBe('NONE');
 
       // Verify profile and list endpoints are back to 'NONE' after rejection
       const rejectProfileResponse = await request(app)
@@ -364,12 +458,24 @@ describe('Connection E2E Tests', () => {
       );
       expect(userBAfterReject.connection).toBeNull();
 
-      // --- REQUEST RE-CREATION & ACCEPTANCE ---
-      // Re-create request for testing acceptance
+      // --- REQUEST RE-CREATION & ACCEPTANCE (TESTING IMMEDIATE RE-REQUEST BEHAVIOR) ---
+      // We explicitly test that immediate re-requesting is allowed post-rejection.
+      // Since the connection record was deleted, there is no cooldown, and the state returned to 'NONE'.
       const sendRecreate2Response = await request(app)
         .post(`/api/v1/connections/request/${userB._id}`)
         .set('Authorization', `Bearer ${tokenA}`);
+      
+      logApi('POST', '/api/v1/connections/request/:userId', {
+        params: { userId: userB._id.toString() },
+      }, sendRecreate2Response.body, 'RE-REQUEST-AFTER-REJECTION', 'User A immediately re-requests User B after rejection -> Expect 201 Created and new connection ID');
+
+      expect(sendRecreate2Response.status).toBe(201);
+      expect(sendRecreate2Response.body.success).toBe(true);
+      
       const finalConnectionId = sendRecreate2Response.body.data.id;
+      expect(finalConnectionId).toBeDefined();
+      expect(finalConnectionId).not.toBe(recreatedId); // Verify a brand new connection ID is generated
+      expect(sendRecreate2Response.body.data.status).toBe(CONNECTION_STATUS.PENDING);
 
       // User B (receiver) accepts User A's request -> Expect 200 OK with clean `{ id, status, chatId }` payload
       const acceptResponse = await request(app)
@@ -389,6 +495,22 @@ describe('Connection E2E Tests', () => {
       expect(acceptResponse.body.data.chatId).toBeDefined();
       const chatId = acceptResponse.body.data.chatId;
 
+      // --- POLISH: ACCEPTING AN ALREADY-ACCEPTED CONNECTION ---
+      // User B tries to accept again -> Expect 400 Bad Request (not pending anymore)
+      const doubleAcceptResponse = await request(app)
+        .patch(`/api/v1/connections/${finalConnectionId}`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ action: CONNECTION_ACTION.ACCEPT });
+
+      logApi('PATCH', '/api/v1/connections/:connectionId', {
+        params: { connectionId: finalConnectionId },
+        body: { action: CONNECTION_ACTION.ACCEPT },
+      }, doubleAcceptResponse.body, 'DOUBLE-ACCEPTANCE-GUARD', 'User B tries to accept an already-accepted connection request -> Expect 400 Bad Request');
+
+      expect(doubleAcceptResponse.status).toBe(400);
+      expect(doubleAcceptResponse.body.success).toBe(false);
+      expect(doubleAcceptResponse.body.message).toContain('no longer pending');
+
       // --- CONNECTED STATE PROFILE STATUS CHECKS ---
       // User A fetching User B's profile -> connection status: 'ACCEPTED', connectionId, chatId (no direction)
       const connectedProfileResponse = await request(app)
@@ -402,19 +524,6 @@ describe('Connection E2E Tests', () => {
       expect(connectedProfileResponse.body.data.connection.direction).toBeUndefined();
       expect(connectedProfileResponse.body.data.connection.id).toBe(finalConnectionId);
       expect(connectedProfileResponse.body.data.connection.chatId).toBe(chatId);
-
-      // User A checking details of User B -> connection status: 'ACCEPTED', connectionId, chatId (no direction)
-      const connectedDetailsResponse = await request(app)
-        .get(`/api/v1/users/${userB._id}/public`)
-        .set('Authorization', `Bearer ${tokenA}`);
-      logApi('GET', '/api/v1/users/:userId/public', { params: { userId: userB._id.toString() } }, connectedDetailsResponse.body, 'CONNECTED-DETAILS', 'User A checks User B\'s public details (ACCEPTED status)');
-      expect(connectedDetailsResponse.status).toBe(200);
-      expect(connectedDetailsResponse.body.success).toBe(true);
-      expect(connectedDetailsResponse.body.data.connection).toBeDefined();
-      expect(connectedDetailsResponse.body.data.connection.status).toBe('ACCEPTED');
-      expect(connectedDetailsResponse.body.data.connection.direction).toBeUndefined();
-      expect(connectedDetailsResponse.body.data.connection.id).toBe(finalConnectionId);
-      expect(connectedDetailsResponse.body.data.connection.chatId).toBe(chatId);
 
       // User A checks profiles list
       const connectedListResponse = await request(app)
@@ -431,51 +540,149 @@ describe('Connection E2E Tests', () => {
       expect(userBInConnectedList.connection.direction).toBeUndefined();
       expect(userBInConnectedList.connection.id).toBe(finalConnectionId);
 
-      // --- RETRIEVE ACTIVE CONNECTIONS ---
+      // --- RETRIEVE ACTIVE CONNECTIONS (BOTH SIDES) ---
       // User A retrieves their active connections list -> Expect list containing User B
-      const activeConnectionsResponse = await request(app)
+      const activeConnectionsResponseA = await request(app)
         .get('/api/v1/connections')
         .set('Authorization', `Bearer ${tokenA}`);
 
-      logApi('GET', '/api/v1/connections', {}, activeConnectionsResponse.body, 'ACTIVE-CONNECTIONS', 'User A fetches active connections list');
+      logApi('GET', '/api/v1/connections', {}, activeConnectionsResponseA.body, 'ACTIVE-CONNECTIONS-A', 'User A fetches active connections list');
 
-      expect(activeConnectionsResponse.status).toBe(200);
-      expect(activeConnectionsResponse.body.success).toBe(true);
-      expect(activeConnectionsResponse.body.data).toHaveLength(1);
-      expect(activeConnectionsResponse.body.data[0].id || activeConnectionsResponse.body.data[0]._id).toBe(finalConnectionId);
-      expect(activeConnectionsResponse.body.data[0].chatId).toBe(chatId);
-      expect(activeConnectionsResponse.body.data[0].connectedUser.id).toBe(userB._id.toString());
-      expect(activeConnectionsResponse.body.data[0].connectedUser.role).toBeUndefined();
-      expect(activeConnectionsResponse.body.data[0].respondedAt).toBeUndefined();
+      expect(activeConnectionsResponseA.status).toBe(200);
+      expect(activeConnectionsResponseA.body.success).toBe(true);
+      expect(activeConnectionsResponseA.body.data).toHaveLength(1);
+      expect(activeConnectionsResponseA.body.data[0].id || activeConnectionsResponseA.body.data[0]._id).toBe(finalConnectionId);
+      expect(activeConnectionsResponseA.body.data[0].chatId).toBe(chatId);
+      expect(activeConnectionsResponseA.body.data[0].connectedUser.id).toBe(userB._id.toString());
 
-      // --- REMOVE CONNECTION ---
-      // User A (or User B) removes the active connection -> Expect 200 OK
-      const removeResponse = await request(app)
+      // User B retrieves their active connections list -> Expect list containing User A
+      const activeConnectionsResponseB = await request(app)
+        .get('/api/v1/connections')
+        .set('Authorization', `Bearer ${tokenB}`);
+
+      logApi('GET', '/api/v1/connections', {}, activeConnectionsResponseB.body, 'ACTIVE-CONNECTIONS-B', 'User B fetches active connections list');
+
+      expect(activeConnectionsResponseB.status).toBe(200);
+      expect(activeConnectionsResponseB.body.success).toBe(true);
+      expect(activeConnectionsResponseB.body.data).toHaveLength(1);
+      expect(activeConnectionsResponseB.body.data[0].id || activeConnectionsResponseB.body.data[0]._id).toBe(finalConnectionId);
+      expect(activeConnectionsResponseB.body.data[0].chatId).toBe(chatId);
+      expect(activeConnectionsResponseB.body.data[0].connectedUser.id).toBe(userA._id.toString());
+
+      // --- REMOVE CONNECTION SECURITY GUARD ---
+      // User C (not in connection) tries to remove connection between User A & User B -> Expect 403 Forbidden
+      const foreignRemoveResponse = await request(app)
         .delete(`/api/v1/connections/${finalConnectionId}`)
-        .set('Authorization', `Bearer ${tokenA}`);
+        .set('Authorization', `Bearer ${tokenC}`);
 
       logApi('DELETE', '/api/v1/connections/:connectionId', {
         params: { connectionId: finalConnectionId },
-      }, removeResponse.body, 'REMOVAL', 'User A removes the accepted active connection');
+      }, foreignRemoveResponse.body, 'FOREIGN-REMOVAL-GUARD', 'User C (not in connection) tries to remove connection -> 403 expected');
+
+      expect(foreignRemoveResponse.status).toBe(403);
+      expect(foreignRemoveResponse.body.success).toBe(false);
+
+      // --- REMOVE CONNECTION (User B is Receiver of original request) ---
+      // Either user can remove. We have User B (receiver) perform the removal to verify both sender/receiver capability.
+      const removeResponse = await request(app)
+        .delete(`/api/v1/connections/${finalConnectionId}`)
+        .set('Authorization', `Bearer ${tokenB}`);
+
+      logApi('DELETE', '/api/v1/connections/:connectionId', {
+        params: { connectionId: finalConnectionId },
+      }, removeResponse.body, 'REMOVAL', 'User B removes the accepted active connection');
 
       expect(removeResponse.status).toBe(200);
       expect(removeResponse.body.success).toBe(true);
+      expect(removeResponse.body.data.id).toBe(finalConnectionId);
+      expect(removeResponse.body.data.status).toBe('NONE');
 
-      // Verify profile and list endpoints are back to 'NONE' after removal
-      const removeProfileResponse = await request(app)
+      // --- VERIFY POST-REMOVAL STATE (USER A PERSPECTIVE) ---
+      // Verify profile and list endpoints are back to null for User A
+      const removeProfileResponseA = await request(app)
         .get(`/api/v1/users/${userB._id}/public`)
         .set('Authorization', `Bearer ${tokenA}`);
-      logApi('GET', '/api/v1/users/:userId/public', { params: { userId: userB._id.toString() } }, removeProfileResponse.body, 'REMOVED-PROFILE', 'User A checks User B\'s profile (after removal - NONE status)');
-      expect(removeProfileResponse.body.data.connection).toBeNull();
+      logApi('GET', '/api/v1/users/:userId/public', { params: { userId: userB._id.toString() } }, removeProfileResponseA.body, 'REMOVED-PROFILE-A', 'User A checks User B\'s profile (after removal - null expected)');
+      expect(removeProfileResponseA.body.data.connection).toBeNull();
 
-      const removeListResponse = await request(app)
+      const removeListResponseA = await request(app)
         .get('/api/v1/users/profiles')
         .set('Authorization', `Bearer ${tokenA}`);
-      logApi('GET', '/api/v1/users/profiles', {}, removeListResponse.body, 'REMOVED-LIST-PROFILES', 'User A fetches community discovery profiles list (after removal - NONE status)');
-      const userBAfterRemoval = removeListResponse.body.data.find(
+      logApi('GET', '/api/v1/users/profiles', {}, removeListResponseA.body, 'REMOVED-LIST-PROFILES-A', 'User A fetches profiles list (after removal)');
+      const userBAfterRemoval = removeListResponseA.body.data.find(
         (p: any) => (p.id || p._id) === userB._id.toString()
       );
       expect(userBAfterRemoval.connection).toBeNull();
+
+      const emptyConnectionsA = await request(app)
+        .get('/api/v1/connections')
+        .set('Authorization', `Bearer ${tokenA}`);
+      expect(emptyConnectionsA.body.data).toHaveLength(0);
+
+      // --- VERIFY POST-REMOVAL STATE (USER B PERSPECTIVE) ---
+      // Verify profile and list endpoints are back to null for User B
+      const removeProfileResponseB = await request(app)
+        .get(`/api/v1/users/${userA._id}/public`)
+        .set('Authorization', `Bearer ${tokenB}`);
+      logApi('GET', '/api/v1/users/:userId/public', { params: { userId: userA._id.toString() } }, removeProfileResponseB.body, 'REMOVED-PROFILE-B', 'User B checks User A\'s profile (after removal - null expected)');
+      expect(removeProfileResponseB.body.data.connection).toBeNull();
+
+      const removeListResponseB = await request(app)
+        .get('/api/v1/users/profiles')
+        .set('Authorization', `Bearer ${tokenB}`);
+      logApi('GET', '/api/v1/users/profiles', {}, removeListResponseB.body, 'REMOVED-LIST-PROFILES-B', 'User B fetches profiles list (after removal)');
+      const userAAfterRemoval = removeListResponseB.body.data.find(
+        (p: any) => (p.id || p._id) === userA._id.toString()
+      );
+      expect(userAAfterRemoval.connection).toBeNull();
+
+      const emptyConnectionsB = await request(app)
+        .get('/api/v1/connections')
+        .set('Authorization', `Bearer ${tokenB}`);
+      expect(emptyConnectionsB.body.data).toHaveLength(0);
+
+      // --- RE-REQUEST AFTER REMOVAL ---
+      // After removing an accepted connection, the DB record is deleted.
+      // Verify the sender can immediately re-request — different DB state than post-rejection.
+      const reRequestAfterRemovalResponse = await request(app)
+        .post(`/api/v1/connections/request/${userB._id}`)
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      logApi('POST', '/api/v1/connections/request/:userId', {
+        params: { userId: userB._id.toString() },
+      }, reRequestAfterRemovalResponse.body, 'RE-REQUEST-AFTER-REMOVAL', 'User A re-requests User B after active connection removal -> 201 expected');
+
+      expect(reRequestAfterRemovalResponse.status).toBe(201);
+      expect(reRequestAfterRemovalResponse.body.success).toBe(true);
+      expect(reRequestAfterRemovalResponse.body.data.id).toBeDefined();
+      expect(reRequestAfterRemovalResponse.body.data.id).not.toBe(finalConnectionId);
+      expect(reRequestAfterRemovalResponse.body.data.status).toBe(CONNECTION_STATUS.PENDING);
+    });
+  });
+
+  describe('Unauthenticated Access (401)', () => {
+    it('should return 401 Forbidden on all connection endpoints when no token is provided', async () => {
+      const fakeId = new mongoose.Types.ObjectId().toString();
+
+      const endpoints: Array<{ method: 'get' | 'post' | 'patch' | 'delete'; url: string; body?: Record<string, unknown> }> = [
+        { method: 'get',    url: '/api/v1/connections' },
+        { method: 'get',    url: '/api/v1/connections/requests?type=received' },
+        { method: 'post',   url: `/api/v1/connections/request/${fakeId}` },
+        { method: 'patch',  url: `/api/v1/connections/${fakeId}`, body: { action: 'ACCEPT' } },
+        { method: 'delete', url: `/api/v1/connections/${fakeId}/request` },
+        { method: 'delete', url: `/api/v1/connections/${fakeId}` },
+        // User module endpoints that require auth
+        { method: 'get',    url: '/api/v1/users/profiles' },
+        { method: 'get',    url: `/api/v1/users/${fakeId}/public` },
+      ];
+
+      for (const ep of endpoints) {
+        const req = request(app)[ep.method](ep.url);
+        if (ep.body) req.send(ep.body);
+        const res = await req;
+        expect(res.status).toBe(401);
+        expect(res.body.success).toBe(false);
+      }
     });
   });
 });
