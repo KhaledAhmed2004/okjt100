@@ -12,6 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const mongoose_1 = __importDefault(require("mongoose"));
 const requestContext_1 = require("../logging/requestContext");
 const date_fns_1 = require("date-fns");
 const escape_string_regexp_1 = __importDefault(require("escape-string-regexp"));
@@ -465,6 +466,71 @@ class QueryBuilder {
                 totalPages,
                 hasNext: page < totalPages,
                 hasPrev: page > 1,
+            };
+        });
+    }
+    // 📄 Cursor-based Pagination
+    cursorPaginate() {
+        return __awaiter(this, arguments, void 0, function* (cursorField = '_id') {
+            var _a, _b, _c, _d, _e, _f, _g;
+            const limit = Math.min(Number((_a = this === null || this === void 0 ? void 0 : this.query) === null || _a === void 0 ? void 0 : _a.limit) || 10, 50);
+            const nextCursor = (_b = this === null || this === void 0 ? void 0 : this.query) === null || _b === void 0 ? void 0 : _b.nextCursor;
+            if (nextCursor) {
+                let decodedCursorValue = nextCursor;
+                try {
+                    decodedCursorValue = Buffer.from(nextCursor, 'base64').toString('ascii');
+                }
+                catch (e) {
+                    // Fallback if not valid base64
+                }
+                // Check if cursor value is a valid ObjectId (since default is _id)
+                if (cursorField === '_id' && mongoose_1.default.Types.ObjectId.isValid(decodedCursorValue)) {
+                    decodedCursorValue = new mongoose_1.default.Types.ObjectId(decodedCursorValue);
+                }
+                // Determine sort direction (default is descending / newest first)
+                let isDescending = true;
+                const sortOption = (_c = this.modelQuery.options) === null || _c === void 0 ? void 0 : _c.sort;
+                if (sortOption) {
+                    if (typeof sortOption === 'string') {
+                        isDescending = sortOption.startsWith('-');
+                    }
+                    else if (typeof sortOption === 'object') {
+                        const val = sortOption[cursorField];
+                        if (val === 1 || val === 'asc' || val === 'ascending') {
+                            isDescending = false;
+                        }
+                    }
+                }
+                else if (((_d = this === null || this === void 0 ? void 0 : this.query) === null || _d === void 0 ? void 0 : _d.sort) && typeof this.query.sort === 'string') {
+                    isDescending = this.query.sort.startsWith('-');
+                }
+                const operator = isDescending ? '$lt' : '$gt';
+                this.modelQuery = this.modelQuery.find({
+                    [cursorField]: { [operator]: decodedCursorValue },
+                });
+            }
+            // Fetch limit + 1 to check if there is a next page
+            this.modelQuery = this.modelQuery.limit(limit + 1);
+            const _start = Date.now();
+            const results = yield this.modelQuery;
+            const dur = Date.now() - _start;
+            const modelName = ((_e = this.modelQuery.model) === null || _e === void 0 ? void 0 : _e.modelName) || ((_g = (_f = this.modelQuery.model) === null || _f === void 0 ? void 0 : _f.collection) === null || _g === void 0 ? void 0 : _g.name);
+            (0, requestContext_1.recordDbQuery)(dur, { model: modelName, operation: 'find', cacheHit: false });
+            const hasMore = results.length > limit;
+            const data = hasMore ? results.slice(0, limit) : results;
+            let newCursor = null;
+            if (hasMore && data.length > 0) {
+                const lastItem = data[data.length - 1];
+                const lastValue = String(lastItem[cursorField]);
+                newCursor = Buffer.from(lastValue).toString('base64');
+            }
+            return {
+                data,
+                meta: {
+                    limit,
+                    nextCursor: newCursor,
+                    hasNext: hasMore,
+                },
             };
         });
     }

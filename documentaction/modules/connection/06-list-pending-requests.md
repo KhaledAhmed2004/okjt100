@@ -1,12 +1,12 @@
-# 06. List Pending Requests
+# 06. List Connection Requests
 
 ```http
-GET /connections/pending
+GET /connections/requests
 Auth: Bearer {{accessToken}} (BROTHER, SISTER)
 ```
 
 ## 1. Overview
-Fetches a paginated list of pending connection requests, either sent by the user or received by them.
+Fetches a cursor-paginated list of pending connection requests, either sent by the user (`type=sent`) or received by them (`type=received`).
 
 ---
 
@@ -14,7 +14,7 @@ Fetches a paginated list of pending connection requests, either sent by the user
 | Parameter | Description | Default | Example |
 | :--- | :--- | :--- | :--- |
 | `type` | Whether to fetch requests you `sent` or `received` | `received` | `sent` |
-| `page` | Pagination page number | `1` | `1` |
+| `nextCursor` | Base64 encoded cursor value of the last item from the previous page for cursor pagination | — | `NjY0YTFiMmMzZDRlNWY2YTdiOGM5ZDFh` |
 | `limit` | Pagination limit | `10` | `10` |
 | `sort` | Sort field (prefix with `-` for descending) | `-createdAt` | `-createdAt` |
 | `fields` | Comma-separated fields to select | — | `status,createdAt` |
@@ -23,24 +23,53 @@ Fetches a paginated list of pending connection requests, either sent by the user
 
 ## 3. Responses
 
-### Success (200)
+### Success (200) - Received Requests (`type=received`)
 ```json
 {
   "success": true,
   "statusCode": 200,
-  "message": "Pending requests retrieved successfully",
-  "meta": { ... },
+  "message": "Received connection requests fetched successfully",
+  "meta": {
+    "limit": 10,
+    "nextCursor": "NjY0YTFiMmMzZDRlNWY2YTdiOGM5ZDFh",
+    "hasNext": false
+  },
   "data": [
     {
-      "_id": "664a1b2c3d4e5f6a7b8c9d1a",
+      "connectionId": "664a1b2c3d4e5f6a7b8c9d1a",
       "sender": {
-        "_id": "664a1b2c3d4e5f6a7b8c9d1b",
+        "id": "664a1b2c3d4e5f6a7b8c9d1b",
         "name": "John Smith",
         "profileImage": "http://..."
       },
-      "receiver": "664a1b2c3d4e5f6a7b8c9d1c",
       "status": "PENDING",
       "createdAt": "2026-05-14T11:00:00.000Z"
+    }
+  ]
+}
+```
+
+### Success (200) - Sent Requests (`type=sent`)
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Sent connection requests fetched successfully",
+  "meta": {
+    "limit": 10,
+    "nextCursor": "NjY0YTFiMmMzZDRlNWY2YTdiOGM5ZDFj",
+    "hasNext": false
+  },
+  "data": [
+    {
+      "connectionId": "664a1b2c3d4e5f6a7b8c9d2f",
+      "receiver": {
+        "id": "664a1b2c3d4e5f6a7b8c9d1e",
+        "name": "Jane Doe",
+        "profileImage": "http://..."
+      },
+      "status": "PENDING",
+      "createdAt": "2026-05-14T11:05:00.000Z"
     }
   ]
 }

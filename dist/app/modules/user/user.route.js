@@ -37,7 +37,7 @@ router.post('/reverify', (0, rateLimit_1.rateLimitMiddleware)({
     { name: 'verificationVideo', maxCount: 1, subfolder: 'users/videos' },
 ], { maxFileSizeMB: 100 }), (0, validateRequest_1.default)(user_validation_1.UserValidation.reverifyAccountZodSchema), user_controller_1.UserController.reverifyAccount);
 // Public user details (Authenticated users only) — rate limited
-router.get('/:userId/user', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, rateLimit_1.rateLimitMiddleware)({
+router.get('/:userId/public', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN, user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, rateLimit_1.rateLimitMiddleware)({
     windowMs: 60000,
     max: 60,
     routeName: 'public-user-details',
@@ -81,7 +81,7 @@ router.get('/', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validate
 router.get('/metrics', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.getUserMetrics);
 // Review user (Approve/Reject)
 router.patch('/:userId/review', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(user_validation_1.UserValidation.updateUserReviewZodSchema), user_controller_1.UserController.updateUserReview);
-// Get specific user details by ID (Admin)
+// Get specific user details by ID (Admin Only)
 router.get('/:userId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), user_controller_1.UserController.getUserById);
 // Admin: Update any user (Update fields including role, status)
 router.patch('/:userId', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(user_validation_1.UserValidation.adminUpdateUserZodSchema), user_controller_1.UserController.adminUpdateUser);

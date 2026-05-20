@@ -162,8 +162,9 @@ const getAllUserRoles = catchAsync(async (req: Request, res: Response) => {
 
 const getUserById = catchAsync(async (req: Request, res: Response) => {
   const { userId } = req.params;
+  const requester = req.user as JwtPayload;
 
-  const result = await UserService.getUserByIdFromDB(userId);
+  const result = await UserService.getUserByIdFromDB(userId, requester);
 
   sendResponse(res, {
     success: true,

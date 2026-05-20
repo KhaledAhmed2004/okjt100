@@ -232,8 +232,11 @@ function newId() {
         (0, vitest_1.expect)(String(rawMsg === null || rawMsg === void 0 ? void 0 : rawMsg.sender)).toBe(userA.toString());
     }));
     /**
-     * Requirement 6.1 — cursor-based pagination: getHistory with a cursor only
-     * returns messages after that cursor.
+     * Requirement 6.1 / 13.1–13.3 — cursor-based pagination: getHistory with a
+     * compound cursor only returns messages after that cursor position.
+     *
+     * The cursor is obtained from the first page's nextCursor (compound base64
+     * format), not constructed manually.
      */
     (0, vitest_1.it)('getHistory with cursor returns only messages after the cursor timestamp', () => __awaiter(void 0, void 0, void 0, function* () {
         // ── Arrange ──────────────────────────────────────────────────────────────
@@ -248,9 +251,13 @@ function newId() {
             { chatId: chat._id, sender: userB, text: 'Msg 2', type: 'text', createdAt: new Date(base + 100) },
             { chatId: chat._id, sender: userA, text: 'Msg 3', type: 'text', createdAt: new Date(base + 200) },
         ]);
-        // Use the timestamp of Msg 1 as the cursor
-        const cursor = new Date(base).toISOString();
-        // ── Act ───────────────────────────────────────────────────────────────────
+        // Fetch the first page with limit=1 to get a valid compound cursor
+        const firstPage = yield message_service_1.MessageService.getHistory(chatId, userA.toString(), undefined, 1);
+        (0, vitest_1.expect)(firstPage.messages).toHaveLength(1);
+        (0, vitest_1.expect)(firstPage.messages[0].text).toBe('Msg 1');
+        (0, vitest_1.expect)(firstPage.pagination.nextCursor).not.toBeNull();
+        const cursor = firstPage.pagination.nextCursor;
+        // ── Act: fetch the next page using the compound cursor ────────────────────
         const history = yield message_service_1.MessageService.getHistory(chatId, userA.toString(), cursor);
         // ── Assert: only Msg 2 and Msg 3 are returned (strictly after cursor) ─────
         (0, vitest_1.expect)(history.messages).toHaveLength(2);

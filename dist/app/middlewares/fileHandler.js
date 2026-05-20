@@ -125,15 +125,34 @@ const formatBytes = (bytes) => {
     return `${value.toFixed(2)} ${sizes[i]}`;
 };
 const parseJsonData = (body) => {
-    if ((body === null || body === void 0 ? void 0 : body.data) && typeof body.data === 'string') {
+    let result = Object.assign({}, body);
+    // 1. Handle legacy "data" field wrapping
+    if (result.data && typeof result.data === 'string') {
         try {
-            return JSON.parse(body.data);
+            const parsed = JSON.parse(result.data);
+            result = Object.assign(Object.assign({}, result), parsed);
+            delete result.data;
         }
         catch (_a) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid JSON in "data" field');
         }
     }
-    return body;
+    // 2. Handle flattened fields that might be JSON strings (objects or arrays)
+    for (const key in result) {
+        if (typeof result[key] === 'string') {
+            const value = result[key].trim();
+            if ((value.startsWith('{') && value.endsWith('}')) ||
+                (value.startsWith('[') && value.endsWith(']'))) {
+                try {
+                    result[key] = JSON.parse(value);
+                }
+                catch (e) {
+                    // If parsing fails, it's just a regular string, so we keep it as is
+                }
+            }
+        }
+    }
+    return result;
 };
 const getFolderByMime = (mime) => {
     if (mime.startsWith('image/'))

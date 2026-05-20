@@ -142,7 +142,8 @@ const getAllUserRoles = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
 }));
 const getUserById = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { userId } = req.params;
-    const result = yield user_service_1.UserService.getUserByIdFromDB(userId);
+    const requester = req.user;
+    const result = yield user_service_1.UserService.getUserByIdFromDB(userId, requester);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,

@@ -9,7 +9,6 @@ const auth_1 = __importDefault(require("../../middlewares/auth"));
 const user_1 = require("../../../enums/user");
 const admin_controller_1 = require("./admin.controller");
 const router = express_1.default.Router();
-// --- Dashboard Metrics ---
 router.get('/growth-metrics', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getDashboardStats);
 router.get('/recent-activities', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), admin_controller_1.AdminController.getRecentActivities);
 exports.AdminRoutes = router;

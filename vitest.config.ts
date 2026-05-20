@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import PremiumReporter from './vitest-custom-reporter';
 
 export default defineConfig({
   test: {
@@ -8,5 +9,7 @@ export default defineConfig({
     exclude: ['**/node_modules/**', '**/dist/**'],
     testTimeout: 30000,
     passWithNoTests: true,
+    reporters: ['default', new PremiumReporter()],
   },
 });
+

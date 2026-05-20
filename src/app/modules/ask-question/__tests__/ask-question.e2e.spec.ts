@@ -129,6 +129,7 @@ describe('AskQuestion E2E Tests', () => {
       const { user, token } = await createAuthUser();
       await AskQuestion.create({
         userId: user._id,
+        userRole: user.role as 'BROTHER' | 'SISTER',
         question: 'My test question',
       });
 
@@ -151,6 +152,7 @@ describe('AskQuestion E2E Tests', () => {
       
       await AskQuestion.create({
         userId: userB.user._id,
+        userRole: userB.user.role as 'BROTHER' | 'SISTER',
         question: 'Question from User B',
       });
 
@@ -180,6 +182,7 @@ describe('AskQuestion E2E Tests', () => {
       const userB = await createAuthUser(USER_ROLES.BROTHER);
       const question = await AskQuestion.create({
         userId: userB.user._id,
+        userRole: userB.user.role as 'BROTHER' | 'SISTER',
         question: 'Please answer this',
       });
 

@@ -49,6 +49,7 @@ const getAllMosquesFromDB = (query) => __awaiter(void 0, void 0, void 0, functio
             { mosqueName: { $regex: searchTerm, $options: 'i' } },
             { area: { $regex: searchTerm, $options: 'i' } },
             { address: { $regex: searchTerm, $options: 'i' } },
+            { description: { $regex: searchTerm, $options: 'i' } },
         ];
     }
     const skip = (Number(page) - 1) * Number(limit);
@@ -84,12 +85,28 @@ const getAllMosquesFromDB = (query) => __awaiter(void 0, void 0, void 0, functio
     // 2. Projection (Flatten for UI)
     pipeline.push({
         $project: {
+            _id: 1,
+            id: '$_id',
             mosqueName: 1,
             address: 1,
             area: 1,
+            phoneNumber: { $ifNull: ['$phoneNumber', ''] },
+            website: { $ifNull: ['$website', ''] },
+            description: { $ifNull: ['$description', ''] },
+            image: { $ifNull: ['$image', ''] },
             prayerTimes: 1,
             distanceInKm: 1,
             updatedAt: 1,
+            latitude: { $ifNull: [{ $arrayElemAt: ['$location.coordinates', 1] }, 0] },
+            longitude: { $ifNull: [{ $arrayElemAt: ['$location.coordinates', 0] }, 0] },
+            mapLink: {
+                $concat: [
+                    'https://www.google.com/maps/search/?api=1&query=',
+                    { $toString: { $ifNull: [{ $arrayElemAt: ['$location.coordinates', 1] }, 0] } },
+                    ',',
+                    { $toString: { $ifNull: [{ $arrayElemAt: ['$location.coordinates', 0] }, 0] } },
+                ],
+            },
         },
     });
     // 3. Pagination
@@ -118,11 +135,25 @@ const getSingleMosqueFromDB = (id) => __awaiter(void 0, void 0, void 0, function
     if (!result) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Mosque not found');
     }
+    // Ensure fields exist for consistency
+    result.id = result._id;
+    result.phoneNumber = result.phoneNumber || '';
+    result.website = result.website || '';
+    result.description = result.description || '';
+    result.image = result.image || '';
     // Flatten location for consistency with list API
     if (result.location && result.location.coordinates) {
-        result.latitude = result.location.coordinates[1];
-        result.longitude = result.location.coordinates[0];
+        const latitude = result.location.coordinates[1];
+        const longitude = result.location.coordinates[0];
+        result.latitude = latitude;
+        result.longitude = longitude;
+        result.mapLink = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
         delete result.location;
+    }
+    else {
+        result.latitude = 0;
+        result.longitude = 0;
+        result.mapLink = `https://www.google.com/maps/search/?api=1&query=0,0`;
     }
     return result;
 });

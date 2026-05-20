@@ -18,155 +18,11 @@ const chat_model_1 = require("../chat/chat.model");
 const mongoose_1 = __importDefault(require("mongoose"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const http_status_codes_1 = require("http-status-codes");
-const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
-const presenceHelper_1 = require("../../helpers/presenceHelper");
 const unreadHelper_1 = require("../../helpers/unreadHelper");
 const notificationsHelper_1 = require("../notification/notificationsHelper");
 const socketManager_1 = require("../../../helpers/socketManager");
 const redisClient_1 = require("../../../shared/redisClient");
 const logger_1 = require("../../../shared/logger");
-const sendMessageToDB = (payload) => __awaiter(void 0, void 0, void 0, function* () {
-    // Ensure attachments is always an array
-    if (!Array.isArray(payload.attachments)) {
-        payload.attachments = [];
-    }
-    // Authorization: sender must be a participant of the chat
-    const isParticipant = yield chat_model_1.Chat.exists({
-        _id: payload === null || payload === void 0 ? void 0 : payload.chatId,
-        participants: payload === null || payload === void 0 ? void 0 : payload.sender,
-    });
-    if (!isParticipant) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not a participant of this chat');
-    }
-    // save to DB
-    const response = yield message_model_1.Message.create(payload);
-    // Populate sender for the socket event
-    const populatedMessage = yield message_model_1.Message.findById(response._id)
-        .populate('sender', '_id name profilePicture')
-        .lean();
-    //@ts-ignore
-    const io = global.io;
-    // Fetch chat participants for socket emit and notifications
-    const chat = yield chat_model_1.Chat.findById(response.chatId).select('participants');
-    const participants = ((chat === null || chat === void 0 ? void 0 : chat.participants) || [])
-        .map(p => String(p))
-        .filter(Boolean);
-    const receivers = participants.filter(p => String(p) !== String(response.sender));
-    if (io && populatedMessage) {
-        // Ensure chatId is a string for frontend matching
-        const chatIdStr = String(payload === null || payload === void 0 ? void 0 : payload.chatId);
-        const messagePayload = {
-            message: Object.assign(Object.assign({}, populatedMessage), { chatId: chatIdStr }),
-        };
-        // Emit to chat room for participants who have joined
-        io.to(`chat::${chatIdStr}`).emit('MESSAGE_SENT', messagePayload);
-        // Also emit to each participant's user room to ensure delivery
-        // even if they haven't joined the chat room yet (e.g., just opened the page)
-        for (const participantId of participants) {
-            io.to(`user::${participantId}`).emit('MESSAGE_SENT', messagePayload);
-        }
-    }
-    // Offline notification triggers
-    try {
-        // Increment unread count for receivers
-        for (const receiverId of receivers) {
-            try {
-                yield (0, unreadHelper_1.incrementUnreadCount)(String(response.chatId), String(receiverId), 1);
-            }
-            catch (_a) { }
-        }
-        for (const receiverId of receivers) {
-            const online = yield (0, presenceHelper_1.isOnline)(receiverId);
-            if (!online) {
-                const preview = response.text || 'New message';
-                yield (0, notificationsHelper_1.sendNotifications)({
-                    title: 'New Message',
-                    text: preview,
-                    receiver: new mongoose_1.default.Types.ObjectId(receiverId),
-                    isRead: false,
-                    type: 'SYSTEM',
-                    referenceId: response._id,
-                });
-            }
-        }
-    }
-    catch (err) {
-        // Swallow notification errors to not block messaging
-    }
-    return response;
-});
-const getMessageFromDB = (user, id, query) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!mongoose_1.default.Types.ObjectId.isValid(id)) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid Chat ID');
-    }
-    const queryBuilder = new QueryBuilder_1.default(message_model_1.Message.find({ chatId: id }), // sender auto-populated via pre-hook
-    query)
-        .search(['text'])
-        .filter()
-        .sort()
-        .paginate()
-        .fields();
-    // Fetch messages
-    let messages = yield queryBuilder.modelQuery;
-    // Explicitly sort by createdAt ASC for predictable ordering
-    messages = messages.sort((a, b) => new Date(a === null || a === void 0 ? void 0 : a.createdAt).getTime() -
-        new Date(b === null || b === void 0 ? void 0 : b.createdAt).getTime());
-    // Get pagination info
-    const pagination = yield queryBuilder.getPaginationInfo();
-    // Fetch the chat participant (exclude the logged-in user)
-    const chat = yield chat_model_1.Chat.findById(id).populate({
-        path: 'participants',
-        select: 'name profile location',
-        match: { _id: { $ne: user.id } },
-    });
-    const participant = (chat === null || chat === void 0 ? void 0 : chat.participants[0]) || null;
-    return {
-        messages,
-        pagination,
-        participant,
-    };
-});
-const markAsDelivered = (messageId, userId) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!mongoose_1.default.Types.ObjectId.isValid(messageId)) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid Message ID');
-    }
-    const updated = yield message_model_1.Message.findByIdAndUpdate(messageId, { $addToSet: { deliveredTo: userId } }, { new: true });
-    return updated;
-});
-const markChatAsRead = (chatId, userId) => __awaiter(void 0, void 0, void 0, function* () {
-    if (!mongoose_1.default.Types.ObjectId.isValid(chatId)) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid Chat ID');
-    }
-    // Find messages that will be marked as read
-    const toUpdate = yield message_model_1.Message.find({
-        chatId,
-        sender: { $ne: userId },
-        readBy: { $ne: userId },
-    }).select('_id chatId');
-    if (!toUpdate.length) {
-        return { modifiedCount: 0, updatedIds: [] };
-    }
-    // Mark them as read for this user
-    yield message_model_1.Message.updateMany({ _id: { $in: toUpdate.map(m => m._id) } }, { $addToSet: { readBy: userId } });
-    // Emit real-time MESSAGE_READ for each updated message to the chat room
-    // @ts-ignore
-    const io = global.io;
-    if (io) {
-        for (const msg of toUpdate) {
-            io.to(`chat::${String(chatId)}`).emit('MESSAGE_READ', {
-                messageId: String(msg._id),
-                chatId: String(chatId),
-                userId,
-            });
-        }
-    }
-    // Reset unread count cache for this user on this chat
-    try {
-        yield (0, unreadHelper_1.setUnreadCount)(String(chatId), String(userId), 0);
-    }
-    catch (_a) { }
-    return { modifiedCount: toUpdate.length, updatedIds: toUpdate.map(m => String(m._id)) };
-});
 const getUnreadCount = (chatId, userId) => __awaiter(void 0, void 0, void 0, function* () {
     const count = yield message_model_1.Message.countDocuments({
         chatId,
@@ -233,11 +89,11 @@ const send = (chatId, senderId, payload) => __awaiter(void 0, void 0, void 0, fu
     // propagated — the saved message is always returned regardless.
     // Determine the receiver: the participant whose ID is NOT senderId (Req 5.7)
     const receiverId = (_c = participantIds.find(id => id !== String(senderId))) !== null && _c !== void 0 ? _c : null;
-    // Side-effect 1: Emit MESSAGE_SENT to the chat room (Req 5.6)
+    // Side-effect 1: Emit MESSAGE_SENT to the chat room only (Req 4).
+    // Clients not yet in the chat room are notified via CHAT_UPDATED (user room).
     try {
-        socketManager_1.SocketManager.getIO()
-            .to(`chat::${chatId}`)
-            .emit('MESSAGE_SENT', { message: populatedMessage });
+        const io = socketManager_1.SocketManager.getIO();
+        io.to(`chat::${chatId}`).emit('MESSAGE_SENT', { message: populatedMessage });
     }
     catch (err) {
         logger_1.errorLogger.error(`[send] Failed to emit MESSAGE_SENT for chat ${chatId}: ${err}`);
@@ -299,40 +155,68 @@ const send = (chatId, senderId, payload) => __awaiter(void 0, void 0, void 0, fu
     }
     return populatedMessage;
 });
+// Req 13.1 — encode compound cursor as base64("{ts}_{id}")
+const encodeCursor = (createdAt, id) => Buffer.from(`${createdAt.toISOString()}_${id}`).toString('base64');
+// Req 13.4 — decode compound cursor; throw ApiError 400 on any parse failure
+const decodeCursor = (cursor) => {
+    let decoded;
+    try {
+        decoded = Buffer.from(cursor, 'base64').toString('utf8');
+    }
+    catch (_a) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid cursor');
+    }
+    const underscoreIdx = decoded.indexOf('_');
+    if (underscoreIdx === -1) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid cursor');
+    }
+    const tsStr = decoded.slice(0, underscoreIdx);
+    const id = decoded.slice(underscoreIdx + 1);
+    const ts = new Date(tsStr);
+    if (isNaN(ts.getTime()) || !mongoose_1.default.Types.ObjectId.isValid(id)) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid cursor');
+    }
+    return { ts, id };
+};
 const getHistory = (chatId, userId, cursor, limit) => __awaiter(void 0, void 0, void 0, function* () {
     // Req 6.6 — validate chatId
     if (!mongoose_1.default.Types.ObjectId.isValid(chatId)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid chatId');
     }
-    // Req 6.7 — validate userId
+    // Req 6.7 / 19.2 — validate userId (used in participant check below, not discarded)
     if (!mongoose_1.default.Types.ObjectId.isValid(userId)) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'Invalid userId');
     }
+    // Req 6.1 / 19.1 — participant authorization check
+    const isParticipant = yield chat_model_1.Chat.exists({ _id: chatId, participants: userId });
+    if (!isParticipant) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not a participant of this chat');
+    }
     // Req 6.2 — clamp limit to 1–100, default 20
     const clampedLimit = Math.min(100, Math.max(1, typeof limit === 'number' && Number.isFinite(limit) ? Math.floor(limit) : 20));
-    // Req 6.1 / 6.3 — build base query; add cursor filter when provided
+    // Req 13.2 — build base query; add compound cursor filter when provided
     const query = { chatId };
     if (cursor) {
-        const cursorDate = new Date(cursor);
-        if (!isNaN(cursorDate.getTime())) {
-            query.createdAt = { $gt: cursorDate };
-        }
+        const { ts, id } = decodeCursor(cursor);
+        query.$or = [
+            { createdAt: { $gt: ts } },
+            { createdAt: ts, _id: { $gt: new mongoose_1.default.Types.ObjectId(id) } },
+        ];
     }
     // Req 6.5 — total matching messages (with cursor filter applied)
     const total = yield message_model_1.Message.countDocuments(query);
-    // Req 6.1, 6.4 — fetch page, sort ascending, populate sender explicitly
+    // Req 6.1, 6.4 — fetch page, sort ascending by (createdAt, _id), populate sender explicitly
     const messages = yield message_model_1.Message.find(query)
-        .sort({ createdAt: 1 })
+        .sort({ createdAt: 1, _id: 1 })
         .limit(clampedLimit)
         .populate('sender', '_id name profilePicture')
         .lean();
     // Req 6.5 — hasNextPage: true if more messages exist after this page
     const hasNextPage = messages.length === clampedLimit && messages.length < total;
-    // Req 6.5 — nextCursor: ISO 8601 timestamp of last returned message, or null
-    const nextCursor = hasNextPage && messages.length > 0
-        ? messages[messages.length - 1].createdAt instanceof Date
-            ? messages[messages.length - 1].createdAt.toISOString()
-            : new Date(messages[messages.length - 1].createdAt).toISOString()
+    // Req 13.3 — nextCursor: compound cursor from last message, or null
+    const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+    const nextCursor = hasNextPage && lastMsg
+        ? encodeCursor(new Date(lastMsg.createdAt), String(lastMsg._id))
         : null;
     return {
         messages: messages,
@@ -401,11 +285,7 @@ const markRead = (chatId, userId) => __awaiter(void 0, void 0, void 0, function*
 });
 exports.MessageService = {
     send,
-    sendMessageToDB,
-    getMessageFromDB,
-    markAsDelivered,
-    markChatAsRead,
-    getUnreadCount,
     getHistory,
     markRead,
+    getUnreadCount,
 };

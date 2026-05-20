@@ -86,7 +86,7 @@ const getPendingConnectionRequests = catchAsync(async (req: Request, res: Respon
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: 'Pending requests retrieved successfully',
+    message: type === 'sent' ? 'Sent connection requests fetched successfully' : 'Received connection requests fetched successfully',
     data: result.data,
     meta: result.pagination,
   });

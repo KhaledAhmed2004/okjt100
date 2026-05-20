@@ -20,7 +20,9 @@ exports.redisClient = new ioredis_1.default(config_1.default.redis_url, {
     // Suppress unhandled-error events — callers catch errors at the call site
     lazyConnect: false,
     enableOfflineQueue: true,
-    maxRetriesPerRequest: null, // let ioredis retry indefinitely in the background
+    connectTimeout: 5000,
+    commandTimeout: 2000, // 2s timeout for any command to prevent hanging requests
+    maxRetriesPerRequest: 3, // Retry a few times then fail if Redis is down
 });
 exports.redisClient.on('error', () => {
     // Intentionally left minimal: connection errors are logged by callers.

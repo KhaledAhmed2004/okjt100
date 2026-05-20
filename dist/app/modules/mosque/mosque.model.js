@@ -7,6 +7,8 @@ const MosqueSchema = new mongoose_1.Schema({
     area: { type: String, required: true },
     phoneNumber: { type: String, required: true },
     website: { type: String },
+    description: { type: String },
+    image: { type: String },
     location: {
         type: { type: String, enum: ['Point'], default: 'Point', required: true },
         coordinates: { type: [Number], required: true }, // [longitude, latitude]
@@ -23,7 +25,7 @@ const MosqueSchema = new mongoose_1.Schema({
     timestamps: true,
 });
 // Indexes for search and filtering
-MosqueSchema.index({ mosqueName: 'text', area: 'text', address: 'text' });
+MosqueSchema.index({ mosqueName: 'text', area: 'text', address: 'text', description: 'text' });
 MosqueSchema.index({ area: 1 });
 MosqueSchema.index({ 'location.coordinates': '2dsphere' });
 const Mosque = (0, mongoose_1.model)('Mosque', MosqueSchema);

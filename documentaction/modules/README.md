@@ -105,6 +105,7 @@ Returned by Zod when request body / query / params fail schema validation. Inclu
 | 9 | **Subscription** | Get current user's subscription (free users get `plan: "FREE"`, never 404). IAP receipt verification. | [subscription/README.md](./subscription/README.md) |
 | 10 | **Admin** | Dashboard analytics: growth metrics, monthly preference-card trend, monthly active-subscriptions trend (with YoY). | [admin/README.md](./admin/README.md) |
 | 11 | **Pending Email** | Admin-only ops endpoints for the durable email retry queue (list / requeue / stats). Backs every transactional email — see [system-concepts.md — Email Delivery & Retry Queue](../system-concepts.md#email-delivery--retry-queue). | [pending-email/README.md](./pending-email/README.md) |
+| 12 | **Prayer Time** | Dynamic calculation of daily Salat times and Friday Jummah timings based on location and timezone completely offline. | [prayer-time/README.md](./prayer-time/README.md) |
 
 ---
 

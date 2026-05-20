@@ -54,7 +54,7 @@ router.post(
 
 // Public user details (Authenticated users only) — rate limited
 router.get(
-  '/:userId/user',
+  '/:userId/public',
   auth(USER_ROLES.SUPER_ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER),
   rateLimitMiddleware({
     windowMs: 60_000,
@@ -184,7 +184,7 @@ router.patch(
   UserController.updateUserReview,
 );
 
-// Get specific user details by ID (Admin)
+// Get specific user details by ID (Admin Only)
 router.get(
   '/:userId',
   auth(USER_ROLES.SUPER_ADMIN),

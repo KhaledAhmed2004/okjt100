@@ -17,10 +17,10 @@ const http_status_codes_1 = require("http-status-codes");
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const connection_service_1 = require("./connection.service");
-const sendRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const sendConnectionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const senderId = req.user.id;
     const receiverId = req.params.userId;
-    const result = yield connection_service_1.ConnectionService.sendRequest(senderId, receiverId);
+    const result = yield connection_service_1.ConnectionService.sendConnectionRequest(senderId, receiverId);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_codes_1.StatusCodes.CREATED,
         success: true,
@@ -28,11 +28,11 @@ const sendRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
         data: result,
     });
 }));
-const respondToRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const respondToConnectionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const userId = req.user.id;
     const connectionId = req.params.connectionId;
     const action = req.body.action;
-    const result = yield connection_service_1.ConnectionService.respondToRequest(connectionId, userId, action);
+    const result = yield connection_service_1.ConnectionService.respondToConnectionRequest(connectionId, userId, action);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_codes_1.StatusCodes.OK,
         success: true,
@@ -40,10 +40,10 @@ const respondToRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 
         data: result,
     });
 }));
-const cancelRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const cancelConnectionRequest = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const userId = req.user.id;
     const connectionId = req.params.connectionId;
-    yield connection_service_1.ConnectionService.cancelRequest(connectionId, userId);
+    yield connection_service_1.ConnectionService.cancelConnectionRequest(connectionId, userId);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_codes_1.StatusCodes.OK,
         success: true,
@@ -71,14 +71,17 @@ const getMyConnections = (0, catchAsync_1.default)((req, res) => __awaiter(void 
         meta: result.pagination,
     });
 }));
-const getPendingRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+const getPendingConnectionRequests = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const userId = req.user.id;
     const type = req.query.type || 'received';
-    const result = yield connection_service_1.ConnectionService.getPendingRequests(userId, type, req.query);
+    // Clone query and remove 'type' so QueryBuilder doesn't try to filter the DB by it
+    const queryObj = Object.assign({}, req.query);
+    delete queryObj.type;
+    const result = yield connection_service_1.ConnectionService.getPendingConnectionRequests(userId, type, queryObj);
     (0, sendResponse_1.default)(res, {
         statusCode: http_status_codes_1.StatusCodes.OK,
         success: true,
-        message: 'Pending requests retrieved successfully',
+        message: type === 'sent' ? 'Sent connection requests fetched successfully' : 'Received connection requests fetched successfully',
         data: result.data,
         meta: result.pagination,
     });
@@ -95,11 +98,11 @@ const getConnectionStatus = (0, catchAsync_1.default)((req, res) => __awaiter(vo
     });
 }));
 exports.ConnectionController = {
-    sendRequest,
-    respondToRequest,
-    cancelRequest,
+    sendConnectionRequest,
+    respondToConnectionRequest,
+    cancelConnectionRequest,
     removeConnection,
     getMyConnections,
-    getPendingRequests,
+    getPendingConnectionRequests,
     getConnectionStatus,
 };

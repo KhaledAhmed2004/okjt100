@@ -17,7 +17,14 @@ const http_status_codes_1 = require("http-status-codes");
 const catchAsync_1 = __importDefault(require("../../../shared/catchAsync"));
 const sendResponse_1 = __importDefault(require("../../../shared/sendResponse"));
 const mosque_service_1 = require("./mosque.service");
+const getFilePath_1 = require("../../../shared/getFilePath");
 const createMosque = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    if (req.files) {
+        const image = (0, getFilePath_1.getSingleFilePath)(req.files, 'image');
+        if (image) {
+            req.body.image = image;
+        }
+    }
     const result = yield mosque_service_1.MosqueService.createMosqueIntoDB(req.body);
     (0, sendResponse_1.default)(res, {
         success: true,
@@ -48,6 +55,12 @@ const getSingleMosque = (0, catchAsync_1.default)((req, res) => __awaiter(void 0
 }));
 const updateMosque = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const { mosqueId } = req.params;
+    if (req.files) {
+        const image = (0, getFilePath_1.getSingleFilePath)(req.files, 'image');
+        if (image) {
+            req.body.image = image;
+        }
+    }
     const result = yield mosque_service_1.MosqueService.updateMosqueIntoDB(mosqueId, req.body);
     (0, sendResponse_1.default)(res, {
         success: true,

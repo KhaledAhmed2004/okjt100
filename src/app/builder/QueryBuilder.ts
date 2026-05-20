@@ -1,4 +1,4 @@
-import { FilterQuery, Query } from 'mongoose';
+import mongoose, { FilterQuery, Query } from 'mongoose';
 import { recordDbQuery } from '../logging/requestContext';
 import { startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import escapeRegex from 'escape-string-regexp';
@@ -532,6 +532,76 @@ class QueryBuilder<T> {
       totalPages,
       hasNext: page < totalPages,
       hasPrev: page > 1,
+    };
+  }
+
+  // 📄 Cursor-based Pagination
+  async cursorPaginate(cursorField: string = '_id') {
+    const limit = Math.min(Number(this?.query?.limit) || 10, 50);
+    const nextCursor = this?.query?.nextCursor as string | undefined;
+
+    if (nextCursor) {
+      let decodedCursorValue: any = nextCursor;
+      try {
+        decodedCursorValue = Buffer.from(nextCursor, 'base64').toString('ascii');
+      } catch (e) {
+        // Fallback if not valid base64
+      }
+
+      // Check if cursor value is a valid ObjectId (since default is _id)
+      if (cursorField === '_id' && mongoose.Types.ObjectId.isValid(decodedCursorValue)) {
+        decodedCursorValue = new mongoose.Types.ObjectId(decodedCursorValue);
+      }
+
+      // Determine sort direction (default is descending / newest first)
+      let isDescending = true;
+      const sortOption = (this.modelQuery as any).options?.sort;
+      if (sortOption) {
+        if (typeof sortOption === 'string') {
+          isDescending = sortOption.startsWith('-');
+        } else if (typeof sortOption === 'object') {
+          const val = sortOption[cursorField];
+          if (val === 1 || val === 'asc' || val === 'ascending') {
+            isDescending = false;
+          }
+        }
+      } else if (this?.query?.sort && typeof this.query.sort === 'string') {
+        isDescending = this.query.sort.startsWith('-');
+      }
+
+      const operator = isDescending ? '$lt' : '$gt';
+
+      this.modelQuery = this.modelQuery.find({
+        [cursorField]: { [operator]: decodedCursorValue },
+      } as FilterQuery<T>);
+    }
+
+    // Fetch limit + 1 to check if there is a next page
+    this.modelQuery = this.modelQuery.limit(limit + 1);
+
+    const _start = Date.now();
+    const results = await this.modelQuery;
+    const dur = Date.now() - _start;
+    const modelName = (this.modelQuery.model as any)?.modelName || (this.modelQuery.model as any)?.collection?.name;
+    recordDbQuery(dur, { model: modelName, operation: 'find', cacheHit: false });
+
+    const hasMore = results.length > limit;
+    const data = hasMore ? results.slice(0, limit) : results;
+
+    let newCursor: string | null = null;
+    if (hasMore && data.length > 0) {
+      const lastItem = data[data.length - 1] as any;
+      const lastValue = String(lastItem[cursorField]);
+      newCursor = Buffer.from(lastValue).toString('base64');
+    }
+
+    return {
+      data,
+      meta: {
+        limit,
+        nextCursor: newCursor,
+        hasNext: hasMore,
+      },
     };
   }
 }

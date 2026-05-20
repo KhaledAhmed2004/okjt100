@@ -57,6 +57,7 @@ const authHelpers_1 = require("../../../helpers/authHelpers");
 const unlinkFile_1 = __importDefault(require("../../../shared/unlinkFile"));
 const generateOTP_1 = __importDefault(require("../../../util/generateOTP"));
 const user_model_1 = require("./user.model");
+const connection_model_1 = require("../connection/connection.model");
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const AggregationBuilder_1 = __importDefault(require("../../builder/AggregationBuilder"));
 const auth_constants_1 = require("../../../config/auth.constants");
@@ -283,9 +284,9 @@ const getAllUserRolesFromDB = (query) => __awaiter(void 0, void 0, void 0, funct
     };
 });
 const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const { searchTerm, page = 1, limit = 10, latitude, longitude, filter, // 'new-reverts' or 'nearby-me'
+    const { searchTerm, limit: rawLimit = 10, nextCursor, latitude, longitude, filter, // 'new-reverts' or 'nearby-me'
      } = query;
+    const limit = Math.min(Number(rawLimit) || 10, 50);
     // Enforce same-role discovery and ACTIVE status only
     const match = {
         role: user.role,
@@ -298,7 +299,20 @@ const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0,
             { name: { $regex: searchTerm, $options: 'i' } },
         ];
     }
-    const skip = (Number(page) - 1) * Number(limit);
+    // Cursor-based pagination: decode cursor and add _id filter
+    if (nextCursor && typeof nextCursor === 'string') {
+        let decodedCursorValue = nextCursor;
+        try {
+            decodedCursorValue = Buffer.from(nextCursor, 'base64').toString('ascii');
+        }
+        catch (e) {
+            // Fallback if not valid base64
+        }
+        if (mongoose_1.Types.ObjectId.isValid(decodedCursorValue)) {
+            // Default sort is descending (newest first), so we need $lt for next page
+            match._id = Object.assign(Object.assign({}, match._id), { $lt: new mongoose_1.Types.ObjectId(decodedCursorValue) });
+        }
+    }
     const pipeline = [];
     // 1. Proximity Search & Sorting Logic
     if (latitude && longitude) {
@@ -321,12 +335,12 @@ const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0,
         }
         else {
             pipeline.push({ $match: match });
-            pipeline.push({ $sort: { createdAt: -1 } });
+            pipeline.push({ $sort: { _id: -1 } });
         }
     }
     else {
         pipeline.push({ $match: match });
-        pipeline.push({ $sort: { createdAt: -1 } });
+        pipeline.push({ $sort: { _id: -1 } });
     }
     // 2. Projection & Derived Fields
     pipeline.push({
@@ -373,15 +387,16 @@ const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0,
                         },
                     },
                 },
-                { $project: { _id: 1, status: 1 } },
+                { $project: { _id: 1, status: 1, sender: 1 } },
             ],
             as: 'connectionInfo',
         },
     });
     // 4. Set connectionStatus using the exact Connection model enum values:
-    //    NONE     → no connection document exists
-    //    PENDING  → connection document exists with status 'PENDING'
-    //    ACCEPTED → connection document exists with status 'ACCEPTED'
+    //    NONE             → no connection document exists
+    //    PENDING_SENT     → connection document exists with status 'PENDING' and requester is sender
+    //    PENDING_RECEIVED → connection document exists with status 'PENDING' and requester is receiver
+    //    CONNECTED        → connection document exists with status 'ACCEPTED'
     pipeline.push({
         $addFields: {
             connectionStatus: {
@@ -391,7 +406,19 @@ const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0,
                         $cond: {
                             if: { $not: ['$$conn'] },
                             then: 'NONE',
-                            else: '$$conn.status',
+                            else: {
+                                $cond: {
+                                    if: { $eq: ['$$conn.status', 'ACCEPTED'] },
+                                    then: 'CONNECTED',
+                                    else: {
+                                        $cond: {
+                                            if: { $eq: ['$$conn.sender', new mongoose_1.Types.ObjectId(user.id)] },
+                                            then: 'PENDING_SENT',
+                                            else: 'PENDING_RECEIVED',
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                 },
@@ -399,35 +426,45 @@ const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0,
             connectionId: { $arrayElemAt: ['$connectionInfo._id', 0] },
         },
     });
-    // 5. Strip the raw lookup array before pagination
+    // 5. Strip the raw lookup array before results
     pipeline.push({ $project: { connectionInfo: 0 } });
-    // 6. Pagination Facet
-    pipeline.push({
-        $facet: {
-            data: [{ $skip: skip }, { $limit: Number(limit) }],
-            totalCount: [{ $count: 'total' }],
-        },
-    });
+    // 6. Cursor pagination: fetch limit + 1 to detect if there is a next page
+    pipeline.push({ $limit: limit + 1 });
     const result = yield user_model_1.User.aggregate(pipeline);
-    const data = result[0].data;
-    const total = ((_a = result[0].totalCount[0]) === null || _a === void 0 ? void 0 : _a.total) || 0;
-    const totalPages = Math.ceil(total / Number(limit));
+    const hasNext = result.length > limit;
+    const data = hasNext ? result.slice(0, limit) : result;
+    let newCursor = null;
+    if (hasNext && data.length > 0) {
+        const lastItem = data[data.length - 1];
+        const lastValue = String(lastItem._id);
+        newCursor = Buffer.from(lastValue).toString('base64');
+    }
     return {
         data,
         meta: {
-            page: Number(page),
-            limit: Number(limit),
-            total,
-            totalPages,
+            limit,
+            nextCursor: newCursor,
+            hasNext,
         },
     };
 });
-const getUserByIdFromDB = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const isExistUser = yield user_model_1.User.findById(id).select('-password -authentication -tokenVersion -deviceTokens -deletedAt');
-    if (!isExistUser) {
+const getUserByIdFromDB = (id, requester) => __awaiter(void 0, void 0, void 0, function* () {
+    const user = yield user_model_1.User.findById(id).select('-password -authentication -tokenVersion -deviceTokens -deletedAt').lean();
+    if (!user) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, "User doesn't exist!");
     }
-    return isExistUser;
+    // Admin specific view: can see all fields except excluded ones above
+    // Flatten location for consistency with other profile APIs
+    if (user.location) {
+        user.country = user.location.country;
+        user.city = user.location.city;
+        if (user.location.coordinates) {
+            user.latitude = user.location.coordinates[1];
+            user.longitude = user.location.coordinates[0];
+        }
+        delete user.location;
+    }
+    return user;
 });
 // Statuses that should make every live JWT for the user stop working
 // immediately. We bump `tokenVersion` on flips INTO these so a stolen or
@@ -619,6 +656,32 @@ const getUserDetailsByIdFromDB = (id, requester) => __awaiter(void 0, void 0, vo
     // Final cleanup of internal status/flags
     delete result.status;
     delete result.deletedAt;
+    // Fetch connection status if requester is a non-admin
+    if (!isSuperAdmin) {
+        const connectionKey = [requester.id, id].sort().join('_');
+        const connection = yield connection_model_1.Connection.findOne({ connectionKey });
+        if (!connection) {
+            result.connectionStatus = 'NONE';
+        }
+        else if (connection.status === 'ACCEPTED') {
+            result.connectionStatus = 'CONNECTED';
+            result.connectionId = connection._id.toString();
+            result.chatId = connection.chatId ? connection.chatId.toString() : undefined;
+        }
+        else if (connection.status === 'PENDING') {
+            if (String(connection.sender) === requester.id) {
+                result.connectionStatus = 'PENDING_SENT';
+                result.connectionId = connection._id.toString();
+            }
+            else {
+                result.connectionStatus = 'PENDING_RECEIVED';
+                result.connectionId = connection._id.toString();
+            }
+        }
+        else {
+            result.connectionStatus = 'NONE';
+        }
+    }
     return result;
 });
 const SOFT_DELETE_RECOVERY_DAYS = 30;

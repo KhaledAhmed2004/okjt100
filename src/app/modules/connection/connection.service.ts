@@ -18,9 +18,21 @@ const sendConnectionRequest = async (senderId: string, receiverId: string) => {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'You cannot connect with yourself');
   }
 
+  const sender = await User.findById(senderId);
+  if (!sender || sender.status !== USER_STATUS.ACTIVE) {
+    throw new ApiError(StatusCodes.NOT_FOUND, 'Sender not found or inactive');
+  }
+
   const receiver = await User.findById(receiverId);
   if (!receiver || receiver.status !== USER_STATUS.ACTIVE) {
     throw new ApiError(StatusCodes.NOT_FOUND, 'Receiver not found or inactive');
+  }
+
+  if (sender.role !== receiver.role) {
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      `A ${sender.role.toLowerCase()} can only connect with another ${sender.role.toLowerCase()}`
+    );
   }
 
   // Check pending limit to prevent spam
@@ -50,7 +62,7 @@ const sendConnectionRequest = async (senderId: string, receiverId: string) => {
     status: CONNECTION_STATUS.PENDING,
   });
 
-  const senderUser = await User.findById(senderId).select('name profileImage');
+  const senderUser = sender;
 
   // Send in-app notification & push/socket
   await sendNotifications({
@@ -72,7 +84,15 @@ const sendConnectionRequest = async (senderId: string, receiverId: string) => {
     });
   }
 
-  return connection;
+  return {
+    id: connection._id,
+    status: connection.status,
+    receiver: {
+      id: receiver._id,
+      name: receiver.name,
+      profileImage: receiver.profileImage,
+    },
+  };
 };
 
 const respondToConnectionRequest = async (connectionId: string, userId: string, action: ConnectionAction) => {
@@ -145,7 +165,11 @@ const respondToConnectionRequest = async (connectionId: string, userId: string, 
       });
     }
 
-    return connection;
+    return {
+      id: connection._id,
+      status: connection.status,
+      chatId: connection.chatId,
+    };
   } catch (error) {
     await session.abortTransaction();
     throw error;
@@ -225,11 +249,9 @@ const getMyConnections = async (userId: string, query: Record<string, unknown>) 
   )
     .filter()
     .sort()
-    .paginate()
     .fields();
 
-  const data = await connectionQuery.modelQuery;
-  const pagination = await connectionQuery.getPaginationInfo();
+  const { data, meta } = await connectionQuery.cursorPaginate('_id');
 
   // Format data to expose "otherUser" instead of sender/receiver to make it easier for frontend
   const formattedData = data.map((conn: any) => {
@@ -246,7 +268,7 @@ const getMyConnections = async (userId: string, query: Record<string, unknown>) 
 
   return {
     data: formattedData,
-    pagination,
+    pagination: meta,
   };
 };
 
@@ -260,15 +282,39 @@ const getPendingConnectionRequests = async (userId: string, type: 'sent' | 'rece
   )
     .filter()
     .sort()
-    .paginate()
     .fields();
 
-  const data = await connectionQuery.modelQuery;
-  const pagination = await connectionQuery.getPaginationInfo();
+  const { data, meta } = await connectionQuery.cursorPaginate('_id');
+
+  const formattedData = data.map((conn: any) => {
+    if (type === 'sent') {
+      return {
+        connectionId: conn._id,
+        receiver: conn.receiver ? {
+          id: conn.receiver._id,
+          name: conn.receiver.name,
+          profileImage: conn.receiver.profileImage,
+        } : null,
+        status: conn.status,
+        createdAt: conn.createdAt,
+      };
+    } else {
+      return {
+        connectionId: conn._id,
+        sender: conn.sender ? {
+          id: conn.sender._id,
+          name: conn.sender.name,
+          profileImage: conn.sender.profileImage,
+        } : null,
+        status: conn.status,
+        createdAt: conn.createdAt,
+      };
+    }
+  });
 
   return {
-    data,
-    pagination,
+    data: formattedData,
+    pagination: meta,
   };
 };
 

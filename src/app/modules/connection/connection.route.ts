@@ -17,7 +17,7 @@ router.get(
 
 // List pending requests (sent or received)
 router.get(
-  '/pending',
+  '/requests',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
   ConnectionController.getPendingConnectionRequests
 );

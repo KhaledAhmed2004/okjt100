@@ -18,38 +18,9 @@ const logger_1 = require("../shared/logger");
 const jwtHelper_1 = require("./jwtHelper");
 const config_1 = __importDefault(require("../config"));
 const redisClient_1 = require("../shared/redisClient");
-// Optional chat/message modules: fall back to stubs when absent
-let Message;
-let Chat;
-try {
-    ({ Message } = require('../app/modules/message/message.model'));
-}
-catch (_a) {
-    Message = {
-        find: () => __awaiter(void 0, void 0, void 0, function* () { return []; }),
-        updateMany: () => __awaiter(void 0, void 0, void 0, function* () { }),
-        findById: () => __awaiter(void 0, void 0, void 0, function* () { return ({ select: () => null }); }),
-        findByIdAndUpdate: () => __awaiter(void 0, void 0, void 0, function* () { return null; }),
-    };
-}
-try {
-    ({ Chat } = require('../app/modules/chat/chat.model'));
-}
-catch (_b) {
-    Chat = {
-        exists: () => __awaiter(void 0, void 0, void 0, function* () { return false; }),
-    };
-}
-let SupportTicket;
-try {
-    ({ SupportTicket } = require('../app/modules/support-ticket/support-ticket.model'));
-}
-catch (_c) {
-    SupportTicket = {
-        findById: () => __awaiter(void 0, void 0, void 0, function* () { return null; }),
-    };
-}
-const node_cache_1 = __importDefault(require("node-cache"));
+const message_model_1 = require("../app/modules/message/message.model");
+const chat_model_1 = require("../app/modules/chat/chat.model");
+const support_ticket_model_1 = require("../app/modules/support-ticket/support-ticket.model");
 const presenceHelper_1 = require("../app/helpers/presenceHelper");
 // -------------------------
 // 🔹 Room Name Generators
@@ -62,7 +33,29 @@ const TICKET_ROOM = (ticketId) => `ticket::${ticketId}`;
 const ADMIN_TICKETS_ROOM = 'admin-tickets';
 const TYPING_KEY = (chatId, userId) => `typing:${chatId}:${userId}`;
 const TYPING_TTL_SECONDS = 5; // throttle window
-const typingThrottle = new node_cache_1.default({ stdTTL: TYPING_TTL_SECONDS, checkperiod: 10, useClones: false });
+// -------------------------
+// 🔹 Rate Limiting Helper (Req 12)
+// -------------------------
+/**
+ * Increments the rate-limit counter for an event+user pair.
+ * Returns true if the limit has been exceeded (caller should reject).
+ * Fails open on Redis errors — logs the error and allows the request through.
+ */
+const isRateLimited = (event, userId, limit, windowSeconds) => __awaiter(void 0, void 0, void 0, function* () {
+    try {
+        const key = `ratelimit:${event}:${userId}`;
+        const count = yield redisClient_1.redisClient.incr(key);
+        if (count === 1) {
+            // First increment — set TTL for the window
+            yield redisClient_1.redisClient.expire(key, windowSeconds);
+        }
+        return count > limit;
+    }
+    catch (err) {
+        logger_1.errorLogger.error(`isRateLimited: Redis error for event=${event} user=${userId}: ${String(err)}`);
+        return false; // fail open
+    }
+});
 // -------------------------
 // 🔹 Main Socket Handler
 // -------------------------
@@ -98,9 +91,9 @@ const socket = (io) => {
             yield (0, presenceHelper_1.setOnline)(userId);
             yield (0, presenceHelper_1.incrConnCount)(userId);
             yield (0, presenceHelper_1.updateLastActive)(userId);
-            socket.join(USER_ROOM(userId)); // join user’s personal private room
-            logger_1.logger.info(colors_1.default.blue(`✅ User ${userId} connected & joined ${USER_ROOM(userId)}`));
-            logEvent('socket_connected', `for user_id: ${userId}`);
+            socket.join(USER_ROOM(userId)); // join user's personal private room
+            logger_1.logger.info(`✅ User ${userId} connected & joined ${USER_ROOM(userId)}`);
+            logger_1.logger.info(`🔔 Event processed: socket_connected for user_id: ${userId}`);
             // Admins auto-join the global support-ticket broadcast room so they
             // receive TICKET_CREATED/TICKET_REPLY events without needing to
             // subscribe per-ticket. Per-ticket rooms (ticket::{id}) are still
@@ -109,13 +102,6 @@ const socket = (io) => {
             if (role === 'SUPER_ADMIN') {
                 socket.join(ADMIN_TICKETS_ROOM);
             }
-            // -----------------------------
-            // 🔹 Helper Function: Simplify repetitive event logging & activity update
-            // -----------------------------
-            const handleEventProcessed = (event, extra) => {
-                (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
-                logEvent(event, extra);
-            };
             // ---------------------------------------------
             // 🔹 Chat Room Join / Leave Events
             // ---------------------------------------------
@@ -123,6 +109,15 @@ const socket = (io) => {
                 // Requirement 8.2: ignore event if chatId is absent or empty string
                 if (!chatId)
                     return;
+                // Req 7: participant authorization
+                const isParticipant = yield chat_model_1.Chat.exists({ _id: chatId, participants: userId });
+                if (!isParticipant) {
+                    socket.emit('ACK_ERROR', {
+                        message: 'You are not a participant of this chat',
+                        chatId,
+                    });
+                    return;
+                }
                 // Write active:{userId}:chat = chatId with 3600-second TTL (Requirement 8.1)
                 try {
                     yield redisClient_1.redisClient.set(`active:${userId}:chat`, chatId, 'EX', 3600);
@@ -133,7 +128,8 @@ const socket = (io) => {
                 // Join the socket room for this chat
                 socket.join(CHAT_ROOM(chatId));
                 yield (0, presenceHelper_1.addUserRoom)(userId, chatId);
-                handleEventProcessed('JOIN_CHAT', `for chat_id: ${chatId}`);
+                (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                logger_1.logger.info(`🔔 Event processed: JOIN_CHAT for chat_id: ${chatId}`);
                 // Broadcast to others in the chat that this user is now online
                 const lastActive = yield (0, presenceHelper_1.getLastActive)(userId);
                 io.to(CHAT_ROOM(chatId)).emit('USER_ONLINE', {
@@ -141,7 +137,7 @@ const socket = (io) => {
                     chatId,
                     lastActive,
                 });
-                logger_1.logger.info(colors_1.default.green(`User ${userId} joined chat room ${CHAT_ROOM(chatId)}`));
+                logger_1.logger.info(`User ${userId} joined chat room ${CHAT_ROOM(chatId)}`);
             }));
             socket.on('LEAVE_CHAT', (_a) => __awaiter(void 0, [_a], void 0, function* ({ chatId }) {
                 if (!chatId)
@@ -155,7 +151,8 @@ const socket = (io) => {
                 }
                 socket.leave(CHAT_ROOM(chatId));
                 yield (0, presenceHelper_1.removeUserRoom)(userId, chatId);
-                handleEventProcessed('LEAVE_CHAT', `for chat_id: ${chatId}`);
+                (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                logger_1.logger.info(`🔔 Event processed: LEAVE_CHAT for chat_id: ${chatId}`);
                 // Notify others that user went offline in this chat
                 const lastActive = yield (0, presenceHelper_1.getLastActive)(userId);
                 io.to(CHAT_ROOM(chatId)).emit('USER_OFFLINE', {
@@ -172,13 +169,14 @@ const socket = (io) => {
                 if (!ticketId)
                     return;
                 try {
-                    const ticket = yield SupportTicket.findById(ticketId).select('_id userId');
+                    const ticket = yield support_ticket_model_1.SupportTicket.findById(ticketId).select('_id userId');
                     if (!ticket) {
                         socket.emit('ACK_ERROR', {
                             message: 'Ticket not found',
                             ticketId: String(ticketId),
                         });
-                        handleEventProcessed('JOIN_TICKET_DENIED', `not_found ticket_id: ${ticketId}`);
+                        (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                        logger_1.logger.info(`🔔 Event processed: JOIN_TICKET_DENIED not_found ticket_id: ${ticketId}`);
                         return;
                     }
                     const isAdmin = role === 'SUPER_ADMIN';
@@ -188,11 +186,13 @@ const socket = (io) => {
                             message: 'You do not have access to this ticket',
                             ticketId: String(ticketId),
                         });
-                        handleEventProcessed('JOIN_TICKET_DENIED', `forbidden ticket_id: ${ticketId}`);
+                        (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                        logger_1.logger.info(`🔔 Event processed: JOIN_TICKET_DENIED forbidden ticket_id: ${ticketId}`);
                         return;
                     }
                     socket.join(TICKET_ROOM(String(ticketId)));
-                    handleEventProcessed('JOIN_TICKET', `for ticket_id: ${ticketId}`);
+                    (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                    logger_1.logger.info(`🔔 Event processed: JOIN_TICKET for ticket_id: ${ticketId}`);
                 }
                 catch (err) {
                     logger_1.logger.error(colors_1.default.red(`JOIN_TICKET error: ${String(err)}`));
@@ -202,7 +202,8 @@ const socket = (io) => {
                 if (!ticketId)
                     return;
                 socket.leave(TICKET_ROOM(String(ticketId)));
-                handleEventProcessed('LEAVE_TICKET', `for ticket_id: ${ticketId}`);
+                (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                logger_1.logger.info(`🔔 Event processed: LEAVE_TICKET for ticket_id: ${ticketId}`);
             }));
             // ---------------------------------------------
             // 🔹 Typing Indicators
@@ -210,44 +211,53 @@ const socket = (io) => {
             socket.on('TYPING_START', (_a) => __awaiter(void 0, [_a], void 0, function* ({ chatId }) {
                 if (!chatId)
                     return;
-                // Guard: Only participants can emit typing events for a chat
-                const allowed = yield Chat.exists({ _id: chatId, participants: userId });
-                if (!allowed) {
-                    handleEventProcessed('TYPING_START_DENIED', `for chat_id: ${chatId}`);
+                // Req 12: rate limit TYPING_START (60 per 60s)
+                if (yield isRateLimited('TYPING_START', userId, 60, 60)) {
+                    socket.emit('ACK_ERROR', { message: 'Rate limit exceeded', event: 'TYPING_START' });
                     return;
                 }
-                // Throttle typing events per user per chat using in-memory TTL key
-                {
-                    const key = TYPING_KEY(chatId, userId);
-                    if (typingThrottle.has(key)) {
-                        handleEventProcessed('TYPING_START_THROTTLED_SKIP', `for chat_id: ${chatId}`);
-                        return;
-                    }
-                    typingThrottle.set(key, 1, TYPING_TTL_SECONDS);
+                // Guard: Only participants can emit typing events for a chat
+                const allowed = yield chat_model_1.Chat.exists({ _id: chatId, participants: userId });
+                if (!allowed) {
+                    (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                    logger_1.logger.info(`🔔 Event processed: TYPING_START_DENIED for chat_id: ${chatId}`);
+                    return;
+                }
+                // Req 2: Throttle typing events per user per chat using Redis SET NX
+                const key = TYPING_KEY(chatId, userId);
+                const acquired = yield redisClient_1.redisClient.set(key, '1', 'EX', TYPING_TTL_SECONDS, 'NX');
+                if (acquired === null) {
+                    // Already throttled — suppress broadcast
+                    (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                    logger_1.logger.info(`🔔 Event processed: TYPING_START_THROTTLED_SKIP for chat_id: ${chatId}`);
+                    return;
                 }
                 io.to(CHAT_ROOM(chatId)).emit('TYPING_START', { userId, chatId });
-                handleEventProcessed('TYPING_START', `for chat_id: ${chatId}`);
+                (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                logger_1.logger.info(`🔔 Event processed: TYPING_START for chat_id: ${chatId}`);
             }));
             socket.on('TYPING_STOP', (_a) => __awaiter(void 0, [_a], void 0, function* ({ chatId }) {
                 if (!chatId)
                     return;
                 // Guard: Only participants can emit typing stop events
-                const allowed = yield Chat.exists({ _id: chatId, participants: userId });
+                const allowed = yield chat_model_1.Chat.exists({ _id: chatId, participants: userId });
                 if (!allowed) {
-                    handleEventProcessed('TYPING_STOP_DENIED', `for chat_id: ${chatId}`);
+                    (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                    logger_1.logger.info(`🔔 Event processed: TYPING_STOP_DENIED for chat_id: ${chatId}`);
                     return;
                 }
-                // Clear throttle key so next start can emit immediately
-                typingThrottle.del(TYPING_KEY(chatId, userId));
+                // Req 2.5: Clear throttle key so next start can emit immediately
+                yield redisClient_1.redisClient.del(TYPING_KEY(chatId, userId));
                 io.to(CHAT_ROOM(chatId)).emit('TYPING_STOP', { userId, chatId });
-                handleEventProcessed('TYPING_STOP', `for chat_id: ${chatId}`);
+                (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                logger_1.logger.info(`🔔 Event processed: TYPING_STOP for chat_id: ${chatId}`);
             }));
             // ---------------------------------------------
             // 🔹 Message Delivery & Read Acknowledgements
             // ---------------------------------------------
             socket.on('DELIVERED_ACK', (_a) => __awaiter(void 0, [_a], void 0, function* ({ messageId }) {
                 try {
-                    const found = yield Message.findById(messageId).select('_id chatId');
+                    const found = yield message_model_1.Message.findById(messageId).select('_id chatId');
                     if (!found) {
                         socket.emit('ACK_ERROR', {
                             message: 'Message not found',
@@ -255,25 +265,25 @@ const socket = (io) => {
                         });
                         return;
                     }
-                    const allowed = yield Chat.exists({ _id: found.chatId, participants: userId });
+                    const allowed = yield chat_model_1.Chat.exists({ _id: found.chatId, participants: userId });
                     if (!allowed) {
                         socket.emit('ACK_ERROR', {
                             message: 'You are not a participant of this chat',
                             chatId: String(found.chatId),
                             messageId: String(found._id),
                         });
-                        handleEventProcessed('DELIVERED_ACK_DENIED', `chat_id: ${String(found.chatId)}`);
+                        (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                        logger_1.logger.info(`🔔 Event processed: DELIVERED_ACK_DENIED chat_id: ${String(found.chatId)}`);
                         return;
                     }
-                    const msg = yield Message.findByIdAndUpdate(messageId, { $addToSet: { deliveredTo: userId } }, { new: true });
-                    if (msg) {
-                        io.to(CHAT_ROOM(String(msg.chatId))).emit('MESSAGE_DELIVERED', {
-                            messageId: String(msg._id),
-                            chatId: String(msg.chatId),
-                            userId,
-                        });
-                        handleEventProcessed('DELIVERED_ACK', `for message_id: ${String(msg._id)}`);
-                    }
+                    // Req 5: emit MESSAGE_DELIVERED without any DB write
+                    io.to(CHAT_ROOM(String(found.chatId))).emit('MESSAGE_DELIVERED', {
+                        messageId: String(found._id),
+                        chatId: String(found.chatId),
+                        userId,
+                    });
+                    (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                    logger_1.logger.info(`🔔 Event processed: DELIVERED_ACK for message_id: ${String(found._id)}`);
                 }
                 catch (err) {
                     logger_1.logger.error(colors_1.default.red(`❌ DELIVERED_ACK error: ${String(err)}`));
@@ -281,7 +291,12 @@ const socket = (io) => {
             }));
             socket.on('READ_ACK', (_a) => __awaiter(void 0, [_a], void 0, function* ({ messageId }) {
                 try {
-                    const found = yield Message.findById(messageId).select('_id chatId');
+                    // Req 12: rate limit READ_ACK (60 per 60s)
+                    if (yield isRateLimited('READ_ACK', userId, 60, 60)) {
+                        socket.emit('ACK_ERROR', { message: 'Rate limit exceeded', event: 'READ_ACK' });
+                        return;
+                    }
+                    const found = yield message_model_1.Message.findById(messageId).select('_id chatId');
                     if (!found) {
                         socket.emit('ACK_ERROR', {
                             message: 'Message not found',
@@ -289,24 +304,27 @@ const socket = (io) => {
                         });
                         return;
                     }
-                    const allowed = yield Chat.exists({ _id: found.chatId, participants: userId });
+                    const allowed = yield chat_model_1.Chat.exists({ _id: found.chatId, participants: userId });
                     if (!allowed) {
                         socket.emit('ACK_ERROR', {
                             message: 'You are not a participant of this chat',
                             chatId: String(found.chatId),
                             messageId: String(found._id),
                         });
-                        handleEventProcessed('READ_ACK_DENIED', `chat_id: ${String(found.chatId)}`);
+                        (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                        logger_1.logger.info(`🔔 Event processed: READ_ACK_DENIED chat_id: ${String(found.chatId)}`);
                         return;
                     }
-                    const msg = yield Message.findByIdAndUpdate(messageId, { $addToSet: { readBy: userId } }, { new: true });
+                    const msg = yield message_model_1.Message.findByIdAndUpdate(messageId, { $addToSet: { readBy: userId } }, { new: true });
                     if (msg) {
-                        io.to(CHAT_ROOM(String(msg.chatId))).emit('MESSAGE_READ', {
-                            messageId: String(msg._id),
+                        // Req 8: emit MESSAGES_READ (plural) with correct payload shape
+                        io.to(CHAT_ROOM(String(msg.chatId))).emit('MESSAGES_READ', {
                             chatId: String(msg.chatId),
                             userId,
+                            updatedIds: [String(msg._id)],
                         });
-                        handleEventProcessed('READ_ACK', `for message_id: ${String(msg._id)}`);
+                        (0, presenceHelper_1.updateLastActive)(userId).catch(() => { });
+                        logger_1.logger.info(`🔔 Event processed: READ_ACK for message_id: ${String(msg._id)}`);
                     }
                 }
                 catch (err) {
@@ -349,7 +367,7 @@ const socket = (io) => {
                         logger_1.logger.info(colors_1.default.yellow(`User ${userId} disconnected one session; ${remaining} session(s) remain.`));
                     }
                     logger_1.logger.info(colors_1.default.red(`User ${userId} disconnected`));
-                    logEvent('socket_disconnected', `for user_id: ${userId}`);
+                    logger_1.logger.info(`🔔 Event processed: socket_disconnected for user_id: ${userId}`);
                 }
                 catch (err) {
                     logger_1.logger.error(colors_1.default.red(`❌ Disconnect handling error: ${String(err)}`));
@@ -364,11 +382,5 @@ const socket = (io) => {
             catch (_c) { }
         }
     }));
-};
-// -------------------------
-// 🔹 Helper: Log formatter
-// -------------------------
-const logEvent = (event, extra) => {
-    logger_1.logger.info(`🔔 Event processed: ${event} ${extra || ''}`);
 };
 exports.socketHelper = { socket };

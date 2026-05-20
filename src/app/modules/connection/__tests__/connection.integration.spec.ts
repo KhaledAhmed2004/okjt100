@@ -85,8 +85,8 @@ describe('ConnectionService Integration', () => {
 
       expect(result).toBeDefined();
       expect(result.status).toBe(CONNECTION_STATUS.PENDING);
-      expect(result.sender.toString()).toBe(sender._id.toString());
-      expect(result.receiver.toString()).toBe(receiver._id.toString());
+      expect(result.receiver.id.toString()).toBe(receiver._id.toString());
+      expect(result.id).toBeDefined();
       
       const { sendNotifications } = await import('../../notification/notificationsHelper');
       expect(sendNotifications).toHaveBeenCalled();
@@ -169,7 +169,7 @@ describe('ConnectionService Integration', () => {
       vi.clearAllMocks(); // Clear io and notifications from send Request
 
       const accepted = await ConnectionService.respondToConnectionRequest(
-        connection._id.toString(),
+        connection.id.toString(),
         receiver._id.toString(),
         CONNECTION_ACTION.ACCEPT
       );
@@ -200,7 +200,7 @@ describe('ConnectionService Integration', () => {
       );
 
       const rejected = await ConnectionService.respondToConnectionRequest(
-        connection._id.toString(),
+        connection.id.toString(),
         receiver._id.toString(),
         CONNECTION_ACTION.REJECT
       );
@@ -209,7 +209,7 @@ describe('ConnectionService Integration', () => {
       expect(rejected).toBeNull();
       
       // Verify DB is clean
-      const dbCheck = await Connection.findById(connection._id);
+      const dbCheck = await Connection.findById(connection.id);
       expect(dbCheck).toBeNull();
     });
 
@@ -225,7 +225,7 @@ describe('ConnectionService Integration', () => {
 
       await expect(
         ConnectionService.respondToConnectionRequest(
-          connection._id.toString(),
+          connection.id.toString(),
           hacker._id.toString(),
           CONNECTION_ACTION.ACCEPT
         )
@@ -247,11 +247,11 @@ describe('ConnectionService Integration', () => {
       );
 
       await ConnectionService.cancelConnectionRequest(
-        connection._id.toString(),
+        connection.id.toString(),
         sender._id.toString()
       );
 
-      const dbCheck = await Connection.findById(connection._id);
+      const dbCheck = await Connection.findById(connection.id);
       expect(dbCheck).toBeNull();
     });
 
@@ -266,7 +266,7 @@ describe('ConnectionService Integration', () => {
 
       await expect(
         ConnectionService.cancelConnectionRequest(
-          connection._id.toString(),
+          connection.id.toString(),
           receiver._id.toString() // receiver cannot cancel it, only respond
         )
       ).rejects.toMatchObject({
@@ -287,17 +287,17 @@ describe('ConnectionService Integration', () => {
       );
 
       await ConnectionService.respondToConnectionRequest(
-        connection._id.toString(),
+        connection.id.toString(),
         receiver._id.toString(),
         CONNECTION_ACTION.ACCEPT
       );
 
       await ConnectionService.removeConnection(
-        connection._id.toString(),
+        connection.id.toString(),
         sender._id.toString() // sender removes it
       );
 
-      const dbCheck = await Connection.findById(connection._id);
+      const dbCheck = await Connection.findById(connection.id);
       expect(dbCheck).toBeNull();
     });
   });

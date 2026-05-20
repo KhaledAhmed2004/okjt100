@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Connection = void 0;
 const mongoose_1 = require("mongoose");
+const connection_constants_1 = require("./connection.constants");
 const connectionSchema = new mongoose_1.Schema({
     sender: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -13,10 +14,15 @@ const connectionSchema = new mongoose_1.Schema({
         ref: 'User',
         required: true,
     },
+    connectionKey: {
+        type: String,
+        required: true,
+        unique: true,
+    },
     status: {
         type: String,
-        enum: ['PENDING', 'ACCEPTED'],
-        default: 'PENDING',
+        enum: Object.values(connection_constants_1.CONNECTION_STATUS),
+        default: connection_constants_1.CONNECTION_STATUS.PENDING,
     },
     chatId: {
         type: mongoose_1.Schema.Types.ObjectId,
@@ -28,9 +34,8 @@ const connectionSchema = new mongoose_1.Schema({
 }, {
     timestamps: true,
 });
-// Compound unique index to prevent duplicate connection requests between the same two users
-// We handle direction logic in the service (A->B and B->A are both blocked if one exists)
-connectionSchema.index({ sender: 1, receiver: 1 }, { unique: true });
+// Deterministic unique index using connectionKey to prevent A->B and B->A race condition
+connectionSchema.index({ connectionKey: 1 }, { unique: true });
 // Indexes for fast pending request lookups
 connectionSchema.index({ receiver: 1, status: 1 });
 connectionSchema.index({ sender: 1, status: 1 });

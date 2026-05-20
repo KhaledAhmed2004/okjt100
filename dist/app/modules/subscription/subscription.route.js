@@ -32,7 +32,7 @@ router.post('/apple/webhook', subscription_controller_1.default.appleWebhookCont
 // Android client passes the Google Play purchase token + productId from
 // the BillingClient — server verifies via Android Publisher API and
 // upserts the subscription record.
-router.post('/google/verify', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, rateLimit_1.rateLimitMiddleware)({
+router.post('/google/verify', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER, user_1.USER_ROLES.SUPER_ADMIN), (0, rateLimit_1.rateLimitMiddleware)({
     windowMs: 60000,
     max: 30,
     routeName: 'subscription-google-verify',
@@ -45,7 +45,7 @@ router.post('/google/verify', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, use
 router.post('/google/webhook', subscription_controller_1.default.googleWebhookController);
 // POST /subscriptions/choose/free
 // লোকালি Free প্ল্যানে সুইচ করে
-router.post('/choose/free', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), subscription_controller_1.default.chooseFreePlanController);
+router.post('/choose/free', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER, user_1.USER_ROLES.SUPER_ADMIN), subscription_controller_1.default.chooseFreePlanController);
 // --- Admin Routes ---
 router.get('/admin', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), subscription_controller_1.default.getAllSubscriptionsController);
 router.get('/admin/analytics', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), subscription_controller_1.default.getSubscriptionAnalyticsController);

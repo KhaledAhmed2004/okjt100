@@ -79,10 +79,11 @@ describe('AskQuestionService', () => {
       const user = await createUser('submit');
       const payload = {
         userId: user._id,
+        userRole: user.role as 'BROTHER' | 'SISTER',
         question: 'What is the best way to learn integration testing?',
       };
 
-      const result = await AskQuestionService.submitQuestionIntoDB(payload);
+      const result = await AskQuestionService.submitQuestionIntoDB(payload as any);
 
       expect(result).toBeDefined();
       expect(result.question).toBe(payload.question);
@@ -99,10 +100,12 @@ describe('AskQuestionService', () => {
 
       await AskQuestion.create({
         userId: userA._id,
+        userRole: userA.role,
         question: 'Question from User A',
       });
       await AskQuestion.create({
         userId: userB._id,
+        userRole: userB.role,
         question: 'Question from User B',
       });
 
@@ -122,6 +125,7 @@ describe('AskQuestionService', () => {
       const user = await createUser('all');
       await AskQuestion.create({
         userId: user._id,
+        userRole: user.role,
         question: 'Global question?',
       });
 
@@ -131,8 +135,9 @@ describe('AskQuestionService', () => {
       expect(result.data[0].question).toBe('Global question?');
       expect(result.data[0].userId).toBeDefined();
       // Verify population (userId should have name and email)
-      expect(result.data[0].userId.name).toBe(user.name);
-      expect(result.data[0].userId.email).toBe(user.email);
+      const populatedUser = result.data[0].userId as any;
+      expect(populatedUser.name).toBe(user.name);
+      expect(populatedUser.email).toBe(user.email);
     });
   });
 
@@ -145,18 +150,21 @@ describe('AskQuestionService', () => {
       // Create some questions in different periods
       await AskQuestion.create({
         userId: user._id,
+        userRole: user.role,
         question: 'Current month pending',
         status: 'pending',
         createdAt: now,
       });
       await AskQuestion.create({
         userId: user._id,
+        userRole: user.role,
         question: 'Current month answered',
         status: 'answered',
         createdAt: now,
       });
       await AskQuestion.create({
         userId: user._id,
+        userRole: user.role,
         question: 'Last month answered',
         status: 'answered',
         createdAt: lastMonth,
@@ -178,12 +186,13 @@ describe('AskQuestionService', () => {
       const user = await createUser('answer');
       const question = await AskQuestion.create({
         userId: user._id,
+        userRole: user.role,
         question: 'Pending question?',
       });
 
       const answerText = 'This is the answer.';
       const result = await AskQuestionService.answerQuestionInDB(
-        question._id.toString(),
+        (question as any)._id.toString(),
         answerText,
       );
 
@@ -202,6 +211,7 @@ describe('AskQuestionService', () => {
       const user = await createUser('re-answer');
       const question = await AskQuestion.create({
         userId: user._id,
+        userRole: user.role,
         question: 'Original question?',
         status: 'answered',
         answers: [
@@ -216,7 +226,7 @@ describe('AskQuestionService', () => {
 
       const newAnswerText = 'Second improved answer.';
       const result = await AskQuestionService.answerQuestionInDB(
-        question._id.toString(),
+        (question as any)._id.toString(),
         newAnswerText,
       );
 
@@ -230,7 +240,7 @@ describe('AskQuestionService', () => {
       const NotificationBuilder = (await import('../../../builder/NotificationBuilder/NotificationBuilder')).default;
       vi.clearAllMocks(); // Clear call from setup if any
       await AskQuestionService.answerQuestionInDB(
-        question._id.toString(),
+        (question as any)._id.toString(),
         'Third answer',
       );
       expect(NotificationBuilder).not.toHaveBeenCalled();

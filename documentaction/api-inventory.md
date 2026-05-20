@@ -26,7 +26,7 @@
 | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
 |---|---|---|---|:---:|---|---|
 | 2.1 | POST | `/users` | Public / SUPER_ADMIN | ✅ | [Module 2.1](./modules/user/01-create-user.md) | — |
-| 2.2 | GET | `/users/:userId/user` | User / Admin | ✅ | [Module 2.2](./modules/user/02-get-user-details-public.md) | — |
+| 2.02 | GET | `/users/:userId/public` | Bearer | ✅ | [Module 2.02](./modules/user/02-get-user-details-public.md) | Profile View |
 | 2.3 | GET | `/users/me` | Bearer | ✅ | [Module 2.3](./modules/user/03-get-own-profile.md) | — |
 | 2.4 | PATCH | `/users/me` | Bearer | ✅ | [Module 2.4](./modules/user/04-update-own-profile.md) | — |
 | 2.6 | DELETE | `/users/me` | Bearer | ✅ | [Module 2.6](./modules/user/06-delete-account.md) | — |
@@ -39,7 +39,7 @@
 | 2.13 | POST | `/users/reverify` | Public | ✅ | [Module 2.13](./modules/user/13-reverify-account.md) | — |
 | 2.14 | GET | `/users` | SUPER_ADMIN | ✅ | [Module 2.14](./modules/user/14-list-users-admin.md) | — |
 | 2.15 | GET | `/users/metrics` | SUPER_ADMIN | ✅ | [Module 2.15](./modules/user/15-user-stats-admin.md) | — |
-| 2.16 | GET | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.16](./modules/user/16-get-user-admin.md) | — |
+| 2.16 | GET | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.16](./modules/user/16-get-user.md) | Admin View |
 | 2.17 | PATCH | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.17](./modules/user/17-update-user-admin.md) | — |
 | 2.18 | DELETE | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.18](./modules/user/18-delete-user-admin.md) | — |
 | 2.19 | PATCH | `/users/:userId/review` | SUPER_ADMIN | ✅ | [Module 2.19](./modules/user/21-review-user-admin.md) | — |
@@ -170,7 +170,7 @@
 | 14.3 | DELETE | `/connections/:connectionId/request` | BROTHER, SISTER | ✅ | [Module 14.3](./modules/connection/03-cancel-request.md) | — |
 | 14.4 | DELETE | `/connections/:connectionId` | BROTHER, SISTER | ✅ | [Module 14.4](./modules/connection/04-remove-connection.md) | — |
 | 14.5 | GET | `/connections` | BROTHER, SISTER | ✅ | [Module 14.5](./modules/connection/05-list-my-connections.md) | — |
-| 14.6 | GET | `/connections/pending` | BROTHER, SISTER | ✅ | [Module 14.6](./modules/connection/06-list-pending-requests.md) | — |
+| 14.6 | GET | `/connections/requests` | BROTHER, SISTER | ✅ | [Module 14.6](./modules/connection/06-list-pending-requests.md) | — |
 | 14.7 | GET | `/connections/status/:userId` | BROTHER, SISTER | ✅ | [Module 14.7](./modules/connection/07-check-connection-status.md) | — |
 
 ## Chat Module
@@ -198,3 +198,9 @@
 | 17.4 | POST | `/subscriptions/google/verify` | Bearer | ✅ | [Module 17.4](./modules/subscription/04-verify-google.md) | — |
 | 17.5 | POST | `/subscriptions/google/webhook` | None | ✅ | [Module 17.5](./modules/subscription/05-google-webhook.md) | — |
 | 17.6 | POST | `/subscriptions/choose/free` | Bearer | ✅ | [Module 17.6](./modules/subscription/06-choose-free.md) | — |
+
+## Prayer Time Module
+
+| ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
+|---|---|---|---|:---:|---|---|
+| 18.1 | GET | `/prayer-times` | None | ✅ | [Module 18.1](./modules/prayer-time/01-get-prayer-times.md) | — |

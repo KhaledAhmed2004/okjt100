@@ -12,19 +12,6 @@ const config_1 = __importDefault(require("../../config"));
 const api_1 = require("@opentelemetry/api");
 const opentelemetry_1 = require("./opentelemetry");
 const performanceMetrics_1 = require("./performanceMetrics");
-// 🗓️ Format date
-const formatDate = () => {
-    const now = new Date();
-    const options = {
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-    };
-    const datePart = now.toLocaleString('en-US', options);
-    return `${datePart} , ${now.getFullYear()}`;
-};
 // 🧾 Status text
 const statusText = (code) => {
     switch (code) {
@@ -243,10 +230,19 @@ const renderQueryMultiLine = (q, index) => {
     }
     // Last line: Suggestion
     const suggestion = q === null || q === void 0 ? void 0 : q.suggestion;
-    const suggestionDisplay = suggestion && suggestion !== 'n/a'
-        ? `${colors_1.default.magenta.bold('💡')} ${colors_1.default.magenta.bold(suggestion)}`
-        : colors_1.default.dim('n/a');
-    lines.push(`      └─ ${colors_1.default.cyan('Suggestion:')} ${suggestionDisplay}`);
+    if (suggestion && suggestion !== 'n/a') {
+        const suggestionDisplay = `${colors_1.default.magenta.bold('💡')} ${colors_1.default.magenta.bold(suggestion)}`;
+        lines.push(`      └─ ${colors_1.default.cyan('Suggestion:')} ${suggestionDisplay}`);
+    }
+    else {
+        // Post-process the last pushed line in the tree to terminate with '└─' instead of '├─'
+        if (lines.length > 1) {
+            const lastIdx = lines.length - 1;
+            if (lines[lastIdx].includes('      ├─ ')) {
+                lines[lastIdx] = lines[lastIdx].replace('      ├─ ', '      └─ ');
+            }
+        }
+    }
     return lines;
 };
 // 📏 File size converter
@@ -391,10 +387,62 @@ const deriveHandlerLabel = (req, res) => {
 // 🧾 Main Logger
 const requestLogger = (req, res, next) => {
     var _a, _b;
+    // 🛑 Skip all logging when explicitly disabled in .env
+    if (config_1.default.disable_logs) {
+        return next();
+    }
     const start = Date.now();
     const requestId = (typeof req.headers['x-request-id'] === 'string' && req.headers['x-request-id']) || (0, crypto_1.randomUUID)();
     res.setHeader('X-Request-Id', requestId);
     res.locals.requestId = requestId;
+    // Intercept response methods to capture response payload
+    const originalJson = res.json;
+    res.json = function (body) {
+        try {
+            res.locals.responsePayload = body;
+        }
+        catch (_a) { }
+        return originalJson.call(this, body);
+    };
+    const originalSend = res.send;
+    res.send = function (body) {
+        try {
+            if (typeof body === 'string' && (body.trim().startsWith('{') || body.trim().startsWith('['))) {
+                res.locals.responsePayload = JSON.parse(body);
+            }
+            else if (body && typeof body === 'object') {
+                res.locals.responsePayload = body;
+            }
+        }
+        catch (_a) { }
+        return originalSend.call(this, body);
+    };
+    // Capture route params dynamically as they are matched by Express routers
+    const capturedParams = {};
+    const proxyHandler = {
+        get(target, prop) {
+            return capturedParams[prop];
+        },
+        set(target, prop, value) {
+            capturedParams[prop] = value;
+            return true;
+        },
+    };
+    const proxy = new Proxy({}, proxyHandler);
+    Object.defineProperty(req, 'params', {
+        get() {
+            return proxy;
+        },
+        set(val) {
+            if (val && typeof val === 'object') {
+                if (Object.keys(val).length > 0) {
+                    Object.assign(capturedParams, val);
+                }
+            }
+        },
+        configurable: true,
+        enumerable: true,
+    });
     // 🆕 NEW: Capture performance baseline (memory, CPU)
     try {
         if ((_b = (_a = config_1.default.tracing) === null || _a === void 0 ? void 0 : _a.performance) === null || _b === void 0 ? void 0 : _b.enabled) {
@@ -410,7 +458,7 @@ const requestLogger = (req, res, next) => {
         // Silent failure - won't affect request
     }
     res.on('finish', () => {
-        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
+        var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
         const ms = Date.now() - start;
         let processedMs = ms;
         try {
@@ -420,13 +468,13 @@ const requestLogger = (req, res, next) => {
             if (typeof total === 'number' && total > 0)
                 processedMs = total;
         }
-        catch (_z) { }
+        catch (_0) { }
         const status = res.statusCode;
         const statusMsg = statusText(status);
         // Silence console logs for observability endpoints to avoid terminal spam
         const isObservabilityRoute = Boolean((_a = req.originalUrl) === null || _a === void 0 ? void 0 : _a.includes('/api/v1/observability'));
         const details = {
-            params: req.params || {},
+            params: capturedParams,
             query: req.query || {},
             body: normalizeBody(req),
             files: extractFilesInfo(req),
@@ -505,7 +553,11 @@ const requestLogger = (req, res, next) => {
             }
         }
         const lines = [];
-        lines.push(colors_1.default.blue.bold(`[${formatDate()}]  🧩 Req-ID: ${requestId}`));
+        lines.push(colors_1.default.blue.bold(`🧩 Req-ID: ${requestId}`));
+        const statusTextColored = status >= 400 ? colors_1.default.red.bold(String(status)) : colors_1.default.green.bold(String(status));
+        const methodColored = req.method === 'GET' ? colors_1.default.green.bold(req.method) : req.method === 'POST' ? colors_1.default.blue.bold(req.method) : req.method === 'PUT' ? colors_1.default.yellow.bold(req.method) : req.method === 'DELETE' ? colors_1.default.red.bold(req.method) : colors_1.default.cyan.bold(req.method);
+        const morganStyleLine = `${methodColored} ${colors_1.default.white(req.originalUrl)} ${statusTextColored} - ${colors_1.default.white(`${processedMs.toFixed(3)} ms`)}`;
+        lines.push(colors_1.default.blue(`     📝 Summary: ${morganStyleLine}`));
         lines.push(`📥 Request: ${methodColor} ${routeColor} from IP:${ipColor}`);
         lines.push(colors_1.default.blue(`     🛰️ Client: ua="${ua}" referer="${referer || 'n/a'}" ct="${contentType || 'n/a'}"`));
         // Enriched device/OS/browser info (if available)
@@ -517,7 +569,13 @@ const requestLogger = (req, res, next) => {
             const arch = info.arch ? `, Arch: ${info.arch}` : '';
             const bits = info.bitness ? `, ${info.bitness}-bit` : '';
             const br = info.browser ? `, Browser: ${info.browser}${info.browserVersion ? ' ' + info.browserVersion : ''}` : '';
-            lines.push(colors_1.default.blue(`     💻 Device: ${info.deviceType}, OS: ${osLabel}${osRaw}${model}${arch}${bits}${br}`));
+        }
+        // 🌐 CORS details
+        if (req.corsStatus) {
+            const corsAllowed = req.corsAllowed;
+            const corsColor = corsAllowed ? colors_1.default.green.bold : colors_1.default.red.bold;
+            const statusColor = corsAllowed ? colors_1.default.green : colors_1.default.red;
+            lines.push(colors_1.default.blue(`     🌐 CORS: ${corsColor(corsAllowed ? '✅' : '❌')} ${statusColor(req.corsStatus)}`));
         }
         if (controllerLabel || serviceLabel) {
             const parts = [];
@@ -570,7 +628,7 @@ const requestLogger = (req, res, next) => {
                 }
             }
         }
-        if (config_1.default.node_env === 'development') {
+        if (config_1.default.node_env === 'development' || config_1.default.node_env === 'test') {
             lines.push(colors_1.default.yellow('     🔎 Request details:'));
             lines.push(colors_1.default.white(indentBlock(JSON.stringify(maskedDetails, null, 2))));
         }
@@ -578,19 +636,31 @@ const requestLogger = (req, res, next) => {
         const respSizeHeader = res.getHeader('Content-Length');
         const respSize = typeof respSizeHeader === 'string' ? respSizeHeader : Array.isArray(respSizeHeader) ? respSizeHeader[0] : respSizeHeader;
         lines.push(`${respLabel} ${statusColor(` ${status} ${statusMsg} `)} ${colors_1.default.blue(respSize ? `(size: ${respSize} bytes)` : '')}`);
+        const errorHandledBy = (_k = res.locals) === null || _k === void 0 ? void 0 : _k.errorHandledBy;
+        if (errorHandledBy) {
+            lines.push(colors_1.default.red(`     💥 Error Handler: ${errorHandledBy}`));
+        }
         // 💬 Message with bg only on message text
         if (responseMessage) {
             lines.push(`💬 Message: ${messageBg(` ${responseMessage} `)}`);
         }
-        if (responseErrors &&
-            Array.isArray(responseErrors) &&
-            responseErrors.length) {
-            lines.push(colors_1.default.red('📌 Details:'));
-            lines.push(colors_1.default.white(indentBlock(JSON.stringify(responseErrors, null, 2))));
+        if (config_1.default.node_env === 'development' || config_1.default.node_env === 'test') {
+            if (responsePayload && Object.keys(responsePayload).length > 0) {
+                const stringified = JSON.stringify(maskSensitive(responsePayload), null, 2);
+                if (stringified.length > 5000) {
+                    lines.push(colors_1.default.yellow('     📥 Response Payload:'));
+                    lines.push(colors_1.default.gray(`     [Payload size ${stringified.length} chars exceeds display limit; truncated]`));
+                    lines.push(colors_1.default.white(indentBlock(stringified.substring(0, 1000) + '\n...')));
+                }
+                else {
+                    lines.push(colors_1.default.yellow('     📥 Response Payload:'));
+                    lines.push(colors_1.default.white(indentBlock(stringified)));
+                }
+            }
         }
         // 🆕 NEW: Capture performance end state (memory, CPU)
         try {
-            if ((_l = (_k = config_1.default.tracing) === null || _k === void 0 ? void 0 : _k.performance) === null || _l === void 0 ? void 0 : _l.enabled) {
+            if ((_m = (_l = config_1.default.tracing) === null || _l === void 0 ? void 0 : _l.performance) === null || _m === void 0 ? void 0 : _m.enabled) {
                 if (config_1.default.tracing.performance.captureMemory) {
                     (0, requestContext_1.recordMemoryEnd)((0, performanceMetrics_1.captureMemorySnapshot)());
                 }
@@ -599,7 +669,7 @@ const requestLogger = (req, res, next) => {
                 }
             }
         }
-        catch (_0) {
+        catch (_1) {
             // Silent failure
         }
         // 📊 Metrics block (DB, Cache, External) with detailed DB categories
@@ -655,8 +725,11 @@ const requestLogger = (req, res, next) => {
                         return 'n/a';
                     if (isAgg && typeof (q === null || q === void 0 ? void 0 : q.pipeline) === 'string') {
                         const m = /\$match\(([^=]+)=/.exec(q.pipeline);
-                        if (m && m[1])
+                        if (m && m[1]) {
+                            if (m[1] === '_id')
+                                return 'n/a';
                             return `createIndex({ ${m[1]}: 1 })`;
+                        }
                     }
                     return 'add indexes on frequent filter fields';
                 };
@@ -750,11 +823,11 @@ const requestLogger = (req, res, next) => {
                 lines.push(`${colors_1.default.bold(' 📊 Total Request Cost ')}: ${costColor(` ${cost} `)} ${cost === 'HIGH' ? '⚠️' : cost === 'MEDIUM' ? '⚠️' : '✅'}`);
             }
         }
-        catch (_1) { }
+        catch (_2) { }
         // 🆕 NEW: Performance Metrics Display
         try {
             const m = (0, requestContext_1.getMetrics)();
-            if (((_o = (_m = config_1.default.tracing) === null || _m === void 0 ? void 0 : _m.performance) === null || _o === void 0 ? void 0 : _o.enabled) &&
+            if (((_p = (_o = config_1.default.tracing) === null || _o === void 0 ? void 0 : _o.performance) === null || _p === void 0 ? void 0 : _p.enabled) &&
                 (m === null || m === void 0 ? void 0 : m.performance) &&
                 (m.performance.memoryStart || m.performance.cpuStart)) {
                 const perf = m.performance;
@@ -776,10 +849,10 @@ const requestLogger = (req, res, next) => {
                     let memoryNote = '';
                     if (growthMB > 50) {
                         const hasFiles = req.files && Object.keys(req.files).length > 0;
-                        const isCryptoOperation = ((_p = req.originalUrl) === null || _p === void 0 ? void 0 : _p.includes('/auth/')) ||
-                            ((_q = req.originalUrl) === null || _q === void 0 ? void 0 : _q.includes('/login')) ||
-                            ((_r = req.originalUrl) === null || _r === void 0 ? void 0 : _r.includes('/register')) ||
-                            ((_s = req.originalUrl) === null || _s === void 0 ? void 0 : _s.includes('/reset-password'));
+                        const isCryptoOperation = ((_q = req.originalUrl) === null || _q === void 0 ? void 0 : _q.includes('/auth/')) ||
+                            ((_r = req.originalUrl) === null || _r === void 0 ? void 0 : _r.includes('/login')) ||
+                            ((_s = req.originalUrl) === null || _s === void 0 ? void 0 : _s.includes('/register')) ||
+                            ((_t = req.originalUrl) === null || _t === void 0 ? void 0 : _t.includes('/reset-password'));
                         if (hasFiles) {
                             memoryNote = colors_1.default.gray(' (file upload allocates buffers - normal)');
                         }
@@ -809,11 +882,11 @@ const requestLogger = (req, res, next) => {
                     // Context note for high CPU overhead (>100%)
                     let cpuOverheadNote = '';
                     if (cpuOverhead > 100) {
-                        const isCryptoOperation = ((_t = req.originalUrl) === null || _t === void 0 ? void 0 : _t.includes('/auth/')) ||
-                            ((_u = req.originalUrl) === null || _u === void 0 ? void 0 : _u.includes('/login')) ||
-                            ((_v = req.originalUrl) === null || _v === void 0 ? void 0 : _v.includes('/register')) ||
-                            ((_w = req.originalUrl) === null || _w === void 0 ? void 0 : _w.includes('/reset-password'));
-                        const isFileOperation = ((_x = req.originalUrl) === null || _x === void 0 ? void 0 : _x.includes('/upload')) ||
+                        const isCryptoOperation = ((_u = req.originalUrl) === null || _u === void 0 ? void 0 : _u.includes('/auth/')) ||
+                            ((_v = req.originalUrl) === null || _v === void 0 ? void 0 : _v.includes('/login')) ||
+                            ((_w = req.originalUrl) === null || _w === void 0 ? void 0 : _w.includes('/register')) ||
+                            ((_x = req.originalUrl) === null || _x === void 0 ? void 0 : _x.includes('/reset-password'));
+                        const isFileOperation = ((_y = req.originalUrl) === null || _y === void 0 ? void 0 : _y.includes('/upload')) ||
                             Boolean(req.files && Object.keys(req.files).length > 0);
                         if (isCryptoOperation) {
                             cpuOverheadNote = colors_1.default.gray(' (bcrypt/JWT uses thread pool - normal)');
@@ -846,7 +919,7 @@ const requestLogger = (req, res, next) => {
                     const growthMB = (0, performanceMetrics_1.calculateMemoryGrowth)(perf.memoryStart, perf.memoryEnd);
                     const cpuTime = (0, performanceMetrics_1.calculateCPUTime)(perf.cpuStart, perf.cpuEnd);
                     const cpuOverhead = (0, performanceMetrics_1.calculateCPUOverhead)(cpuTime.totalMs, processedMs);
-                    const loopMetrics = ((_y = perf.eventLoopSamples) === null || _y === void 0 ? void 0 : _y.length)
+                    const loopMetrics = ((_z = perf.eventLoopSamples) === null || _z === void 0 ? void 0 : _z.length)
                         ? (0, performanceMetrics_1.calculateEventLoopMetrics)(perf.eventLoopSamples)
                         : { avgLag: 0 };
                     const memHealth = (0, performanceMetrics_1.getMemoryHealth)(growthMB, thresholds.memory);
@@ -859,7 +932,7 @@ const requestLogger = (req, res, next) => {
                 }
             }
         }
-        catch (_2) { }
+        catch (_3) { }
         // ⏱️ Duration with thresholds and category label
         const durColor = processedMs >= 1000 ? colors_1.default.bgRed.white.bold : processedMs >= 300 ? colors_1.default.bgYellow.black.bold : colors_1.default.bgGreen.black.bold;
         const categoryLabel = processedMs >= 1000 ? 'Slow: >= 1000ms' : processedMs >= 300 ? 'Moderate: 300–999ms' : 'Fast: < 300ms';

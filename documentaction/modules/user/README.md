@@ -17,7 +17,7 @@
 | # | Method | Endpoint | Auth | Documentation |
 |---|---|---|---|---|
 | 01 | POST | `/users` | Public / SUPER_ADMIN | [01-create-user.md](./01-create-user.md) |
-| 02 | GET | `/users/:userId/user` | Bearer | [02-get-user-details-public.md](./02-get-user-details-public.md) |
+| 02 | GET | `/users/:userId/public` | Bearer | [02-get-user-details-public.md](./02-get-user-details-public.md) |
 | 03 | GET | `/users/me` | Bearer | [03-get-own-profile.md](./03-get-own-profile.md) |
 | 04 | PATCH | `/users/me` | Bearer | [04-update-own-profile.md](./04-update-own-profile.md) |
 | 06 | DELETE | `/users/me` | Bearer | [06-delete-account.md](./06-delete-account.md) |
@@ -30,7 +30,7 @@
 | 13 | POST | `/users/reverify` | Public (token) | [13-reverify-account.md](./13-reverify-account.md) |
 | 14 | GET | `/users` | SUPER_ADMIN | [14-list-users-admin.md](./14-list-users-admin.md) |
 | 15 | GET | `/users/metrics` | SUPER_ADMIN | [15-user-stats-admin.md](./15-user-stats-admin.md) |
-| 16 | GET | `/users/:userId` | SUPER_ADMIN | [16-get-user-admin.md](./16-get-user-admin.md) |
+| 16 | GET | `/users/:userId` | SUPER_ADMIN | [16-get-user.md](./16-get-user.md) |
 | 17 | PATCH | `/users/:userId` | SUPER_ADMIN | [17-update-user-admin.md](./17-update-user-admin.md) |
 | 18 | DELETE | `/users/:userId` | SUPER_ADMIN | [18-delete-user-admin.md](./18-delete-user-admin.md) |
 | 19 | PATCH | `/users/:userId/review` | SUPER_ADMIN | [21-review-user-admin.md](./21-review-user-admin.md) |

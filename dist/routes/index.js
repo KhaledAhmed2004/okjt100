@@ -21,6 +21,7 @@ const dua_route_1 = require("../app/modules/dua/dua.route");
 const connection_route_1 = require("../app/modules/connection/connection.route");
 const chat_route_1 = require("../app/modules/chat/chat.route");
 const message_route_1 = require("../app/modules/message/message.route");
+const prayer_time_route_1 = require("../app/modules/prayer-time/prayer-time.route");
 const router = express_1.default.Router();
 const apiRoutes = [
     {
@@ -90,6 +91,10 @@ const apiRoutes = [
     {
         path: '/messages',
         route: message_route_1.MessageRoutes,
+    },
+    {
+        path: '/prayer-times',
+        route: prayer_time_route_1.PrayerTimeRoutes,
     },
 ];
 apiRoutes.forEach(route => router.use(route.path, route.route));

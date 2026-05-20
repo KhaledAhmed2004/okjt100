@@ -30,6 +30,8 @@ exports.allowedOrigins = [
     'http://127.0.0.1:5001',
     'http://10.10.7.33:5001',
     // Dev server alternate ports
+    'http://localhost:5002',
+    'http://127.0.0.1:5002',
     'http://localhost:5003',
     'http://127.0.0.1:5003',
     'http://localhost:5005',
@@ -47,22 +49,18 @@ const isOriginAllowed = (origin) => {
 };
 exports.isOriginAllowed = isOriginAllowed;
 // Rate-limited CORS decision logging
+// Rate-limited CORS decision logging (only for blocks to avoid log spam)
 const maybeLogCors = (origin, allowed) => {
     if (!CORS_DEBUG)
         return;
-    const key = origin || 'no-origin';
-    const now = Date.now();
-    const last = corsLogMap.get(key) || 0;
-    if (now - last < CORS_LOG_WINDOW_MS)
-        return;
-    corsLogMap.set(key, now);
-    if (!origin) {
-        logger_1.logger.info('CORS allow: request without Origin header (Postman/mobile/native)');
-        return;
-    }
-    if (allowed)
-        logger_1.logger.info(`CORS allow: ${origin}`);
-    else
+    if (!allowed) {
+        const key = origin || 'no-origin';
+        const now = Date.now();
+        const last = corsLogMap.get(key) || 0;
+        if (now - last < CORS_LOG_WINDOW_MS)
+            return;
+        corsLogMap.set(key, now);
         logger_1.errorLogger.warn(`CORS block: ${origin}`);
+    }
 };
 exports.maybeLogCors = maybeLogCors;

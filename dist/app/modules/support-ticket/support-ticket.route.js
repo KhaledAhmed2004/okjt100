@@ -14,13 +14,11 @@ const support_ticket_validation_1 = require("./support-ticket.validation");
 const router = express_1.default.Router();
 const ATTACHMENT_FIELDS = [{ name: 'attachments', maxCount: 5 }];
 const FILE_OPTS = { maxFileSizeMB: 25 };
-// ============ Admin routes (fixed prefix — declared BEFORE /:ticketId) ============
 router.get('/admin/list', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), support_ticket_controller_1.SupportTicketController.getAllTickets);
 router.get('/admin/stats', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), support_ticket_controller_1.SupportTicketController.getTicketStats);
 router.patch('/admin/:ticketId/status', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(support_ticket_validation_1.SupportTicketValidation.updateStatusZodSchema), support_ticket_controller_1.SupportTicketController.updateTicketStatus);
 router.patch('/admin/:ticketId/priority', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(support_ticket_validation_1.SupportTicketValidation.updatePriorityZodSchema), support_ticket_controller_1.SupportTicketController.updateTicketPriority);
 router.patch('/admin/:ticketId/assign', (0, auth_1.default)(user_1.USER_ROLES.SUPER_ADMIN), (0, validateRequest_1.default)(support_ticket_validation_1.SupportTicketValidation.assignTicketZodSchema), support_ticket_controller_1.SupportTicketController.assignTicket);
-// ============ User routes ============
 // Create a new ticket (with optional attachments)
 router.post('/', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, fileHandler_1.fileHandler)(ATTACHMENT_FIELDS, FILE_OPTS), (0, validateRequest_1.default)(support_ticket_validation_1.SupportTicketValidation.createTicketZodSchema), support_ticket_controller_1.SupportTicketController.createTicket);
 // List my tickets (BROTHER/SISTER only — admins use /admin/list)

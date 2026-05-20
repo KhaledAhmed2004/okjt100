@@ -9,13 +9,9 @@ const ApiError_1 = __importDefault(require("../../errors/ApiError"));
 const handleValidationError_1 = __importDefault(require("../../errors/handleValidationError"));
 const handleZodError_1 = __importDefault(require("../../errors/handleZodError"));
 const handleCastError_1 = __importDefault(require("../../errors/handleCastError"));
-const logger_1 = require("../../shared/logger");
 const api_1 = require("@opentelemetry/api");
 const globalErrorHandler = (error, req, res, next) => {
-    // config.node_env === 'development'
-    //   ? console.log('🚨 globalErrorHandler ~~ ', error)
-    //   : errorLogger.error('🚨 globalErrorHandler ~~ ', error);
-    logger_1.errorLogger.error('🚨 globalErrorHandler ~~ ', error);
+    // (disabled) redundant separate console log - now beautifully captured and handled by OTel & custom requestLogger
     // OpenTelemetry: start Error Handler span
     const tracer = api_1.trace.getTracer('app');
     const span = tracer.startSpan('Error Handler');
@@ -97,6 +93,7 @@ const globalErrorHandler = (error, req, res, next) => {
                 ? [{ path: '', message: error.message }]
                 : [];
         }
+        res.locals.errorHandledBy = 'globalErrorHandler';
         res.locals.responsePayload = {
             success: false,
             statusCode,

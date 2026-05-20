@@ -173,7 +173,8 @@ async function main() {
 
     const port = Number(config.port) || 5001;
     const host =
-      config.node_env === 'development'
+      config.node_env?.toLowerCase() === 'development' || 
+      config.node_env?.toLowerCase() === 'clean-test'
         ? '0.0.0.0'
         : (config.ip_address && String(config.ip_address).trim()) || '0.0.0.0';
 
@@ -183,7 +184,9 @@ async function main() {
     });
 
     // Req 14: create server reference first, then attach Socket.IO before 'listening' fires
-    server = app.listen(port, host);
+    server = app.listen(port, host, () => {
+      serverSpinner.succeed(`HTTP server listening on ${host}:${port}`);
+    });
 
     // Req 11 + 14: initialize Socket.IO immediately after listen() returns the server
     // reference — before the 'listening' event fires — so SocketManager.getIO() is

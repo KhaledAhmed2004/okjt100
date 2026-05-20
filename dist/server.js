@@ -39,6 +39,7 @@ const mongoose_1 = __importDefault(require("mongoose"));
 const socket_io_1 = require("socket.io");
 const app_1 = __importDefault(require("./app"));
 const config_1 = __importDefault(require("./config"));
+const corsLogger_1 = require("./app/logging/corsLogger");
 const seedAdmin_1 = require("./DB/seedAdmin");
 const socketHelper_1 = require("./helpers/socketHelper");
 const socketManager_1 = require("./helpers/socketManager");
@@ -74,7 +75,7 @@ process.on('uncaughtException', error => {
 let server;
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
+        var _a, _b, _c, _d;
         try {
             // Display banner if enabled
             if (config_1.default.banner.enabled) {
@@ -197,33 +198,43 @@ function main() {
                 }
             }
             const port = Number(config_1.default.port) || 5001;
-            const host = config_1.default.node_env === 'development'
+            const host = ((_c = config_1.default.node_env) === null || _c === void 0 ? void 0 : _c.toLowerCase()) === 'development' ||
+                ((_d = config_1.default.node_env) === null || _d === void 0 ? void 0 : _d.toLowerCase()) === 'clean-test'
                 ? '0.0.0.0'
                 : (config_1.default.ip_address && String(config_1.default.ip_address).trim()) || '0.0.0.0';
             const serverSpinner = (0, spinnerHelper_1.createSpinner)({
                 text: `Starting HTTP server on ${host}:${port}...`,
                 color: 'cyan'
             });
+            // Req 14: create server reference first, then attach Socket.IO before 'listening' fires
             server = app_1.default.listen(port, host, () => {
+                serverSpinner.succeed(`HTTP server listening on ${host}:${port}`);
+            });
+            // Req 11 + 14: initialize Socket.IO immediately after listen() returns the server
+            // reference — before the 'listening' event fires — so SocketManager.getIO() is
+            // callable from any code path that runs after this point.
+            const socketSpinner = (0, spinnerHelper_1.createSpinner)({
+                text: 'Initializing Socket.IO server...',
+                color: 'cyan'
+            });
+            const io = new socket_io_1.Server(server, {
+                pingTimeout: 60000,
+                cors: {
+                    origin: corsLogger_1.allowedOrigins, // Req 11: use HTTP-layer allowlist, not '*'
+                    methods: ['GET', 'POST'],
+                    credentials: true,
+                },
+            });
+            socketHelper_1.socketHelper.socket(io);
+            socketManager_1.SocketManager.init(io);
+            socketSpinner.succeed('Socket.IO ready for real-time connections');
+            startupStatus.socketIO = true;
+            // Req 14: startup summary logging goes in the 'listening' event handler
+            server.on('listening', () => {
                 const url = `http://${host}:${port}/`;
                 serverSpinner.succeed(`Server is listening at ${url}`);
                 // Store server info
                 startupStatus.server = { url, host, port };
-                // Initialize Socket.IO
-                const socketSpinner = (0, spinnerHelper_1.createSpinner)({
-                    text: 'Initializing Socket.IO server...',
-                    color: 'cyan'
-                });
-                const io = new socket_io_1.Server(server, {
-                    pingTimeout: 60000,
-                    cors: {
-                        origin: '*',
-                    },
-                });
-                socketHelper_1.socketHelper.socket(io);
-                socketManager_1.SocketManager.init(io);
-                socketSpinner.succeed('Socket.IO ready for real-time connections');
-                startupStatus.socketIO = true;
                 // Add timestamp
                 startupStatus.timestamp = new Date().toLocaleString('en-US', {
                     timeZone: 'Asia/Dhaka',

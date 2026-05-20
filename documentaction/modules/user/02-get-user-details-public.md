@@ -1,29 +1,25 @@
-# 02. Get User Details (Public Profile)
+# 02. Get Public User Details
 
 ```http
-GET /users/:userId/user
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+GET /users/:userId/public
+Authorization: Bearer {{accessToken}}
 ```
 
-## 1. Overview
-Returns a **limited** public profile of another user. Enforces strict role-based privacy: brothers can only view brothers, sisters can only view sisters; only `SUPER_ADMIN` bypasses the role match. Suspended/deleted users are invisible — including to the requester themselves through this endpoint.
+> Retrieves public profile information of another user.
 
----
+## Implementation
+- **Route**: [user.route.ts](file:///src/app/modules/user/user.route.ts)
+- **Controller**: [user.controller.ts](file:///src/app/modules/user/user.controller.ts) — `getUserDetailsById`
+- **Service**: [user.service.ts](file:///src/app/modules/user/user.service.ts) — `getUserDetailsByIdFromDB`
 
-## 2. Business Rules (Source of Truth)
-
-### 2.1 Authentication Rules
-Enforced by the `auth` middleware before the controller is reached.
-
-- **Missing `Authorization` header** -> `401 Unauthorized` (`"message": "Unauthorized access"`).
-- **Header does not start with `Bearer `** -> `401 Unauthorized` (`"message": "Authorization header must start with \"Bearer \""`).
-- **Empty token after `Bearer `** -> `401 Unauthorized` (`"message": "Unauthorized access"`).
-- **Invalid signature / `JsonWebTokenError`** -> `401 Unauthorized` (`"message": "Invalid token"`).
-- **Expired token / `TokenExpiredError`** -> `401 Unauthorized` (`"message": "Token has expired"`).
-- **Token not yet active / `NotBeforeError`** -> `401 Unauthorized` (`"message": "Token not active"`).
-- **Verified payload missing `role`** -> `401 Unauthorized` (`"message": "Invalid token payload"`).
-- **User in token no longer exists in DB** -> `401 Unauthorized` (`"message": "User no longer exists"`).
-- **`tokenVersion` in JWT does not match DB** -> `401 Unauthorized` (`"message": "Session invalidated — please log in again"`).
+### Business Logic
+1. **Retrieval**: Fetches the user by ID.
+2. **Access Control**: 
+   - Regular users (`BROTHER`/`SISTER`) can only view `ACTIVE` users of the same role.
+3. **Field Selection**: Only public fields are returned:
+   - `id`, `name`, `role`, `profileImage`, `interests`, `isVerified`, `createdAt`
+   - `location` (flattened to `country`, `city`, `latitude`, `longitude`)
+4. **Connection Status**: Includes `connectionStatus`, `connectionId`, and `chatId` relative to the requester.
 
 ### 2.2 Account Status Rules (Requester)
 Checked after the DB lookup in the auth middleware.
@@ -105,26 +101,22 @@ The service then **flattens** `location` into top-level `country` and `city` and
 
 ## 6. Responses
 
-### Success (200)
+### Scenario: Success (200)
 ```json
 {
   "success": true,
   "statusCode": 200,
   "message": "User details retrieved successfully",
   "data": {
-    "_id": "664a1b2c3d4e5f6a7b8c9d0e",
-    "name": "Jane Doe",
-    "role": "SISTER",
-    "profileImage": "uploads/users/profiles/2026-pic.jpg",
-    "country": "USA",
-    "city": "New York",
-    "latitude": 40.7128,
-    "longitude": -74.006,
+    "id": "664a1b2c3d4e5f6a7b8c9d0e",
+    "name": "John Doe",
+    "role": "BROTHER",
+    "profileImage": "/default-avatar.svg",
+    "interests": ["Islamic History", "Coding"],
     "isVerified": true,
-    "revertDate": "2024-05-11T00:00:00.000Z",
-    "aboutMe": "Short intro",
-    "interests": ["Quran Study", "Fitness"],
-    "createdAt": "2026-05-09T10:00:00.000Z"
+    "createdAt": "2026-03-15T10:30:00.000Z",
+    "connectionStatus": "PENDING_SENT",
+    "connectionId": "664a1b2c3d4e5f6a7b8c9d0f"
   }
 }
 ```

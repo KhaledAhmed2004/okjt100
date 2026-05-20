@@ -241,7 +241,7 @@ const postEnd = (op) => function (_res, next) {
             const sort = ((_k = this.options) === null || _k === void 0 ? void 0 : _k.sort) || ((_l = this._mongooseOptions) === null || _l === void 0 ? void 0 : _l.sort);
             const sortKeys = sort && typeof sort === 'object' ? Object.keys(sort) : [];
             // Combine filter keys and sort keys for compound index
-            const allKeys = Array.from(new Set([...keys, ...sortKeys])); // Remove duplicates
+            const allKeys = Array.from(new Set([...keys, ...sortKeys])).filter(k => k !== '_id'); // Remove duplicates and skip '_id'
             const idxFields = allKeys.slice(0, 3).map(k => {
                 // Use -1 for descending sort, 1 for ascending or filter fields
                 const sortDir = sort && sort[k] === -1 ? -1 : 1;

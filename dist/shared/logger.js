@@ -10,12 +10,11 @@ const config_1 = __importDefault(require("../config"));
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { createLogger, format, transports } = require('winston');
 const { combine, timestamp, label, printf } = format;
-// Format timestamp in BD timezone as "YYYY-MM-DD HH:MM:SS AM/PM"
 const bdTime = (date = new Date()) => {
     const parts = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Dhaka',
         year: 'numeric',
-        month: '2-digit',
+        month: 'short',
         day: '2-digit',
         hour: '2-digit',
         minute: '2-digit',
@@ -23,14 +22,14 @@ const bdTime = (date = new Date()) => {
         hour12: true,
     }).formatToParts(date);
     const get = (type) => { var _a; return ((_a = parts.find(p => p.type === type)) === null || _a === void 0 ? void 0 : _a.value) || ''; };
-    const yyyy = get('year');
-    const mm = get('month');
-    const dd = get('day');
-    const hh = get('hour');
-    const min = get('minute');
-    const ss = get('second');
+    const month = get('month');
+    const day = get('day');
+    const year = get('year');
+    const hour = get('hour');
+    const minute = get('minute');
+    const second = get('second');
     const dayPeriod = get('dayPeriod');
-    return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss} ${dayPeriod}`;
+    return `${month} ${day}, ${hour}:${minute}:${second} ${dayPeriod}, ${year}`;
 };
 const myFormat = printf(({ level, message, label, timestamp }) => {
     // Always render timestamps in BD timezone
@@ -59,12 +58,14 @@ const logger = createLogger({
     level: config_1.default.node_env === 'development' ? 'debug' : 'info',
     format: combine(label({ label: 'Task Titans' }), timestamp(), myFormat),
     transports: baseTransports,
+    silent: config_1.default.disable_logs,
 });
 exports.logger = logger;
 const errorLogger = createLogger({
     level: 'error',
     format: combine(label({ label: 'Task Titans' }), timestamp(), myFormat),
     transports: errorTransports,
+    silent: config_1.default.disable_logs,
 });
 exports.errorLogger = errorLogger;
 // Optional desktop notification for critical failures in development

@@ -39,7 +39,7 @@ Stores connection requests and established connections between users.
 | 03 | DELETE | `/connections/:connectionId/request` | `BROTHER`, `SISTER` | ✅ Done: Sender cancels a **PENDING** request (undo send). | [03-cancel-request.md](./03-cancel-request.md) |
 | 04 | DELETE | `/connections/:connectionId` | `BROTHER`, `SISTER` | ✅ Done: Either user removes an **ACCEPTED** connection. | [04-remove-connection.md](./04-remove-connection.md) |
 | 05 | GET | `/connections` | `BROTHER`, `SISTER` | ✅ Done: Fetches my accepted connections. | [05-list-my-connections.md](./05-list-my-connections.md) |
-| 06 | GET | `/connections/pending` | `BROTHER`, `SISTER` | ✅ Done: Fetches pending requests (`?type=sent\|received`). | [06-list-pending-requests.md](./06-list-pending-requests.md) |
+| 06 | GET | `/connections/requests` | `BROTHER`, `SISTER` | ✅ Done: Fetches pending requests (`?type=sent\|received`). | [06-list-pending-requests.md](./06-list-pending-requests.md) |
 | 07 | GET | `/connections/status/:userId` | `BROTHER`, `SISTER` | ✅ Done: Checks connection status with a user. | [07-check-connection-status.md](./07-check-connection-status.md) |
 
 ---

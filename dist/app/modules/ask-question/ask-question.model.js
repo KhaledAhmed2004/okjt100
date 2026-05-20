@@ -1,9 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = require("mongoose");
+const AnswerVersionSchema = new mongoose_1.Schema({
+    version: { type: Number, required: true },
+    text: { type: String, required: true },
+    isActive: { type: Boolean, required: true, default: true },
+    createdAt: { type: Date, required: true },
+}, { _id: false });
 const AskQuestionSchema = new mongoose_1.Schema({
     userId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User', required: true },
-    userRole: { type: String, required: true },
+    userRole: { type: String, enum: ['BROTHER', 'SISTER'], required: true },
     question: { type: String, required: true },
     imageUrl: { type: String },
     status: {
@@ -12,11 +18,8 @@ const AskQuestionSchema = new mongoose_1.Schema({
         default: 'pending',
         required: true,
     },
-    answer: { type: String },
-    answeredAt: { type: Date },
-}, {
-    timestamps: true,
-});
+    answers: { type: [AnswerVersionSchema], default: [] },
+}, { timestamps: true });
 // Indexes
 AskQuestionSchema.index({ question: 'text' });
 AskQuestionSchema.index({ userId: 1 });

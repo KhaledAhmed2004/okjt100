@@ -4608,13 +4608,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/connections/pending",
+              "raw": "{{baseUrl}}/connections/requests",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "connections",
-                "pending"
+                "requests"
               ],
               "query": [
                 {
@@ -4623,9 +4623,9 @@
                   "description": "Whether to fetch requests you `sent` or `received`"
                 },
                 {
-                  "key": "page",
-                  "value": "1",
-                  "description": "Pagination page number"
+                  "key": "nextCursor",
+                  "value": "",
+                  "description": "Base64 cursor value for pagination"
                 },
                 {
                   "key": "limit",

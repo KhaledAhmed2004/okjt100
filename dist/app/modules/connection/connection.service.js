@@ -14,39 +14,55 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ConnectionService = void 0;
 const http_status_codes_1 = require("http-status-codes");
+const connection_utils_1 = require("./connection.utils");
+const connection_constants_1 = require("./connection.constants");
+const config_1 = __importDefault(require("../../../config"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const ApiError_1 = __importDefault(require("../../../errors/ApiError"));
 const user_model_1 = require("../user/user.model");
 const connection_model_1 = require("./connection.model");
 const chat_service_1 = require("../chat/chat.service");
-const chat_model_1 = require("../chat/chat.model");
 const user_1 = require("../../../enums/user");
 const QueryBuilder_1 = __importDefault(require("../../builder/QueryBuilder"));
 const notificationsHelper_1 = require("../notification/notificationsHelper");
-const sendRequest = (senderId, receiverId) => __awaiter(void 0, void 0, void 0, function* () {
+const sendConnectionRequest = (senderId, receiverId) => __awaiter(void 0, void 0, void 0, function* () {
     if (senderId === receiverId) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You cannot connect with yourself');
+    }
+    const sender = yield user_model_1.User.findById(senderId);
+    if (!sender || sender.status !== user_1.USER_STATUS.ACTIVE) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Sender not found or inactive');
     }
     const receiver = yield user_model_1.User.findById(receiverId);
     if (!receiver || receiver.status !== user_1.USER_STATUS.ACTIVE) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Receiver not found or inactive');
     }
-    // Check if connection already exists (either direction)
-    const existingConnection = yield connection_model_1.Connection.findOne({
-        $or: [
-            { sender: senderId, receiver: receiverId },
-            { sender: receiverId, receiver: senderId },
-        ],
-    });
+    if (sender.role !== receiver.role) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, `A ${sender.role.toLowerCase()} can only connect with another ${sender.role.toLowerCase()}`);
+    }
+    // Check pending limit to prevent spam
+    const pendingCount = yield connection_model_1.Connection.countDocuments({ sender: senderId, status: connection_constants_1.CONNECTION_STATUS.PENDING });
+    const maxRequests = config_1.default.connection.max_pending_requests;
+    if (pendingCount >= maxRequests) {
+        throw new ApiError_1.default(http_status_codes_1.StatusCodes.TOO_MANY_REQUESTS, `You have reached the maximum number of pending requests (${maxRequests})`);
+    }
+    // Generate deterministic connectionKey to prevent A->B and B->A race condition
+    const connectionKey = (0, connection_utils_1.generateConnectionKey)(senderId, receiverId);
+    // Check if connection already exists (either direction) using connectionKey
+    const existingConnection = yield connection_model_1.Connection.findOne({ connectionKey });
     if (existingConnection) {
+        if (existingConnection.status === connection_constants_1.CONNECTION_STATUS.ACCEPTED) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.CONFLICT, 'You are already connected with this user');
+        }
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.CONFLICT, 'Connection request already exists');
     }
     const connection = yield connection_model_1.Connection.create({
         sender: senderId,
         receiver: receiverId,
-        status: 'PENDING',
+        connectionKey,
+        status: connection_constants_1.CONNECTION_STATUS.PENDING,
     });
-    const senderUser = yield user_model_1.User.findById(senderId).select('name profileImage');
+    const senderUser = sender;
     // Send in-app notification & push/socket
     yield (0, notificationsHelper_1.sendNotifications)({
         receiver: new mongoose_1.default.Types.ObjectId(receiverId),
@@ -65,60 +81,85 @@ const sendRequest = (senderId, receiverId) => __awaiter(void 0, void 0, void 0, 
             sender: senderUser,
         });
     }
-    return connection;
+    return {
+        id: connection._id,
+        status: connection.status,
+        receiver: {
+            id: receiver._id,
+            name: receiver.name,
+            profileImage: receiver.profileImage,
+        },
+    };
 });
-const respondToRequest = (connectionId, userId, action) => __awaiter(void 0, void 0, void 0, function* () {
-    const connection = yield connection_model_1.Connection.findById(connectionId);
-    if (!connection) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Connection request not found');
-    }
-    if (String(connection.receiver) !== userId) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only the receiver can respond to this request');
-    }
-    if (connection.status !== 'PENDING') {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'This request is no longer pending');
-    }
-    // @ts-ignore
-    const io = global.io;
-    if (action === 'REJECT') {
-        // Delete the connection
-        yield connection_model_1.Connection.findByIdAndDelete(connectionId);
+const respondToConnectionRequest = (connectionId, userId, action) => __awaiter(void 0, void 0, void 0, function* () {
+    const session = yield mongoose_1.default.startSession();
+    try {
+        session.startTransaction();
+        const connection = yield connection_model_1.Connection.findById(connectionId).session(session);
+        if (!connection) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Connection request not found');
+        }
+        if (String(connection.receiver) !== userId) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only the receiver can respond to this request');
+        }
+        if (connection.status !== connection_constants_1.CONNECTION_STATUS.PENDING) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'This request is no longer pending');
+        }
+        // @ts-ignore
+        const io = global.io;
+        if (action === connection_constants_1.CONNECTION_ACTION.REJECT) {
+            // Delete the connection
+            yield connection_model_1.Connection.findByIdAndDelete(connectionId).session(session);
+            yield session.commitTransaction();
+            if (io) {
+                io.to(`user::${String(connection.sender)}`).emit('CONNECTION_REJECTED', {
+                    connectionId: connection._id,
+                });
+            }
+            return null;
+        }
+        // Action is ACCEPT
+        const participants = [String(connection.sender), String(connection.receiver)];
+        // Create or get chat using ChatService
+        const chat = yield chat_service_1.ChatService.createOrGet(participants[0], participants[1]);
+        connection.status = connection_constants_1.CONNECTION_STATUS.ACCEPTED;
+        connection.chatId = chat._id;
+        connection.respondedAt = new Date();
+        yield connection.save({ session });
+        yield session.commitTransaction();
+        const receiverUser = yield user_model_1.User.findById(userId).select('name profileImage');
+        // Notify sender
+        yield (0, notificationsHelper_1.sendNotifications)({
+            receiver: new mongoose_1.default.Types.ObjectId(String(connection.sender)),
+            type: 'SYSTEM',
+            title: 'Connection Accepted',
+            text: `${receiverUser === null || receiverUser === void 0 ? void 0 : receiverUser.name} accepted your connection request`,
+            resourceType: 'User',
+            resourceId: userId,
+            userId: String(connection.sender), // passed for push/socket helper compatibility
+        });
         if (io) {
-            io.to(`user::${String(connection.sender)}`).emit('CONNECTION_REJECTED', {
+            io.to(`user::${String(connection.sender)}`).emit('CONNECTION_ACCEPTED', {
                 connectionId: connection._id,
+                chatId: chat._id,
+                user: receiverUser,
             });
         }
-        return null;
+        return {
+            id: connection._id,
+            status: connection.status,
+            chatId: connection.chatId,
+        };
     }
-    // Action is ACCEPT
-    const participants = [String(connection.sender), String(connection.receiver)];
-    // Create or get chat using ChatService
-    const chat = yield chat_service_1.ChatService.createChatToDB(participants);
-    connection.status = 'ACCEPTED';
-    connection.chatId = chat._id;
-    connection.respondedAt = new Date();
-    yield connection.save();
-    const receiverUser = yield user_model_1.User.findById(userId).select('name profileImage');
-    // Notify sender
-    yield (0, notificationsHelper_1.sendNotifications)({
-        receiver: new mongoose_1.default.Types.ObjectId(String(connection.sender)),
-        type: 'SYSTEM',
-        title: 'Connection Accepted',
-        text: `${receiverUser === null || receiverUser === void 0 ? void 0 : receiverUser.name} accepted your connection request`,
-        resourceType: 'User',
-        resourceId: userId,
-        userId: String(connection.sender), // passed for push/socket helper compatibility
-    });
-    if (io) {
-        io.to(`user::${String(connection.sender)}`).emit('CONNECTION_ACCEPTED', {
-            connectionId: connection._id,
-            chatId: chat._id,
-            user: receiverUser,
-        });
+    catch (error) {
+        yield session.abortTransaction();
+        throw error;
     }
-    return connection;
+    finally {
+        session.endSession();
+    }
 });
-const cancelRequest = (connectionId, userId) => __awaiter(void 0, void 0, void 0, function* () {
+const cancelConnectionRequest = (connectionId, userId) => __awaiter(void 0, void 0, void 0, function* () {
     const connection = yield connection_model_1.Connection.findById(connectionId);
     if (!connection) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Connection request not found');
@@ -126,50 +167,56 @@ const cancelRequest = (connectionId, userId) => __awaiter(void 0, void 0, void 0
     if (String(connection.sender) !== userId) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Only the sender can cancel this request');
     }
-    if (connection.status !== 'PENDING') {
+    if (connection.status !== connection_constants_1.CONNECTION_STATUS.PENDING) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'This request is no longer pending');
     }
     yield connection_model_1.Connection.findByIdAndDelete(connectionId);
     return null;
 });
 const removeConnection = (connectionId, userId) => __awaiter(void 0, void 0, void 0, function* () {
-    const connection = yield connection_model_1.Connection.findById(connectionId);
-    if (!connection) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Connection not found');
+    const session = yield mongoose_1.default.startSession();
+    try {
+        session.startTransaction();
+        const connection = yield connection_model_1.Connection.findById(connectionId).session(session);
+        if (!connection) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Connection not found');
+        }
+        if (String(connection.sender) !== userId && String(connection.receiver) !== userId) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not part of this connection');
+        }
+        const otherUserId = String(connection.sender) === userId ? String(connection.receiver) : String(connection.sender);
+        yield connection_model_1.Connection.findByIdAndDelete(connectionId).session(session);
+        yield session.commitTransaction();
+        // @ts-ignore
+        const io = global.io;
+        if (io) {
+            io.to(`user::${otherUserId}`).emit('CONNECTION_REMOVED', {
+                connectionId: connection._id,
+                chatId: connection.chatId,
+            });
+        }
+        return null;
     }
-    if (String(connection.sender) !== userId && String(connection.receiver) !== userId) {
-        throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not part of this connection');
+    catch (error) {
+        yield session.abortTransaction();
+        throw error;
     }
-    // Mark chat as inactive
-    if (connection.chatId) {
-        yield chat_model_1.Chat.findByIdAndUpdate(connection.chatId, { status: false });
+    finally {
+        session.endSession();
     }
-    const otherUserId = String(connection.sender) === userId ? String(connection.receiver) : String(connection.sender);
-    yield connection_model_1.Connection.findByIdAndDelete(connectionId);
-    // @ts-ignore
-    const io = global.io;
-    if (io) {
-        io.to(`user::${otherUserId}`).emit('CONNECTION_REMOVED', {
-            connectionId: connection._id,
-            chatId: connection.chatId,
-        });
-    }
-    return null;
 });
 const getMyConnections = (userId, query) => __awaiter(void 0, void 0, void 0, function* () {
     const connectionQuery = new QueryBuilder_1.default(connection_model_1.Connection.find({
         $or: [{ sender: userId }, { receiver: userId }],
-        status: 'ACCEPTED',
+        status: connection_constants_1.CONNECTION_STATUS.ACCEPTED,
     }).populate([
         { path: 'sender', select: 'name profileImage role' },
         { path: 'receiver', select: 'name profileImage role' }
     ]), query)
         .filter()
         .sort()
-        .paginate()
         .fields();
-    const data = yield connectionQuery.modelQuery;
-    const pagination = yield connectionQuery.getPaginationInfo();
+    const { data, meta } = yield connectionQuery.cursorPaginate('_id');
     // Format data to expose "otherUser" instead of sender/receiver to make it easier for frontend
     const formattedData = data.map((conn) => {
         const isSender = String(conn.sender._id) === userId;
@@ -184,42 +231,62 @@ const getMyConnections = (userId, query) => __awaiter(void 0, void 0, void 0, fu
     });
     return {
         data: formattedData,
-        pagination,
+        pagination: meta,
     };
 });
-const getPendingRequests = (userId, type, query) => __awaiter(void 0, void 0, void 0, function* () {
-    const filter = type === 'sent' ? { sender: userId, status: 'PENDING' } : { receiver: userId, status: 'PENDING' };
+const getPendingConnectionRequests = (userId, type, query) => __awaiter(void 0, void 0, void 0, function* () {
+    const filter = type === 'sent' ? { sender: userId, status: connection_constants_1.CONNECTION_STATUS.PENDING } : { receiver: userId, status: connection_constants_1.CONNECTION_STATUS.PENDING };
     const populateField = type === 'sent' ? 'receiver' : 'sender';
     const connectionQuery = new QueryBuilder_1.default(connection_model_1.Connection.find(filter).populate({ path: populateField, select: 'name profileImage role' }), query)
         .filter()
         .sort()
-        .paginate()
         .fields();
-    const data = yield connectionQuery.modelQuery;
-    const pagination = yield connectionQuery.getPaginationInfo();
+    const { data, meta } = yield connectionQuery.cursorPaginate('_id');
+    const formattedData = data.map((conn) => {
+        if (type === 'sent') {
+            return {
+                connectionId: conn._id,
+                receiver: conn.receiver ? {
+                    id: conn.receiver._id,
+                    name: conn.receiver.name,
+                    profileImage: conn.receiver.profileImage,
+                } : null,
+                status: conn.status,
+                createdAt: conn.createdAt,
+            };
+        }
+        else {
+            return {
+                connectionId: conn._id,
+                sender: conn.sender ? {
+                    id: conn.sender._id,
+                    name: conn.sender.name,
+                    profileImage: conn.sender.profileImage,
+                } : null,
+                status: conn.status,
+                createdAt: conn.createdAt,
+            };
+        }
+    });
     return {
-        data,
-        pagination,
+        data: formattedData,
+        pagination: meta,
     };
 });
 const getConnectionStatus = (userId, otherUserId) => __awaiter(void 0, void 0, void 0, function* () {
-    const connection = yield connection_model_1.Connection.findOne({
-        $or: [
-            { sender: userId, receiver: otherUserId },
-            { sender: otherUserId, receiver: userId },
-        ],
-    });
+    const connectionKey = (0, connection_utils_1.generateConnectionKey)(userId, otherUserId);
+    const connection = yield connection_model_1.Connection.findOne({ connectionKey });
     if (!connection) {
         return { status: 'NONE' };
     }
-    if (connection.status === 'ACCEPTED') {
+    if (connection.status === connection_constants_1.CONNECTION_STATUS.ACCEPTED) {
         return {
             status: 'CONNECTED',
             connectionId: connection._id,
             chatId: connection.chatId
         };
     }
-    if (connection.status === 'PENDING') {
+    if (connection.status === connection_constants_1.CONNECTION_STATUS.PENDING) {
         if (String(connection.sender) === userId) {
             return { status: 'PENDING_SENT', connectionId: connection._id };
         }
@@ -230,11 +297,11 @@ const getConnectionStatus = (userId, otherUserId) => __awaiter(void 0, void 0, v
     return { status: 'NONE' };
 });
 exports.ConnectionService = {
-    sendRequest,
-    respondToRequest,
-    cancelRequest,
+    sendConnectionRequest,
+    respondToConnectionRequest,
+    cancelConnectionRequest,
     removeConnection,
     getMyConnections,
-    getPendingRequests,
+    getPendingConnectionRequests,
     getConnectionStatus,
 };

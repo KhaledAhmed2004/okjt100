@@ -16,6 +16,7 @@ import { DuaRoutes } from '../app/modules/dua/dua.route';
 import { ConnectionRoutes } from '../app/modules/connection/connection.route';
 import { ChatRoutes } from '../app/modules/chat/chat.route';
 import { MessageRoutes } from '../app/modules/message/message.route';
+import { PrayerTimeRoutes } from '../app/modules/prayer-time/prayer-time.route';
 
 const router = express.Router();
 
@@ -87,6 +88,10 @@ const apiRoutes = [
   {
     path: '/messages',
     route: MessageRoutes,
+  },
+  {
+    path: '/prayer-times',
+    route: PrayerTimeRoutes,
   },
 ];
 

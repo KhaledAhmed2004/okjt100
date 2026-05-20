@@ -10,6 +10,7 @@ import { sendVerificationOTP } from '../../../helpers/authHelpers';
 import unlinkFile from '../../../shared/unlinkFile';
 import generateOTP from '../../../util/generateOTP';
 import { User } from './user.model';
+import { Connection } from '../connection/connection.model';
 import QueryBuilder from '../../builder/QueryBuilder';
 import AggregationBuilder from '../../builder/AggregationBuilder';
 import { IUser } from './user.interface';
@@ -293,12 +294,14 @@ const getUserProfilesFromDB = async (
 ) => {
   const { 
     searchTerm, 
-    page = 1, 
-    limit = 10, 
+    limit: rawLimit = 10, 
+    nextCursor,
     latitude, 
     longitude,
     filter, // 'new-reverts' or 'nearby-me'
   } = query;
+
+  const limit = Math.min(Number(rawLimit) || 10, 50);
 
   // Enforce same-role discovery and ACTIVE status only
   const match: Record<string, any> = {
@@ -314,7 +317,21 @@ const getUserProfilesFromDB = async (
     ];
   }
 
-  const skip = (Number(page) - 1) * Number(limit);
+  // Cursor-based pagination: decode cursor and add _id filter
+  if (nextCursor && typeof nextCursor === 'string') {
+    let decodedCursorValue: string = nextCursor;
+    try {
+      decodedCursorValue = Buffer.from(nextCursor, 'base64').toString('ascii');
+    } catch (e) {
+      // Fallback if not valid base64
+    }
+
+    if (Types.ObjectId.isValid(decodedCursorValue)) {
+      // Default sort is descending (newest first), so we need $lt for next page
+      match._id = { ...match._id, $lt: new Types.ObjectId(decodedCursorValue) };
+    }
+  }
+
   const pipeline: PipelineStage[] = [];
 
   // 1. Proximity Search & Sorting Logic
@@ -339,11 +356,11 @@ const getUserProfilesFromDB = async (
       }
     } else {
       pipeline.push({ $match: match });
-      pipeline.push({ $sort: { createdAt: -1 } });
+      pipeline.push({ $sort: { _id: -1 as const } });
     }
   } else {
     pipeline.push({ $match: match });
-    pipeline.push({ $sort: { createdAt: -1 } });
+    pipeline.push({ $sort: { _id: -1 as const } });
   }
 
   // 2. Projection & Derived Fields
@@ -392,16 +409,17 @@ const getUserProfilesFromDB = async (
             },
           },
         },
-        { $project: { _id: 1, status: 1 } },
+        { $project: { _id: 1, status: 1, sender: 1 } },
       ],
       as: 'connectionInfo',
     },
   });
 
   // 4. Set connectionStatus using the exact Connection model enum values:
-  //    NONE     → no connection document exists
-  //    PENDING  → connection document exists with status 'PENDING'
-  //    ACCEPTED → connection document exists with status 'ACCEPTED'
+  //    NONE             → no connection document exists
+  //    PENDING_SENT     → connection document exists with status 'PENDING' and requester is sender
+  //    PENDING_RECEIVED → connection document exists with status 'PENDING' and requester is receiver
+  //    CONNECTED        → connection document exists with status 'ACCEPTED'
   pipeline.push({
     $addFields: {
       connectionStatus: {
@@ -411,7 +429,19 @@ const getUserProfilesFromDB = async (
             $cond: {
               if: { $not: ['$$conn'] },
               then: 'NONE',
-              else: '$$conn.status',
+              else: {
+                $cond: {
+                  if: { $eq: ['$$conn.status', 'ACCEPTED'] },
+                  then: 'CONNECTED',
+                  else: {
+                    $cond: {
+                      if: { $eq: ['$$conn.sender', new Types.ObjectId(user.id)] },
+                      then: 'PENDING_SENT',
+                      else: 'PENDING_RECEIVED',
+                    },
+                  },
+                },
+              },
             },
           },
         },
@@ -420,41 +450,56 @@ const getUserProfilesFromDB = async (
     },
   });
 
-  // 5. Strip the raw lookup array before pagination
+  // 5. Strip the raw lookup array before results
   pipeline.push({ $project: { connectionInfo: 0 } });
 
-  // 6. Pagination Facet
-  pipeline.push({
-    $facet: {
-      data: [{ $skip: skip }, { $limit: Number(limit) }],
-      totalCount: [{ $count: 'total' }],
-    },
-  });
+  // 6. Cursor pagination: fetch limit + 1 to detect if there is a next page
+  pipeline.push({ $limit: limit + 1 });
 
   const result = await User.aggregate(pipeline);
-  const data = result[0].data;
-  const total = result[0].totalCount[0]?.total || 0;
-  const totalPages = Math.ceil(total / Number(limit));
+
+  const hasNext = result.length > limit;
+  const data = hasNext ? result.slice(0, limit) : result;
+
+  let newCursor: string | null = null;
+  if (hasNext && data.length > 0) {
+    const lastItem = data[data.length - 1];
+    const lastValue = String(lastItem._id);
+    newCursor = Buffer.from(lastValue).toString('base64');
+  }
 
   return {
     data,
     meta: {
-      page: Number(page),
-      limit: Number(limit),
-      total,
-      totalPages,
+      limit,
+      nextCursor: newCursor,
+      hasNext,
     },
   };
 };
 
-const getUserByIdFromDB = async (id: string): Promise<IUser | null> => {
-  const isExistUser = await User.findById(id).select(
+const getUserByIdFromDB = async (id: string, requester: JwtPayload): Promise<Partial<IUser> | null> => {
+  const user = await User.findById(id).select(
     '-password -authentication -tokenVersion -deviceTokens -deletedAt',
-  );
-  if (!isExistUser) {
+  ).lean();
+
+  if (!user) {
     throw new ApiError(StatusCodes.NOT_FOUND, "User doesn't exist!");
   }
-  return isExistUser;
+
+  // Admin specific view: can see all fields except excluded ones above
+  // Flatten location for consistency with other profile APIs
+  if (user.location) {
+    (user as any).country = user.location.country;
+    (user as any).city = user.location.city;
+    if (user.location.coordinates) {
+      (user as any).latitude = user.location.coordinates[1];
+      (user as any).longitude = user.location.coordinates[0];
+    }
+    delete user.location;
+  }
+
+  return user as Partial<IUser>;
 };
 
 // Statuses that should make every live JWT for the user stop working
@@ -686,6 +731,30 @@ const getUserDetailsByIdFromDB = async (id: string, requester: JwtPayload) => {
   // Final cleanup of internal status/flags
   delete (result as any).status;
   delete (result as any).deletedAt;
+
+  // Fetch connection status if requester is a non-admin
+  if (!isSuperAdmin) {
+    const connectionKey = [requester.id, id].sort().join('_');
+    const connection = await Connection.findOne({ connectionKey });
+
+    if (!connection) {
+      (result as any).connectionStatus = 'NONE';
+    } else if (connection.status === 'ACCEPTED') {
+      (result as any).connectionStatus = 'CONNECTED';
+      (result as any).connectionId = connection._id.toString();
+      (result as any).chatId = connection.chatId ? connection.chatId.toString() : undefined;
+    } else if (connection.status === 'PENDING') {
+      if (String(connection.sender) === requester.id) {
+        (result as any).connectionStatus = 'PENDING_SENT';
+        (result as any).connectionId = connection._id.toString();
+      } else {
+        (result as any).connectionStatus = 'PENDING_RECEIVED';
+        (result as any).connectionId = connection._id.toString();
+      }
+    } else {
+      (result as any).connectionStatus = 'NONE';
+    }
+  }
 
   return result;
 };

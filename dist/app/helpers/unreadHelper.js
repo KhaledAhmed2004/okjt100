@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.UnreadHelper = exports.batchGetUnreadCounts = exports.clearUnreadCount = exports.incrementUnreadCount = exports.setUnreadCount = exports.getUnreadCountCached = void 0;
+exports.batchGetUnreadCounts = exports.clearUnreadCount = exports.incrementUnreadCount = exports.setUnreadCount = exports.getUnreadCountCached = void 0;
 /**
  * unreadHelper — Redis-backed unread count helpers.
  *
@@ -81,10 +81,3 @@ const batchGetUnreadCounts = (pairs) => __awaiter(void 0, void 0, void 0, functi
     });
 });
 exports.batchGetUnreadCounts = batchGetUnreadCounts;
-exports.UnreadHelper = {
-    getUnreadCountCached: exports.getUnreadCountCached,
-    setUnreadCount: exports.setUnreadCount,
-    incrementUnreadCount: exports.incrementUnreadCount,
-    clearUnreadCount: exports.clearUnreadCount,
-    batchGetUnreadCounts: exports.batchGetUnreadCounts,
-};
