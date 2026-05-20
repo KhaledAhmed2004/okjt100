@@ -92,20 +92,6 @@ const getPendingConnectionRequests = catchAsync(async (req: Request, res: Respon
   });
 });
 
-const getConnectionStatus = catchAsync(async (req: Request, res: Response) => {
-  const userId = (req.user as JwtPayload).id;
-  const otherUserId = req.params.userId;
-
-  const result = await ConnectionService.getConnectionStatus(userId, otherUserId);
-
-  sendResponse(res, {
-    statusCode: StatusCodes.OK,
-    success: true,
-    message: 'Connection status retrieved successfully',
-    data: result,
-  });
-});
-
 export const ConnectionController = {
   sendConnectionRequest,
   respondToConnectionRequest,
@@ -113,5 +99,4 @@ export const ConnectionController = {
   removeConnection,
   getMyConnections,
   getPendingConnectionRequests,
-  getConnectionStatus,
 };

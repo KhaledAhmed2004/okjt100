@@ -242,8 +242,8 @@ const getMyConnections = async (userId: string, query: Record<string, unknown>) 
       $or: [{ sender: userId }, { receiver: userId }],
       status: CONNECTION_STATUS.ACCEPTED,
     }).populate([
-      { path: 'sender', select: 'name profileImage role' },
-      { path: 'receiver', select: 'name profileImage role' }
+      { path: 'sender', select: 'name profileImage' },
+      { path: 'receiver', select: 'name profileImage' }
     ]),
     query
   )
@@ -253,16 +253,23 @@ const getMyConnections = async (userId: string, query: Record<string, unknown>) 
 
   const { data, meta } = await connectionQuery.cursorPaginate('_id');
 
-  // Format data to expose "otherUser" instead of sender/receiver to make it easier for frontend
+  // Format data to expose "connectedUser" instead of sender/receiver to make it easier for frontend
   const formattedData = data.map((conn: any) => {
     const isSender = String(conn.sender._id) === userId;
     return {
       _id: conn._id,
       status: conn.status,
       chatId: conn.chatId,
-      respondedAt: conn.respondedAt,
       createdAt: conn.createdAt,
-      user: isSender ? conn.receiver : conn.sender,
+      connectedUser: isSender ? {
+        id: conn.receiver._id,
+        name: conn.receiver.name,
+        profileImage: conn.receiver.profileImage,
+      } : {
+        id: conn.sender._id,
+        name: conn.sender.name,
+        profileImage: conn.sender.profileImage,
+      },
     };
   });
 
@@ -318,34 +325,6 @@ const getPendingConnectionRequests = async (userId: string, type: 'sent' | 'rece
   };
 };
 
-const getConnectionStatus = async (userId: string, otherUserId: string) => {
-  const connectionKey = generateConnectionKey(userId, otherUserId);
-
-  const connection = await Connection.findOne({ connectionKey });
-
-  if (!connection) {
-    return { status: 'NONE' };
-  }
-
-  if (connection.status === CONNECTION_STATUS.ACCEPTED) {
-    return {
-      status: 'CONNECTED',
-      connectionId: connection._id,
-      chatId: connection.chatId
-    };
-  }
-
-  if (connection.status === CONNECTION_STATUS.PENDING) {
-    if (String(connection.sender) === userId) {
-      return { status: 'PENDING_SENT', connectionId: connection._id };
-    } else {
-      return { status: 'PENDING_RECEIVED', connectionId: connection._id };
-    }
-  }
-
-  return { status: 'NONE' };
-};
-
 export const ConnectionService = {
   sendConnectionRequest,
   respondToConnectionRequest,
@@ -353,5 +332,4 @@ export const ConnectionService = {
   removeConnection,
   getMyConnections,
   getPendingConnectionRequests,
-  getConnectionStatus,
 };

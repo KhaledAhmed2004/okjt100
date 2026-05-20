@@ -7,14 +7,6 @@ import { ConnectionValidation } from './connection.validation';
 
 const router = express.Router();
 
-// Get connection status with a specific user
-router.get(
-  '/status/:userId',
-  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.checkConnectionStatusParamsSchema),
-  ConnectionController.getConnectionStatus
-);
-
 // List pending requests (sent or received)
 router.get(
   '/requests',

@@ -140,7 +140,7 @@ describe('User Profile APIs', () => {
       expect(response.body.message).toBe("User not found");
     });
 
-    it('returns profile details with connectionStatus: NONE when no connection exists', async () => {
+    it('returns profile details with connection: null when no connection exists', async () => {
       const { token: brotherToken } = await createAuthUser(USER_ROLES.BROTHER);
       const { user: targetBrother } = await createAuthUser(USER_ROLES.BROTHER);
 
@@ -150,11 +150,10 @@ describe('User Profile APIs', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.connectionStatus).toBe('NONE');
-      expect(response.body.data.connectionId).toBeUndefined();
+      expect(response.body.data.connection).toBeNull();
     });
 
-    it('returns profile details with connectionStatus: PENDING_SENT when a request is sent by requester', async () => {
+    it('returns profile details with connection status PENDING and direction OUTGOING when a request is sent by requester', async () => {
       const { user: userA, token: tokenA } = await createAuthUser(USER_ROLES.BROTHER);
       const { user: userB } = await createAuthUser(USER_ROLES.BROTHER);
 
@@ -172,11 +171,13 @@ describe('User Profile APIs', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.connectionStatus).toBe('PENDING_SENT');
-      expect(response.body.data.connectionId).toBe(connection._id.toString());
+      expect(response.body.data.connection).toBeDefined();
+      expect(response.body.data.connection.status).toBe('PENDING');
+      expect(response.body.data.connection.direction).toBe('OUTGOING');
+      expect(response.body.data.connection.id).toBe(connection._id.toString());
     });
 
-    it('returns profile details with connectionStatus: PENDING_RECEIVED when a request is received by requester', async () => {
+    it('returns profile details with connection status PENDING and direction INCOMING when a request is received by requester', async () => {
       const { user: userA, token: tokenA } = await createAuthUser(USER_ROLES.BROTHER);
       const { user: userB } = await createAuthUser(USER_ROLES.BROTHER);
 
@@ -194,11 +195,13 @@ describe('User Profile APIs', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.connectionStatus).toBe('PENDING_RECEIVED');
-      expect(response.body.data.connectionId).toBe(connection._id.toString());
+      expect(response.body.data.connection).toBeDefined();
+      expect(response.body.data.connection.status).toBe('PENDING');
+      expect(response.body.data.connection.direction).toBe('INCOMING');
+      expect(response.body.data.connection.id).toBe(connection._id.toString());
     });
 
-    it('returns profile details with connectionStatus: CONNECTED when connection is accepted', async () => {
+    it('returns profile details with connection status ACCEPTED and omitted direction when connection is accepted', async () => {
       const { user: userA, token: tokenA } = await createAuthUser(USER_ROLES.BROTHER);
       const { user: userB } = await createAuthUser(USER_ROLES.BROTHER);
 
@@ -218,9 +221,11 @@ describe('User Profile APIs', () => {
 
       expect(response.status).toBe(200);
       expect(response.body.success).toBe(true);
-      expect(response.body.data.connectionStatus).toBe('CONNECTED');
-      expect(response.body.data.connectionId).toBe(connection._id.toString());
-      expect(response.body.data.chatId).toBe(fakeChatId.toString());
+      expect(response.body.data.connection).toBeDefined();
+      expect(response.body.data.connection.status).toBe('ACCEPTED');
+      expect(response.body.data.connection.direction).toBeUndefined();
+      expect(response.body.data.connection.id).toBe(connection._id.toString());
+      expect(response.body.data.connection.chatId).toBe(fakeChatId.toString());
     });
   });
 });

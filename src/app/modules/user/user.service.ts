@@ -415,29 +415,32 @@ const getUserProfilesFromDB = async (
     },
   });
 
-  // 4. Set connectionStatus using the exact Connection model enum values:
-  //    NONE             → no connection document exists
-  //    PENDING_SENT     → connection document exists with status 'PENDING' and requester is sender
-  //    PENDING_RECEIVED → connection document exists with status 'PENDING' and requester is receiver
-  //    CONNECTED        → connection document exists with status 'ACCEPTED'
+  // 4. Set nested connection object relative to requester:
+  //    No connection: connection: null
+  //    Pending:       connection: { id, status: 'PENDING', direction: 'OUTGOING' | 'INCOMING' }
+  //    Accepted:      connection: { id, status: 'ACCEPTED' } (direction is omitted)
   pipeline.push({
     $addFields: {
-      connectionStatus: {
+      connection: {
         $let: {
           vars: { conn: { $arrayElemAt: ['$connectionInfo', 0] } },
           in: {
             $cond: {
               if: { $not: ['$$conn'] },
-              then: 'NONE',
+              then: null,
               else: {
-                $cond: {
-                  if: { $eq: ['$$conn.status', 'ACCEPTED'] },
-                  then: 'CONNECTED',
-                  else: {
-                    $cond: {
-                      if: { $eq: ['$$conn.sender', new Types.ObjectId(user.id)] },
-                      then: 'PENDING_SENT',
-                      else: 'PENDING_RECEIVED',
+                id: '$$conn._id',
+                status: '$$conn.status',
+                direction: {
+                  $cond: {
+                    if: { $eq: ['$$conn.status', 'ACCEPTED'] },
+                    then: '$$REMOVE',
+                    else: {
+                      $cond: {
+                        if: { $eq: ['$$conn.sender', new Types.ObjectId(user.id)] },
+                        then: 'OUTGOING',
+                        else: 'INCOMING',
+                      },
                     },
                   },
                 },
@@ -446,7 +449,6 @@ const getUserProfilesFromDB = async (
           },
         },
       },
-      connectionId: { $arrayElemAt: ['$connectionInfo._id', 0] },
     },
   });
 
@@ -738,21 +740,21 @@ const getUserDetailsByIdFromDB = async (id: string, requester: JwtPayload) => {
     const connection = await Connection.findOne({ connectionKey });
 
     if (!connection) {
-      (result as any).connectionStatus = 'NONE';
+      (result as any).connection = null;
     } else if (connection.status === 'ACCEPTED') {
-      (result as any).connectionStatus = 'CONNECTED';
-      (result as any).connectionId = connection._id.toString();
-      (result as any).chatId = connection.chatId ? connection.chatId.toString() : undefined;
+      (result as any).connection = {
+        id: connection._id.toString(),
+        status: 'ACCEPTED',
+        chatId: connection.chatId ? connection.chatId.toString() : undefined,
+      };
     } else if (connection.status === 'PENDING') {
-      if (String(connection.sender) === requester.id) {
-        (result as any).connectionStatus = 'PENDING_SENT';
-        (result as any).connectionId = connection._id.toString();
-      } else {
-        (result as any).connectionStatus = 'PENDING_RECEIVED';
-        (result as any).connectionId = connection._id.toString();
-      }
+      (result as any).connection = {
+        id: connection._id.toString(),
+        status: 'PENDING',
+        direction: String(connection.sender) === requester.id ? 'OUTGOING' : 'INCOMING',
+      };
     } else {
-      (result as any).connectionStatus = 'NONE';
+      (result as any).connection = null;
     }
   }
 

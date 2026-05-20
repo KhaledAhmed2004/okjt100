@@ -24,15 +24,8 @@ export const getConnectionByIdParamsSchema = z.object({
   }),
 });
 
-export const checkConnectionStatusParamsSchema = z.object({
-  params: z.object({
-    userId: z.string({ required_error: 'User ID is required' }),
-  }),
-});
-
 export const ConnectionValidation = {
   sendConnectionRequestSchema,
   respondToConnectionRequestSchema,
   getConnectionByIdParamsSchema,
-  checkConnectionStatusParamsSchema,
 };
