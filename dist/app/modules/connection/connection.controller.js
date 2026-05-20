@@ -86,17 +86,6 @@ const getPendingConnectionRequests = (0, catchAsync_1.default)((req, res) => __a
         meta: result.pagination,
     });
 }));
-const getConnectionStatus = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const userId = req.user.id;
-    const otherUserId = req.params.userId;
-    const result = yield connection_service_1.ConnectionService.getConnectionStatus(userId, otherUserId);
-    (0, sendResponse_1.default)(res, {
-        statusCode: http_status_codes_1.StatusCodes.OK,
-        success: true,
-        message: 'Connection status retrieved successfully',
-        data: result,
-    });
-}));
 exports.ConnectionController = {
     sendConnectionRequest,
     respondToConnectionRequest,
@@ -104,5 +93,4 @@ exports.ConnectionController = {
     removeConnection,
     getMyConnections,
     getPendingConnectionRequests,
-    getConnectionStatus,
 };

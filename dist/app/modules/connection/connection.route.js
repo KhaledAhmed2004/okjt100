@@ -11,8 +11,6 @@ const validateRequest_1 = __importDefault(require("../../middlewares/validateReq
 const connection_controller_1 = require("./connection.controller");
 const connection_validation_1 = require("./connection.validation");
 const router = express_1.default.Router();
-// Get connection status with a specific user
-router.get('/status/:userId', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.checkConnectionStatusParamsSchema), connection_controller_1.ConnectionController.getConnectionStatus);
 // List pending requests (sent or received)
 router.get('/requests', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), connection_controller_1.ConnectionController.getPendingConnectionRequests);
 // List my accepted connections

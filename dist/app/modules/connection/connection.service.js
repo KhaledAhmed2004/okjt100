@@ -210,23 +210,30 @@ const getMyConnections = (userId, query) => __awaiter(void 0, void 0, void 0, fu
         $or: [{ sender: userId }, { receiver: userId }],
         status: connection_constants_1.CONNECTION_STATUS.ACCEPTED,
     }).populate([
-        { path: 'sender', select: 'name profileImage role' },
-        { path: 'receiver', select: 'name profileImage role' }
+        { path: 'sender', select: 'name profileImage' },
+        { path: 'receiver', select: 'name profileImage' }
     ]), query)
         .filter()
         .sort()
         .fields();
     const { data, meta } = yield connectionQuery.cursorPaginate('_id');
-    // Format data to expose "otherUser" instead of sender/receiver to make it easier for frontend
+    // Format data to expose "connectedUser" instead of sender/receiver to make it easier for frontend
     const formattedData = data.map((conn) => {
         const isSender = String(conn.sender._id) === userId;
         return {
             _id: conn._id,
             status: conn.status,
             chatId: conn.chatId,
-            respondedAt: conn.respondedAt,
             createdAt: conn.createdAt,
-            user: isSender ? conn.receiver : conn.sender,
+            connectedUser: isSender ? {
+                id: conn.receiver._id,
+                name: conn.receiver.name,
+                profileImage: conn.receiver.profileImage,
+            } : {
+                id: conn.sender._id,
+                name: conn.sender.name,
+                profileImage: conn.sender.profileImage,
+            },
         };
     });
     return {
@@ -273,29 +280,6 @@ const getPendingConnectionRequests = (userId, type, query) => __awaiter(void 0, 
         pagination: meta,
     };
 });
-const getConnectionStatus = (userId, otherUserId) => __awaiter(void 0, void 0, void 0, function* () {
-    const connectionKey = (0, connection_utils_1.generateConnectionKey)(userId, otherUserId);
-    const connection = yield connection_model_1.Connection.findOne({ connectionKey });
-    if (!connection) {
-        return { status: 'NONE' };
-    }
-    if (connection.status === connection_constants_1.CONNECTION_STATUS.ACCEPTED) {
-        return {
-            status: 'CONNECTED',
-            connectionId: connection._id,
-            chatId: connection.chatId
-        };
-    }
-    if (connection.status === connection_constants_1.CONNECTION_STATUS.PENDING) {
-        if (String(connection.sender) === userId) {
-            return { status: 'PENDING_SENT', connectionId: connection._id };
-        }
-        else {
-            return { status: 'PENDING_RECEIVED', connectionId: connection._id };
-        }
-    }
-    return { status: 'NONE' };
-});
 exports.ConnectionService = {
     sendConnectionRequest,
     respondToConnectionRequest,
@@ -303,5 +287,4 @@ exports.ConnectionService = {
     removeConnection,
     getMyConnections,
     getPendingConnectionRequests,
-    getConnectionStatus,
 };

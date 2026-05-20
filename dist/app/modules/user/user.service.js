@@ -392,29 +392,32 @@ const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0,
             as: 'connectionInfo',
         },
     });
-    // 4. Set connectionStatus using the exact Connection model enum values:
-    //    NONE             → no connection document exists
-    //    PENDING_SENT     → connection document exists with status 'PENDING' and requester is sender
-    //    PENDING_RECEIVED → connection document exists with status 'PENDING' and requester is receiver
-    //    CONNECTED        → connection document exists with status 'ACCEPTED'
+    // 4. Set nested connection object relative to requester:
+    //    No connection: connection: null
+    //    Pending:       connection: { id, status: 'PENDING', direction: 'OUTGOING' | 'INCOMING' }
+    //    Accepted:      connection: { id, status: 'ACCEPTED' } (direction is omitted)
     pipeline.push({
         $addFields: {
-            connectionStatus: {
+            connection: {
                 $let: {
                     vars: { conn: { $arrayElemAt: ['$connectionInfo', 0] } },
                     in: {
                         $cond: {
                             if: { $not: ['$$conn'] },
-                            then: 'NONE',
+                            then: null,
                             else: {
-                                $cond: {
-                                    if: { $eq: ['$$conn.status', 'ACCEPTED'] },
-                                    then: 'CONNECTED',
-                                    else: {
-                                        $cond: {
-                                            if: { $eq: ['$$conn.sender', new mongoose_1.Types.ObjectId(user.id)] },
-                                            then: 'PENDING_SENT',
-                                            else: 'PENDING_RECEIVED',
+                                id: '$$conn._id',
+                                status: '$$conn.status',
+                                direction: {
+                                    $cond: {
+                                        if: { $eq: ['$$conn.status', 'ACCEPTED'] },
+                                        then: '$$REMOVE',
+                                        else: {
+                                            $cond: {
+                                                if: { $eq: ['$$conn.sender', new mongoose_1.Types.ObjectId(user.id)] },
+                                                then: 'OUTGOING',
+                                                else: 'INCOMING',
+                                            },
                                         },
                                     },
                                 },
@@ -423,7 +426,6 @@ const getUserProfilesFromDB = (user, query) => __awaiter(void 0, void 0, void 0,
                     },
                 },
             },
-            connectionId: { $arrayElemAt: ['$connectionInfo._id', 0] },
         },
     });
     // 5. Strip the raw lookup array before results
@@ -661,25 +663,24 @@ const getUserDetailsByIdFromDB = (id, requester) => __awaiter(void 0, void 0, vo
         const connectionKey = [requester.id, id].sort().join('_');
         const connection = yield connection_model_1.Connection.findOne({ connectionKey });
         if (!connection) {
-            result.connectionStatus = 'NONE';
+            result.connection = null;
         }
         else if (connection.status === 'ACCEPTED') {
-            result.connectionStatus = 'CONNECTED';
-            result.connectionId = connection._id.toString();
-            result.chatId = connection.chatId ? connection.chatId.toString() : undefined;
+            result.connection = {
+                id: connection._id.toString(),
+                status: 'ACCEPTED',
+                chatId: connection.chatId ? connection.chatId.toString() : undefined,
+            };
         }
         else if (connection.status === 'PENDING') {
-            if (String(connection.sender) === requester.id) {
-                result.connectionStatus = 'PENDING_SENT';
-                result.connectionId = connection._id.toString();
-            }
-            else {
-                result.connectionStatus = 'PENDING_RECEIVED';
-                result.connectionId = connection._id.toString();
-            }
+            result.connection = {
+                id: connection._id.toString(),
+                status: 'PENDING',
+                direction: String(connection.sender) === requester.id ? 'OUTGOING' : 'INCOMING',
+            };
         }
         else {
-            result.connectionStatus = 'NONE';
+            result.connection = null;
         }
     }
     return result;

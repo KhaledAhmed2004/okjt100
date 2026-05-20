@@ -125,7 +125,7 @@ function createAuthUser(role_1) {
             (0, vitest_1.expect)(response.status).toBe(404);
             (0, vitest_1.expect)(response.body.message).toBe("User not found");
         }));
-        (0, vitest_1.it)('returns profile details with connectionStatus: NONE when no connection exists', () => __awaiter(void 0, void 0, void 0, function* () {
+        (0, vitest_1.it)('returns profile details with connection: null when no connection exists', () => __awaiter(void 0, void 0, void 0, function* () {
             const { token: brotherToken } = yield createAuthUser(user_1.USER_ROLES.BROTHER);
             const { user: targetBrother } = yield createAuthUser(user_1.USER_ROLES.BROTHER);
             const response = yield (0, supertest_1.default)(app_1.default)
@@ -133,10 +133,9 @@ function createAuthUser(role_1) {
                 .set('Authorization', `Bearer ${brotherToken}`);
             (0, vitest_1.expect)(response.status).toBe(200);
             (0, vitest_1.expect)(response.body.success).toBe(true);
-            (0, vitest_1.expect)(response.body.data.connectionStatus).toBe('NONE');
-            (0, vitest_1.expect)(response.body.data.connectionId).toBeUndefined();
+            (0, vitest_1.expect)(response.body.data.connection).toBeNull();
         }));
-        (0, vitest_1.it)('returns profile details with connectionStatus: PENDING_SENT when a request is sent by requester', () => __awaiter(void 0, void 0, void 0, function* () {
+        (0, vitest_1.it)('returns profile details with connection status PENDING and direction OUTGOING when a request is sent by requester', () => __awaiter(void 0, void 0, void 0, function* () {
             const { user: userA, token: tokenA } = yield createAuthUser(user_1.USER_ROLES.BROTHER);
             const { user: userB } = yield createAuthUser(user_1.USER_ROLES.BROTHER);
             const connectionKey = [userA._id.toString(), userB._id.toString()].sort().join('_');
@@ -151,10 +150,12 @@ function createAuthUser(role_1) {
                 .set('Authorization', `Bearer ${tokenA}`);
             (0, vitest_1.expect)(response.status).toBe(200);
             (0, vitest_1.expect)(response.body.success).toBe(true);
-            (0, vitest_1.expect)(response.body.data.connectionStatus).toBe('PENDING_SENT');
-            (0, vitest_1.expect)(response.body.data.connectionId).toBe(connection._id.toString());
+            (0, vitest_1.expect)(response.body.data.connection).toBeDefined();
+            (0, vitest_1.expect)(response.body.data.connection.status).toBe('PENDING');
+            (0, vitest_1.expect)(response.body.data.connection.direction).toBe('OUTGOING');
+            (0, vitest_1.expect)(response.body.data.connection.id).toBe(connection._id.toString());
         }));
-        (0, vitest_1.it)('returns profile details with connectionStatus: PENDING_RECEIVED when a request is received by requester', () => __awaiter(void 0, void 0, void 0, function* () {
+        (0, vitest_1.it)('returns profile details with connection status PENDING and direction INCOMING when a request is received by requester', () => __awaiter(void 0, void 0, void 0, function* () {
             const { user: userA, token: tokenA } = yield createAuthUser(user_1.USER_ROLES.BROTHER);
             const { user: userB } = yield createAuthUser(user_1.USER_ROLES.BROTHER);
             const connectionKey = [userA._id.toString(), userB._id.toString()].sort().join('_');
@@ -169,10 +170,12 @@ function createAuthUser(role_1) {
                 .set('Authorization', `Bearer ${tokenA}`);
             (0, vitest_1.expect)(response.status).toBe(200);
             (0, vitest_1.expect)(response.body.success).toBe(true);
-            (0, vitest_1.expect)(response.body.data.connectionStatus).toBe('PENDING_RECEIVED');
-            (0, vitest_1.expect)(response.body.data.connectionId).toBe(connection._id.toString());
+            (0, vitest_1.expect)(response.body.data.connection).toBeDefined();
+            (0, vitest_1.expect)(response.body.data.connection.status).toBe('PENDING');
+            (0, vitest_1.expect)(response.body.data.connection.direction).toBe('INCOMING');
+            (0, vitest_1.expect)(response.body.data.connection.id).toBe(connection._id.toString());
         }));
-        (0, vitest_1.it)('returns profile details with connectionStatus: CONNECTED when connection is accepted', () => __awaiter(void 0, void 0, void 0, function* () {
+        (0, vitest_1.it)('returns profile details with connection status ACCEPTED and omitted direction when connection is accepted', () => __awaiter(void 0, void 0, void 0, function* () {
             const { user: userA, token: tokenA } = yield createAuthUser(user_1.USER_ROLES.BROTHER);
             const { user: userB } = yield createAuthUser(user_1.USER_ROLES.BROTHER);
             const connectionKey = [userA._id.toString(), userB._id.toString()].sort().join('_');
@@ -189,9 +192,11 @@ function createAuthUser(role_1) {
                 .set('Authorization', `Bearer ${tokenA}`);
             (0, vitest_1.expect)(response.status).toBe(200);
             (0, vitest_1.expect)(response.body.success).toBe(true);
-            (0, vitest_1.expect)(response.body.data.connectionStatus).toBe('CONNECTED');
-            (0, vitest_1.expect)(response.body.data.connectionId).toBe(connection._id.toString());
-            (0, vitest_1.expect)(response.body.data.chatId).toBe(fakeChatId.toString());
+            (0, vitest_1.expect)(response.body.data.connection).toBeDefined();
+            (0, vitest_1.expect)(response.body.data.connection.status).toBe('ACCEPTED');
+            (0, vitest_1.expect)(response.body.data.connection.direction).toBeUndefined();
+            (0, vitest_1.expect)(response.body.data.connection.id).toBe(connection._id.toString());
+            (0, vitest_1.expect)(response.body.data.connection.chatId).toBe(fakeChatId.toString());
         }));
     });
 });

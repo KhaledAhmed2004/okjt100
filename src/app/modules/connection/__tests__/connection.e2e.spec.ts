@@ -129,7 +129,7 @@ describe('Connection E2E Tests', () => {
 
       // --- GENDER ISOLATION CHECK (BROTHER only sees BROTHERs) ---
       const hasSisterInBrotherList = initListResponse.body.data.some((p: any) => p.role === USER_ROLES.SISTER);
-      expect(hasSisterInBrotherList).toBe(false, 'BROTHER should not see SISTERs in discovery list');
+      expect(hasSisterInBrotherList).toBe(false);
       
       const userBInInitList = initListResponse.body.data.find(
         (p: any) => (p.id || p._id) === userB._id.toString()
@@ -151,7 +151,7 @@ describe('Connection E2E Tests', () => {
       logApi('GET', '/api/v1/users/profiles', {}, sisterListResponse.body, 'INITIAL-LIST-PROFILES-SISTER', 'User C (SISTER) fetches discovery list (should not see BROTHERs)');
       expect(sisterListResponse.status).toBe(200);
       const hasBrotherInSisterList = sisterListResponse.body.data.some((p: any) => p.role === USER_ROLES.BROTHER);
-      expect(hasBrotherInSisterList).toBe(false, 'SISTER should not see BROTHERs in discovery list');
+      expect(hasBrotherInSisterList).toBe(false);
 
       // Extract User B's ID directly from the profiles list payload to simulate discovery flow
       const userBIdFromList = userBInInitList.id || userBInInitList._id;
