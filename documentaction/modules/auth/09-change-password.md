@@ -6,12 +6,9 @@ Content-Type: application/json
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-For an already-logged-in user who wants to change their password without going through the email OTP flow. Validates the current password (defense-in-depth against stolen-token mutation), enforces the password-strength regex on the new password, hashes and stores it, and **bumps `tokenVersion`** — every JWT the user holds becomes invalid on the next request (true global logout). The client must re-authenticate after success.
-
-For unauthenticated password recovery (forgot password), use [03-forgot-password.md](./03-forgot-password.md) → [02-verify-otp.md](./02-verify-otp.md) → [04-reset-password.md](./04-reset-password.md).
-
----
+> For an already-logged-in user who wants to change their password without going through the email OTP flow. Validates the current password (defense-in-depth against stolen-token mutation), enforces the password-strength regex on the new password, hashes and stores it, and **bumps `tokenVersion`** — every JWT the user holds becomes invalid on the next request (true global logout). The client must re-authenticate after success.
+>
+> For unauthenticated password recovery (forgot password), use [03-forgot-password.md](./03-forgot-password.md) → [02-verify-otp.md](./02-verify-otp.md) → [04-reset-password.md](./04-reset-password.md).
 
 ## 2. Business Rules (Source of Truth)
 

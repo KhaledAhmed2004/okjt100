@@ -6,14 +6,11 @@ Content-Type: multipart/form-data
 Auth: None (Public — token validated inline)
 ```
 
-## 1. Overview
-Recovery path for users whose `status` was flipped to `REJECTED` by an admin. Because REJECTED users are blocked by both the login service and the protected-route auth middleware (see [auth/01-login.md](../auth/01-login.md) §status table and [system-concepts.md](../../system-concepts.md)), they have no way to authenticate. This endpoint is **public** and authenticates the user via a one-time token that the admin reject flow emails them automatically (see [admin/07-update-user.md](../admin/07-update-user.md) — `accountRejected` template).
+> Recovery path for users whose `status` was flipped to `REJECTED` by an admin. Because REJECTED users are blocked by both the login service and the protected-route auth middleware (see [auth/01-login.md](../auth/01-login.md) §status table and [system-concepts.md](../../system-concepts.md)), they have no way to authenticate. This endpoint is **public** and authenticates the user via a one-time token that the admin reject flow emails them automatically (see [admin/07-update-user.md](../admin/07-update-user.md) — `accountRejected` template).
+>
+> On success: the new `verificationImage` and `verificationVideo` replace the rejected ones (old files are unlinked from disk), `status` flips back to `PENDING`, `isVerified` resets to `false`, `rejectionReason` is cleared, the one-time token is consumed, and the user re-enters the admin verification queue.
 
-On success: the new `verificationImage` and `verificationVideo` replace the rejected ones (old files are unlinked from disk), `status` flips back to `PENDING`, `isVerified` resets to `false`, `rejectionReason` is cleared, the one-time token is consumed, and the user re-enters the admin verification queue.
-
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication
 - **Public route** — no `auth` middleware. The `token` in the request body is the credential.

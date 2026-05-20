@@ -17,12 +17,9 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 
 ---
 
-## 1. Overview
-Sends a message to a specific chat. Supports text and multiple file attachments (images, audio, video, documents).
+> Sends a text or media message within a chat conversation. Supports multi-file uploads for images, videos, and documents.
 
----
-
-## 2. Business Rules
+## 2. Business Rules (Source of Truth)
 - **Authorization**: Sender ke oboshshoi oi `chatId` er ekjon participant hote hobe.
 - **Attachments**: Files upload hoye ekta unified `attachments` array te convert hoy. Prottekta attachment object-er shape: `{ type: 'image'|'video'|'audio'|'file', url: string, name: string }`.
 - **Real-time**: 

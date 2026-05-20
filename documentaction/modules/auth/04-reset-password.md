@@ -7,12 +7,9 @@ Content-Type: application/json
 Auth: Reset Token (NOT a JWT — opaque 64-char hex)
 ```
 
-## 1. Overview
-Commits a new password using the `resetToken` issued by [02-verify-otp.md](./02-verify-otp.md). The token sits in the `Authorization` header (either as raw value or with `Bearer ` prefix — controller accepts both). On success: password is hashed, the user's `tokenVersion` is bumped (every JWT they hold becomes invalid — true global logout), the one-time `isResetPassword` flag is cleared, and every reset token tied to this user is deleted.
-
-After success, the client must redirect to [01-login.md](./01-login.md) and authenticate with the new password.
-
----
+> Commits a new password using the `resetToken` issued by [02-verify-otp.md](./02-verify-otp.md). The token sits in the `Authorization` header (either as raw value or with `Bearer ` prefix — controller accepts both). On success: password is hashed, the user's `tokenVersion` is bumped (every JWT they hold becomes invalid — true global logout), the one-time `isResetPassword` flag is cleared, and every reset token tied to this user is deleted.
+>
+> After success, the client must redirect to [01-login.md](./01-login.md) and authenticate with the new password.
 
 ## 2. Business Rules (Source of Truth)
 

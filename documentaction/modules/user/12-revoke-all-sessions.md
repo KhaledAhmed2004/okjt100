@@ -5,14 +5,11 @@ POST /users/me/sessions/revoke-all
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Nukes every device session for the authenticated user — clears `deviceTokens[]` entirely **and** bumps `tokenVersion`. Every JWT this user holds (including the one used to call this endpoint) becomes invalid on the next request. The classic "log me out everywhere" / "I lost my phone" button.
+> Nukes every device session for the authenticated user — clears `deviceTokens[]` entirely **and** bumps `tokenVersion`. Every JWT this user holds (including the one used to call this endpoint) becomes invalid on the next request. The classic "log me out everywhere" / "I lost my phone" button.
+>
+> This is **the only user-callable mechanism** to invalidate every active JWT. Password reset and password change also bump `tokenVersion` (see [system-concepts.md — Token-Version Invalidation Policy](../../system-concepts.md#token-version-invalidation-policy)).
 
-This is **the only user-callable mechanism** to invalidate every active JWT. Password reset and password change also bump `tokenVersion` (see [system-concepts.md — Token-Version Invalidation Policy](../../system-concepts.md#token-version-invalidation-policy)).
-
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

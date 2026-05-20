@@ -34,7 +34,7 @@
                 "login"
               ]
             },
-            "description": "`400 Bad Request` from `validateRequest` with the Zod error details.",
+            "description": "Standard email + password sign-in. Returns an access-token / refresh-token pair. The refresh token is also set as an `httpOnly` cookie so browser clients don't have to handle it in JS. Status checks happen at the service layer **before** password comparison so the user gets the right reason (suspended / rejected / unverified) instead of a generic 401.",
             "auth": {
               "type": "noauth"
             },
@@ -89,7 +89,7 @@
                 "verify-otp"
               ]
             },
-            "description": "`429 Too Many Requests` (`\"message\": \"Too many requests, please try again later\"`).",
+            "description": "Single endpoint that handles **two distinct flows** based on the user's `isVerified` state at the moment of OTP submission:",
             "auth": {
               "type": "noauth"
             },
@@ -144,7 +144,7 @@
                 "forgot-password"
               ]
             },
-            "description": "`400 Bad Request` from `validateRequest`. Note that malformed emails fail loudly (Zod 400), but unknown emails return silent 200 — the distinction is between \"shape is wrong\" (client bug) and \"email doesn't exist\" (intentional silence).",
+            "description": "Initiates the password-reset flow by sending a 6-digit OTP to the user's email. Designed with **silent success** — the response is identical whether the email belongs to a real account or not. An attacker who pastes a list of emails into this endpoint cannot tell which ones are registered. The actual reset happens in two more steps: [02-verify-otp.md](./02-verify-otp.md) (issues a `resetToken`) → [04-reset-password.md](./04-reset-password.md) (commits the new password).",
             "auth": {
               "type": "noauth"
             },
@@ -181,7 +181,7 @@
                 "reset-password"
               ]
             },
-            "description": "`400 Bad Request` (`\"message\": \"Password must include upper, lower, number, special and be 8+ chars\"`).",
+            "description": "Commits a new password using the `resetToken` issued by [02-verify-otp.md](./02-verify-otp.md). The token sits in the `Authorization` header (either as raw value or with `Bearer ` prefix — controller accepts both). On success: password is hashed, the user's `tokenVersion` is bumped (every JWT they hold becomes invalid — true global logout), the one-time `isResetPassword` flag is cleared, and every reset token tied to this user is deleted.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -225,7 +225,7 @@
                 "refresh-token"
               ]
             },
-            "description": "`400 \"Refresh token is required\"`.",
+            "description": "Rotates a refresh token. Verifies the inbound refresh JWT, compares its embedded `tokenVersion` against the DB value (**reuse detection**), bumps the DB `tokenVersion`, and issues a fresh access + refresh pair. If a previously-rotated refresh token is replayed (typical attacker behavior with a stolen token after the legitimate client has already rotated), the version check fails and every JWT for the user is invalidated — the user must log in again.",
             "auth": {
               "type": "noauth"
             },
@@ -280,7 +280,7 @@
                 "logout"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Ends the **current device's** push session and clears the `refreshToken` browser cookie. Removes the supplied `deviceToken` from the user's `deviceTokens[]` array so the device stops receiving FCM/APNs notifications. **Does NOT bump `tokenVersion`** — the JWT itself remains valid until natural expiry (short-lived access token; refresh-token flow will continue to work on this device until the user logs back in elsewhere). To globally invalidate every session on every device, use [user/12-revoke-all-sessions.md](../user/12-revoke-all-sessions.md) (bumps `tokenVersion`).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -324,7 +324,7 @@
                 "resend-otp"
               ]
             },
-            "description": "`400 Bad Request` from `validateRequest`.",
+            "description": "Re-issues the 6-digit registration verification OTP that gets sent during account creation. **Only for the registration flow** — to obtain a fresh password-reset OTP, call [03-forgot-password.md](./03-forgot-password.md) again, which overwrites the existing OTP and invalidates prior reset tokens.",
             "auth": {
               "type": "noauth"
             },
@@ -361,7 +361,7 @@
                 "social-login"
               ]
             },
-            "description": "`400 Bad Request` from `validateRequest`.",
+            "description": "Unified sign-in / sign-up via Google or Apple ID tokens. Verifies the provider-issued JWT cryptographically (Google: RSA against `googleAudience` array of iOS/Android/Web client IDs; Apple: RSA + nonce-hash match), then either logs an existing user in (matched strictly by `googleId` / `appleId`) or creates a new account. Refuses to auto-link a provider identity to an existing email-based account — that's an OWASP-flagged account-hijack vector. Returns the same `{ accessToken, refreshToken }` envelope as [01-login.md](./01-login.md).",
             "auth": {
               "type": "noauth"
             },
@@ -398,7 +398,7 @@
                 "change-password"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "For an already-logged-in user who wants to change their password without going through the email OTP flow. Validates the current password (defense-in-depth against stolen-token mutation), enforces the password-strength regex on the new password, hashes and stores it, and **bumps `tokenVersion`** — every JWT the user holds becomes invalid on the next request (true global logout). The client must re-authenticate after success.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -442,7 +442,7 @@
                 "restore-account"
               ]
             },
-            "description": "ACTIVE`, clears `deletedAt` / `recoveryDeadline`, bumps `tokenVersion` (so any leftover JWTs from before deletion stay invalid), and issues a fresh access + refresh token pair — same response shape as `POST /auth/login`.",
+            "description": "Restores an account that was soft-deleted via [user/06-delete-account.md](../user/06-delete-account.md) and is still inside its 30-day recovery window. The endpoint takes `email` + `password`, validates both, flips `status: DELETED -> ACTIVE`, clears `deletedAt` / `recoveryDeadline`, bumps `tokenVersion` (so any leftover JWTs from before deletion stay invalid), and issues a fresh access + refresh token pair — same response shape as `POST /auth/login`.",
             "auth": {
               "type": "noauth"
             },
@@ -483,7 +483,7 @@
                 "users"
               ]
             },
-            "description": "request silently proceeds as **public registration** (`isAdmin = false`).",
+            "description": "Single endpoint for both **public mobile registration** (`BROTHER` / `SISTER`) and **administrative account creation** (`SUPER_ADMIN`). The difference is detected at the controller level: if a valid `Bearer` token belonging to a `SUPER_ADMIN` is supplied, the request is treated as admin creation; otherwise it is public registration. There is **no `auth` middleware** on this route — the JWT is inspected inline. Any token error silently falls back to public registration.",
             "auth": {
               "type": "noauth"
             },
@@ -580,7 +580,7 @@
           "response": []
         },
         {
-          "name": "2.2 Get User Details (Public Profile)",
+          "name": "2.02 Get Public User Details",
           "request": {
             "method": "GET",
             "header": [
@@ -591,14 +591,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/users/{{userId}}/user",
+              "raw": "{{baseUrl}}/users/{{userId}}/public",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "users",
                 "{{userId}}",
-                "user"
+                "public"
               ],
               "variable": [
                 {
@@ -607,7 +607,7 @@
                 }
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Retrieves public profile information of another user.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -642,7 +642,7 @@
                 "me"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Returns the **full** profile of the currently authenticated user, including private fields hidden from the public endpoint. Read-only — no DB writes, no side effects.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -677,7 +677,7 @@
                 "me"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Allows the currently authenticated user to update their own profile (text fields and an optional new `profileImage`). The previous profile image is unlinked from disk when a new one is uploaded.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -777,7 +777,7 @@
                 "me"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Lets the authenticated user request deletion of their own account. The account is **soft-deleted** with a 30-day recovery window — during that window the user can come back and re-activate via [auth/10-restore-account.md](../auth/10-restore-account.md). After 30 days, a daily cron job at 03:00 UTC permanently removes the user record and cascade-deletes their owned content (notifications, group activity, ask-imam questions, reset tokens). Subscription history is intentionally retained for billing / IAP-refund audit.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -823,7 +823,7 @@
                 "request"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Step 1 of the self-service email-change flow. The user supplies a new email address and their current password; the server validates the password, checks the new email isn't already in use, stores the pending change on the user document, and:",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -869,7 +869,7 @@
                 "confirm"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Step 2 of the self-service email-change flow. The user submits the 6-digit OTP that was emailed to the **new** address by [07-email-change-request.md](./07-email-change-request.md). On a successful match the server commits the change: `email` is updated to the pending value, the `emailChange` subdoc is cleared, and `tokenVersion` is bumped — invalidating every JWT that was issued under the old email. The client must call [auth/01-login.md](../auth/01-login.md) again with the new email.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -914,7 +914,7 @@
                 "data-export"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Returns a single JSON envelope containing every piece of data the system stores **about** the requesting user. Satisfies GDPR Article 15 (right of access). Synchronous — the entire payload is in the HTTP response. Mobile-store policies (Apple §5.1.1(v), Google Play account-deletion policy) require this surface to exist for accounts in EU jurisdictions.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -950,7 +950,7 @@
                 "sessions"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Lists every device session for the authenticated user. A \"session\" is one entry in `User.deviceTokens[]` — typically created at login on each device (mobile / tablet / browser). The response returns metadata only: **the raw FCM/APNs push token is never exposed**, only the subdoc id (`tokenId`), `platform`, `appVersion`, and `lastSeenAt`. The client uses `tokenId` to address a specific session in [11-revoke-session.md](./11-revoke-session.md).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -993,7 +993,7 @@
                 }
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Removes **one** specific device session from the authenticated user's `deviceTokens[]`. The device stops receiving push notifications immediately. The JWT issued to that device **remains valid until natural expiry** — `tokenVersion` is intentionally not bumped (bumping it would invalidate every session, not just this one). For a true \"logout this device, invalidate its token now\" use [auth/06-logout.md](../auth/06-logout.md) **on the device itself**, or use [12-revoke-all-sessions.md](./12-revoke-all-sessions.md) to nuke everything.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1030,7 +1030,7 @@
                 "revoke-all"
               ]
             },
-            "description": "`401 Unauthorized` (`\"message\": \"Unauthorized access\"`).",
+            "description": "Nukes every device session for the authenticated user — clears `deviceTokens[]` entirely **and** bumps `tokenVersion`. Every JWT this user holds (including the one used to call this endpoint) becomes invalid on the next request. The classic \"log me out everywhere\" / \"I lost my phone\" button.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1065,7 +1065,7 @@
                 "reverify"
               ]
             },
-            "description": "`400 \"Invalid re-verification token format\"`. |",
+            "description": "Recovery path for users whose `status` was flipped to `REJECTED` by an admin. Because REJECTED users are blocked by both the login service and the protected-route auth middleware (see [auth/01-login.md](../auth/01-login.md) §status table and [system-concepts.md](../../system-concepts.md)), they have no way to authenticate. This endpoint is **public** and authenticates the user via a one-time token that the admin reject flow emails them automatically (see [admin/07-update-user.md](../admin/07-update-user.md) — `accountRejected` template).",
             "auth": {
               "type": "noauth"
             },
@@ -1218,7 +1218,7 @@
           "response": []
         },
         {
-          "name": "2.16 Get User by ID (Admin)",
+          "name": "2.16 Get User (Admin Only)",
           "request": {
             "method": "GET",
             "header": [
@@ -1244,7 +1244,7 @@
                 }
               ]
             },
-            "description": "Admin specific view of a user's basic info. Returns user data wrapped in a `user` object.",
+            "description": "Retrieves full user details by ID. This endpoint is strictly for Administrators. Regular users should use `/users/:userId/public` or `/users/me`.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1747,11 +1747,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups",
+              "raw": "{{baseUrl}}/api/v1/groups",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "groups"
               ]
             },
@@ -1783,11 +1785,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups?page=1&limit=10&searchTerm=Quran",
+              "raw": "{{baseUrl}}/api/v1/groups?page=1&limit=10&searchTerm=Quran",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "groups"
               ],
               "query": [
@@ -1831,11 +1835,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/{{groupId}}/join",
+              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/join",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "groups",
                 "{{groupId}}",
                 "join"
@@ -1873,11 +1879,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/{{groupId}}/posts",
+              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/posts",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "groups",
                 "{{groupId}}",
                 "posts"
@@ -1924,11 +1932,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/{{groupId}}/posts?page=1&limit=10&searchTerm=keyword",
+              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/posts?page=1&limit=10&searchTerm=keyword",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "groups",
                 "{{groupId}}",
                 "posts"
@@ -1980,11 +1990,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/posts/{{postId}}/like",
+              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}/like",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "groups",
                 "posts",
                 "{{postId}}",
@@ -2023,11 +2035,13 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/groups/posts/{{postId}}/comments",
+              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}/comments",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
+                "api",
+                "v1",
                 "groups",
                 "posts",
                 "{{postId}}",
@@ -2059,6 +2073,416 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.8 Delete Post",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "posts",
+                "{{postId}}"
+              ],
+              "variable": [
+                {
+                  "key": "postId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Deletes a post and all its associated likes and comments. Also cleans up any attached files.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.9 Delete Comment",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/comments/{{commentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "comments",
+                "{{commentId}}"
+              ],
+              "variable": [
+                {
+                  "key": "commentId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Deletes a comment. If it's a top-level comment, all nested replies will also be deleted.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.10 Leave Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/leave",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "{{groupId}}",
+                "leave"
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Removes the authenticated user from the specified group and decrements the group's member count.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.11 Update Group",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "{{groupId}}"
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Updates the metadata of an existing group.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.12 Delete Group",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "{{groupId}}"
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Deletes a group and all associated members, posts, likes, and comments. Also cleans up attached files.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.13 Get Group Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "{{groupId}}"
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Fetches metadata for a single group, including a flag indicating if the requesting user is a member.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.14 Get Post Comments",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}/comments?page=1&limit=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "posts",
+                "{{postId}}",
+                "comments"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "postId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Fetches the paginated list of comments for a specific post.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.15 Kick Member",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/members/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "{{groupId}}",
+                "members",
+                "{{userId}}"
+              ],
+              "variable": [
+                {
+                  "key": "groupId",
+                  "value": ""
+                },
+                {
+                  "key": "userId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Removes a member from a group. Only accessible by Super Admins.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.16 Pin/Unpin Post",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}/pin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "groups",
+                "posts",
+                "{{postId}}",
+                "pin"
+              ],
+              "variable": [
+                {
+                  "key": "postId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Toggles the \"pinned\" status of a post. Pinned posts appear at the top of the group feed.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             }
           },
           "response": []
@@ -4377,64 +4801,15 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/connections/request/{{userId}}",
+              "raw": "{{baseUrl}}/connections",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "connections",
-                "request",
-                "{{userId}}"
-              ],
-              "variable": [
-                {
-                  "key": "userId",
-                  "value": ""
-                }
+                "connections"
               ]
             },
-            "description": "",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "14.2 Respond to Request",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/connections/{{connectionId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "connections",
-                "{{connectionId}}"
-              ],
-              "variable": [
-                {
-                  "key": "connectionId",
-                  "value": ""
-                }
-              ]
-            },
-            "description": "",
+            "description": "Allows a user to send a connection request to another user. If the request is successful, a pending connection record is created, and the receiver is notified via Socket.IO and Push Notification.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4447,7 +4822,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"action\": \"ACCEPT\", // Either `ACCEPT` or `REJECT`\n}",
+              "raw": "{\n  \"receiverId\": \"664a1b2c3d4e5f6a7b8c9d1c\", // The `id` of the user you want to connect with\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4458,9 +4833,9 @@
           "response": []
         },
         {
-          "name": "14.3 Cancel Pending Request",
+          "name": "14.2 Accept Connection Request",
           "request": {
-            "method": "DELETE",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -4469,14 +4844,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/connections/{{connectionId}}/request",
+              "raw": "{{baseUrl}}/connections/{{connectionId}}/accept",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "connections",
                 "{{connectionId}}",
-                "request"
+                "accept"
               ],
               "variable": [
                 {
@@ -4485,7 +4860,7 @@
                 }
               ]
             },
-            "description": "Allows the **sender** of a pending connection request to cancel (undo) it before the receiver responds. Uses `DELETE` because the pending request document is permanently removed.",
+            "description": "Allows the receiver of a connection request to accept it. This action updates the connection status to `ACCEPTED` and automatically creates a private chat between the two users.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4500,9 +4875,9 @@
           "response": []
         },
         {
-          "name": "14.4 Remove Connection",
+          "name": "14.3 Reject Connection Request",
           "request": {
-            "method": "DELETE",
+            "method": "POST",
             "header": [
               {
                 "key": "Content-Type",
@@ -4511,13 +4886,14 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/connections/{{connectionId}}",
+              "raw": "{{baseUrl}}/connections/{{connectionId}}/reject",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "connections",
-                "{{connectionId}}"
+                "{{connectionId}}",
+                "reject"
               ],
               "variable": [
                 {
@@ -4526,7 +4902,7 @@
                 }
               ]
             },
-            "description": "Allows either user in an **accepted** connection to permanently remove it. Both the connection record and the associated chat session are invalidated.",
+            "description": "Allows the receiver of a connection request to reject it. This action deletes the connection record from the database.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4541,7 +4917,91 @@
           "response": []
         },
         {
-          "name": "14.5 List My Connections",
+          "name": "14.4 Cancel Pending Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections/{{connectionId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections",
+                "{{connectionId}}",
+                "cancel"
+              ],
+              "variable": [
+                {
+                  "key": "connectionId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Allows the **sender** of a pending connection request to cancel (undo) it before the receiver responds.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14.5 Remove Connection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/connections/{{connectionId}}/remove",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "connections",
+                "{{connectionId}}",
+                "remove"
+              ],
+              "variable": [
+                {
+                  "key": "connectionId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Allows either user in an **accepted** connection to permanently remove it.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "14.6 List My Connections",
           "request": {
             "method": "GET",
             "header": [
@@ -4561,28 +5021,18 @@
               ],
               "query": [
                 {
-                  "key": "page",
-                  "value": "1",
-                  "description": "Pagination page number"
-                },
-                {
                   "key": "limit",
                   "value": "10",
                   "description": "Pagination limit"
                 },
                 {
-                  "key": "sort",
-                  "value": "-createdAt",
-                  "description": "Sort field (prefix with `-` for descending)"
-                },
-                {
-                  "key": "fields",
-                  "value": "status,createdAt",
-                  "description": "Comma-separated fields to select"
+                  "key": "cursor",
+                  "value": "...",
+                  "description": "Base64 cursor for next page"
                 }
               ]
             },
-            "description": "",
+            "description": "Fetches a paginated list of all established (ACCEPTED) connections for the logged-in user.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4597,7 +5047,7 @@
           "response": []
         },
         {
-          "name": "14.6 List Pending Requests",
+          "name": "14.7 List Connection Requests",
           "request": {
             "method": "GET",
             "header": [
@@ -4618,14 +5068,14 @@
               ],
               "query": [
                 {
-                  "key": "type",
+                  "key": "direction",
                   "value": "sent",
                   "description": "Whether to fetch requests you `sent` or `received`"
                 },
                 {
                   "key": "nextCursor",
-                  "value": "",
-                  "description": "Base64 cursor value for pagination"
+                  "value": "NjY0YTFiMmMzZDRlNWY2YTdiOGM5ZDFh",
+                  "description": "Base64 encoded cursor value of the last item from the previous page for cursor pagination"
                 },
                 {
                   "key": "limit",
@@ -4644,49 +5094,7 @@
                 }
               ]
             },
-            "description": "",
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "14.7 Check Connection Status",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json",
-                "type": "text"
-              }
-            ],
-            "url": {
-              "raw": "{{baseUrl}}/connections/status/{{userId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "connections",
-                "status",
-                "{{userId}}"
-              ],
-              "variable": [
-                {
-                  "key": "userId",
-                  "value": ""
-                }
-              ]
-            },
-            "description": "",
+            "description": "Fetches a cursor-paginated list of pending connection requests, either sent by the user (`direction=sent`) or received by them (`direction=received`).",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4732,7 +5140,7 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Creates a new chat between the logged-in user and another user, or retrieves an existing one if it already exists.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4772,7 +5180,7 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Fetches all chat conversations for the logged-in user, including last message preview, unread count, and participant presence.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -4811,7 +5219,7 @@
                 "messages"
               ]
             },
-            "description": "",
+            "description": "Sends a text or media message within a chat conversation. Supports multi-file uploads for images, videos, and documents.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -5127,6 +5535,70 @@
               ]
             },
             "description": "User manually FREE plan-e switch korar jonno ei endpoint use korbe (jodi tar kono active store subscription na thake).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Prayer Time Module",
+      "item": [
+        {
+          "name": "18.1 Get Prayer Times",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/prayer-times",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "prayer-times"
+              ],
+              "query": [
+                {
+                  "key": "latitude",
+                  "value": "23.8103",
+                  "description": "Latitude of the location (must be between -90 and 90)"
+                },
+                {
+                  "key": "longitude",
+                  "value": "90.4125",
+                  "description": "Longitude of the location (must be between -180 and 180)"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-06-12",
+                  "description": "Target date in `YYYY-MM-DD` format (defaults to current date)"
+                },
+                {
+                  "key": "timezone",
+                  "value": "Asia/Dhaka",
+                  "description": "Standard IANA timezone identifier (defaults to `Asia/Dhaka`)"
+                },
+                {
+                  "key": "madhab",
+                  "value": "Hanafi",
+                  "description": "Madhab for Asr calculation: `Hanafi` (default) or `Shafi`"
+                },
+                {
+                  "key": "method",
+                  "value": "karachi",
+                  "description": "Calculation method authority (default: `karachi`)"
+                }
+              ]
+            },
+            "description": "Computes highly accurate Salat (Prayer) times dynamically and offline based on geographical coordinates (GPS) and a date.",
             "auth": {
               "type": "noauth"
             }

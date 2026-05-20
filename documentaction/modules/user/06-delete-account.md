@@ -6,14 +6,11 @@ Content-Type: application/json
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Lets the authenticated user request deletion of their own account. The account is **soft-deleted** with a 30-day recovery window — during that window the user can come back and re-activate via [auth/10-restore-account.md](../auth/10-restore-account.md). After 30 days, a daily cron job at 03:00 UTC permanently removes the user record and cascade-deletes their owned content (notifications, group activity, ask-imam questions, reset tokens). Subscription history is intentionally retained for billing / IAP-refund audit.
+> Lets the authenticated user request deletion of their own account. The account is **soft-deleted** with a 30-day recovery window — during that window the user can come back and re-activate via [auth/10-restore-account.md](../auth/10-restore-account.md). After 30 days, a daily cron job at 03:00 UTC permanently removes the user record and cascade-deletes their owned content (notifications, group activity, ask-imam questions, reset tokens). Subscription history is intentionally retained for billing / IAP-refund audit.
+>
+> This endpoint requires the user's **current password** in the body — defense in depth against accidental or hijacked-session deletion.
 
-This endpoint requires the user's **current password** in the body — defense in depth against accidental or hijacked-session deletion.
-
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

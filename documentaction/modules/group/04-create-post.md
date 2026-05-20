@@ -1,7 +1,7 @@
 # 04. Create Post
 
 ```http
-POST /groups/:groupId/posts
+POST /api/v1/groups/:groupId/posts
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```

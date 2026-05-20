@@ -1,7 +1,7 @@
 # 12. Delete Group
 
 ```http
-DELETE /groups/:groupId
+DELETE /api/v1/groups/:groupId
 Auth: Bearer {{accessToken}} (ADMIN, SUPER_ADMIN)
 ```
 

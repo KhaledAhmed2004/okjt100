@@ -6,12 +6,9 @@ Content-Type: application/json
 Auth: None (Public — credentials validated inline)
 ```
 
-## 1. Overview
-Restores an account that was soft-deleted via [user/06-delete-account.md](../user/06-delete-account.md) and is still inside its 30-day recovery window. The endpoint takes `email` + `password`, validates both, flips `status: DELETED -> ACTIVE`, clears `deletedAt` / `recoveryDeadline`, bumps `tokenVersion` (so any leftover JWTs from before deletion stay invalid), and issues a fresh access + refresh token pair — same response shape as `POST /auth/login`.
-
-After 30 days the user document is permanently purged by the daily cron at 03:00 UTC; restoration is no longer possible at that point. To prevent enumeration, the response in that case is the same as wrong credentials.
-
----
+> Restores an account that was soft-deleted via [user/06-delete-account.md](../user/06-delete-account.md) and is still inside its 30-day recovery window. The endpoint takes `email` + `password`, validates both, flips `status: DELETED -> ACTIVE`, clears `deletedAt` / `recoveryDeadline`, bumps `tokenVersion` (so any leftover JWTs from before deletion stay invalid), and issues a fresh access + refresh token pair — same response shape as `POST /auth/login`.
+>
+> After 30 days the user document is permanently purged by the daily cron at 03:00 UTC; restoration is no longer possible at that point. To prevent enumeration, the response in that case is the same as wrong credentials.
 
 ## 2. Business Rules (Source of Truth)
 

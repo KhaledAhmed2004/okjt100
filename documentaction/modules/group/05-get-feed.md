@@ -1,7 +1,7 @@
 # 05. Get Group Feed
 
 ```http
-GET /groups/:groupId/posts?page=1&limit=10&searchTerm=keyword
+GET /api/v1/groups/:groupId/posts?page=1&limit=10&searchTerm=keyword
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```

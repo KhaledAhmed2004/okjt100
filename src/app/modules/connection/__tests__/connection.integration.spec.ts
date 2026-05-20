@@ -171,7 +171,7 @@ describe('ConnectionService Integration', () => {
       const accepted = await ConnectionService.respondToConnectionRequest(
         connection.id.toString(),
         receiver._id.toString(),
-        CONNECTION_ACTION.ACCEPT
+        CONNECTION_ACTION.ACCEPTED
       );
       console.log('--- respondToConnectionRequest (ACCEPT) Response ---\n', JSON.stringify(accepted, null, 2));
 
@@ -202,11 +202,11 @@ describe('ConnectionService Integration', () => {
       const rejected = await ConnectionService.respondToConnectionRequest(
         connection.id.toString(),
         receiver._id.toString(),
-        CONNECTION_ACTION.REJECT
+        CONNECTION_ACTION.REJECTED
       );
       console.log('--- respondToConnectionRequest (REJECT) Response ---\n', JSON.stringify(rejected, null, 2));
 
-      expect(rejected).toBeNull();
+      expect(rejected).toEqual({ id: connection.id, status: 'NONE' });
       
       // Verify DB is clean
       const dbCheck = await Connection.findById(connection.id);
@@ -227,7 +227,7 @@ describe('ConnectionService Integration', () => {
         ConnectionService.respondToConnectionRequest(
           connection.id.toString(),
           hacker._id.toString(),
-          CONNECTION_ACTION.ACCEPT
+          CONNECTION_ACTION.ACCEPTED
         )
       ).rejects.toMatchObject({
         statusCode: 403,
@@ -289,7 +289,7 @@ describe('ConnectionService Integration', () => {
       await ConnectionService.respondToConnectionRequest(
         connection.id.toString(),
         receiver._id.toString(),
-        CONNECTION_ACTION.ACCEPT
+        CONNECTION_ACTION.ACCEPTED
       );
 
       await ConnectionService.removeConnection(

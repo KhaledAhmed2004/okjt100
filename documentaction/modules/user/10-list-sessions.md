@@ -5,12 +5,9 @@ GET /users/me/sessions
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Lists every device session for the authenticated user. A "session" is one entry in `User.deviceTokens[]` — typically created at login on each device (mobile / tablet / browser). The response returns metadata only: **the raw FCM/APNs push token is never exposed**, only the subdoc id (`tokenId`), `platform`, `appVersion`, and `lastSeenAt`. The client uses `tokenId` to address a specific session in [11-revoke-session.md](./11-revoke-session.md).
+> Lists every device session for the authenticated user. A "session" is one entry in `User.deviceTokens[]` — typically created at login on each device (mobile / tablet / browser). The response returns metadata only: **the raw FCM/APNs push token is never exposed**, only the subdoc id (`tokenId`), `platform`, `appVersion`, and `lastSeenAt`. The client uses `tokenId` to address a specific session in [11-revoke-session.md](./11-revoke-session.md).
 
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

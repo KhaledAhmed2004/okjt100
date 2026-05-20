@@ -6,16 +6,13 @@ Content-Type: application/json
 Auth: None (Public)
 ```
 
-## 1. Overview
-Re-issues the 6-digit registration verification OTP that gets sent during account creation. **Only for the registration flow** — to obtain a fresh password-reset OTP, call [03-forgot-password.md](./03-forgot-password.md) again, which overwrites the existing OTP and invalidates prior reset tokens.
-
-The service-layer helper `sendVerificationOTP` ([authHelpers.ts:18-57](../../../src/helpers/authHelpers.ts#L18-L57)) enforces a **60-second cooldown** between consecutive resends. The TTL on the issued OTP is **10 minutes** (longer than the password-reset OTP's 3 minutes because registration tolerates slower mail-checking).
-
-Two layers of throttling protect this endpoint:
-- **Per-user 60s cooldown** at the service layer (blocks repeated taps on the same email).
-- **Per-IP 5/min route limit** (blocks an attacker sweeping many emails from one host).
-
----
+> Re-issues the 6-digit registration verification OTP that gets sent during account creation. **Only for the registration flow** — to obtain a fresh password-reset OTP, call [03-forgot-password.md](./03-forgot-password.md) again, which overwrites the existing OTP and invalidates prior reset tokens.
+>
+> The service-layer helper `sendVerificationOTP` ([authHelpers.ts:18-57](../../../src/helpers/authHelpers.ts#L18-L57)) enforces a **60-second cooldown** between consecutive resends. The TTL on the issued OTP is **10 minutes** (longer than the password-reset OTP's 3 minutes because registration tolerates slower mail-checking).
+>
+> Two layers of throttling protect this endpoint:
+> - **Per-user 60s cooldown** at the service layer (blocks repeated taps on the same email).
+> - **Per-IP 5/min route limit** (blocks an attacker sweeping many emails from one host).
 
 ## 2. Business Rules (Source of Truth)
 

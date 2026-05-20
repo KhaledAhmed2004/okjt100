@@ -6,12 +6,9 @@ Content-Type: multipart/form-data
 Auth: None (Public Registration) | Bearer {{accessToken}} (SUPER_ADMIN create)
 ```
 
-## 1. Overview
-Single endpoint for both **public mobile registration** (`BROTHER` / `SISTER`) and **administrative account creation** (`SUPER_ADMIN`). The difference is detected at the controller level: if a valid `Bearer` token belonging to a `SUPER_ADMIN` is supplied, the request is treated as admin creation; otherwise it is public registration. There is **no `auth` middleware** on this route — the JWT is inspected inline. Any token error silently falls back to public registration.
+> Single endpoint for both **public mobile registration** (`BROTHER` / `SISTER`) and **administrative account creation** (`SUPER_ADMIN`). The difference is detected at the controller level: if a valid `Bearer` token belonging to a `SUPER_ADMIN` is supplied, the request is treated as admin creation; otherwise it is public registration. There is **no `auth` middleware** on this route — the JWT is inspected inline. Any token error silently falls back to public registration.
 
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 This route does **not** mount the `auth` middleware. The 9 standard auth-failure cases (missing token, malformed header, expired token, etc.) **do not apply** here.

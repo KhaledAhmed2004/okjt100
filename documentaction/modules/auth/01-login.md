@@ -6,10 +6,7 @@ Content-Type: application/json
 Auth: None (Public — credentials validated inline)
 ```
 
-## 1. Overview
-Standard email + password sign-in. Returns an access-token / refresh-token pair. The refresh token is also set as an `httpOnly` cookie so browser clients don't have to handle it in JS. Status checks happen at the service layer **before** password comparison so the user gets the right reason (suspended / rejected / unverified) instead of a generic 401.
-
----
+> Standard email + password sign-in. Returns an access-token / refresh-token pair. The refresh token is also set as an `httpOnly` cookie so browser clients don't have to handle it in JS. Status checks happen at the service layer **before** password comparison so the user gets the right reason (suspended / rejected / unverified) instead of a generic 401.
 
 ## 2. Business Rules (Source of Truth)
 

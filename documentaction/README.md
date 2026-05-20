@@ -47,13 +47,15 @@ Shob API ei format follow kore:
 | # | Screen | Description |
 |---|--------|-------------|
 | 1 | [Auth](./app-screens/01-auth.md) | Register, login, OTP verify, password reset, refresh token, social login |
-| 2 | [Home](./app-screens/02-home.md) | Stats, favorite cards, "All Cards / My Cards" tabs, quick create |
-| 3 | [Preference Card Details](./app-screens/03-preference-card-details.md) | Card details, favorite toggle, share, download |
-| 4 | [Create Preference Card](./app-screens/04-create-preference-card.md) | Card creation form, supplies/sutures pickers, photo upload, draft/publish |
-| 5 | [Library](./app-screens/05-library.md) | Global search across public preference cards (filters + sort) |
-| 6 | [Calendar](./app-screens/06-calendar.md) | Calendar view, event CRUD, reminders |
-| 7 | [Profile](./app-screens/07-profile.md) | User data, edit profile, subscription (IAP), legal pages, logout |
-| 8 | [Notifications](./app-screens/08-notifications.md) | Notification list, bell indicator (red dot from `meta.unreadCount`), mark read, delete |
+| 2 | [Home](./app-screens/02-home.md) | Stats, prayer times, community feed, quick navigation |
+| 3 | [Namaz/Prayer Time](./modules/prayer-time/README.md) | Prayer times calculation based on location/timezone |
+| 4 | [Community Discovery](./modules/user/README.md) | Discover brothers/sisters, view public profiles |
+| 5 | [Connections & Chat](./modules/connection/README.md) | Connect with others, real-time messaging, chat history |
+| 6 | [Dua & Learning](./modules/dua/README.md) | Islamic knowledge, duas, and learning content |
+| 7 | [Mosque & Khutbah](./modules/mosque/README.md) | Nearby mosques and recorded khutbahs |
+| 8 | [Profile](./app-screens/07-profile.md) | User data, edit profile, subscription (IAP), legal pages, logout |
+| 9 | [Notifications](./app-screens/08-notifications.md) | Notification list, mark read, delete |
+| 10 | [Support](./modules/support-ticket/README.md) | Help desk and support tickets |
 
 ---
 
@@ -63,8 +65,7 @@ Shob API ei format follow kore:
 |---|--------|-------------|
 | 1 | [Auth](./dashboard-screens/01-auth.md) | Admin login, token management, forget password flow |
 | 2 | [Overview](./dashboard-screens/02-overview.md) | Dashboard stats, counts, recent activity |
-| 3 | [User Management](./dashboard-screens/03-user-management.md) | Doctor / user management — search, filter, CRUD, block/activate |
-| 4 | [Preference Card Management](./dashboard-screens/04-preference-card-management.md) | Card moderation, verification (approve/reject), delete |
+| 3 | [User Management](./dashboard-screens/03-user-management.md) | Brother / Sister management — search, filter, verification, blocking |
+| 4 | [Islamic Content](./modules/learning-content/README.md) | Dua, Khutbah, and Learning content moderation |
 | 5 | [Legal Management](./dashboard-screens/05-legal-management.md) | Legal pages CMS (Terms, Privacy) |
-| 6 | [Supplies Management](./dashboard-screens/06-supplies-management.md) | Supplies master catalog — single + bulk create, edit, delete |
-| 7 | [Sutures Management](./dashboard-screens/07-sutures-management.md) | Sutures master catalog — single + bulk create, edit, delete |
+| 6 | [Support Tickets](./modules/support-ticket/README.md) | Help desk management for user queries |

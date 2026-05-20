@@ -40,6 +40,12 @@ import ScheduledNotification from './scheduler/ScheduledNotification.model';
 export type NotificationType =
   | 'ADMIN'
   | 'SYSTEM'
+  // ── Connection events ──────────────────────────────────────────────────────
+  | 'CONNECTION_REQUEST'
+  | 'CONNECTION_ACCEPTED'
+  // ── Messaging events ───────────────────────────────────────────────────────
+  | 'NEW_MESSAGE'
+  // ── Community events ───────────────────────────────────────────────────────
   | 'QUESTION_ANSWERED'
   | 'NEW_QUESTION'
   | 'POST_LIKED'

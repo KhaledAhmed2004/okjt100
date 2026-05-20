@@ -6,12 +6,9 @@ Content-Type: application/json
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Step 2 of the self-service email-change flow. The user submits the 6-digit OTP that was emailed to the **new** address by [07-email-change-request.md](./07-email-change-request.md). On a successful match the server commits the change: `email` is updated to the pending value, the `emailChange` subdoc is cleared, and `tokenVersion` is bumped — invalidating every JWT that was issued under the old email. The client must call [auth/01-login.md](../auth/01-login.md) again with the new email.
+> Step 2 of the self-service email-change flow. The user submits the 6-digit OTP that was emailed to the **new** address by [07-email-change-request.md](./07-email-change-request.md). On a successful match the server commits the change: `email` is updated to the pending value, the `emailChange` subdoc is cleared, and `tokenVersion` is bumped — invalidating every JWT that was issued under the old email. The client must call [auth/01-login.md](../auth/01-login.md) again with the new email.
 
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

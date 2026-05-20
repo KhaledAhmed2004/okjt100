@@ -3,7 +3,8 @@
  *
  * Uses supertest to hit the actual API endpoints.
  * Uses mongodb-memory-server (ReplSet) for real MongoDB transactions.
- * Mocks NotificationBuilder, Redis, and global Socket.io.
+ * Mocks pushNotificationHelper (Firebase), Redis, and global Socket.io.
+ * sendNotifications runs for real so Notification records are written to DB.
  */
 
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest';
@@ -13,7 +14,8 @@ import request from 'supertest';
 import app from '../../../../app';
 import { User } from '../../user/user.model';
 import { Connection } from '../connection.model';
-import { CONNECTION_STATUS, CONNECTION_ACTION } from '../connection.constants';
+import { Notification } from '../../notification/notification.model';
+import { CONNECTION_STATUS } from '../connection.constants';
 import { jwtHelper } from '../../../../helpers/jwtHelper';
 import config from '../../../../config';
 import { Secret } from 'jsonwebtoken';
@@ -23,24 +25,13 @@ import { logApi } from '../../../../helpers/__tests__/testLogger';
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-vi.mock('../../../builder/NotificationBuilder/NotificationBuilder', () => {
-  const mockSend = vi.fn().mockResolvedValue({ success: true });
-  const mockBuilder = {
-    to: vi.fn().mockReturnThis(),
-    setTitle: vi.fn().mockReturnThis(),
-    setText: vi.fn().mockReturnThis(),
-    setType: vi.fn().mockReturnThis(),
-    setResource: vi.fn().mockReturnThis(),
-    viaAll: vi.fn().mockReturnThis(),
-    send: mockSend,
-  };
-  return {
-    default: vi.fn().mockImplementation(() => mockBuilder),
-  };
-});
-
-vi.mock('../../notification/notificationsHelper', () => ({
-  sendNotifications: vi.fn().mockResolvedValue(true),
+// Mock only the Firebase push layer — sendNotifications itself runs for real,
+// so Notification documents are actually written to the DB and can be queried.
+vi.mock('../../notification/pushNotificationHelper', () => ({
+  pushNotificationHelper: {
+    sendPushNotifications: vi.fn().mockResolvedValue(undefined),
+    sendPushNotification: vi.fn().mockResolvedValue(undefined),
+  },
 }));
 
 // Mock Redis to prevent connection issues
@@ -99,6 +90,7 @@ afterAll(async () => {
 beforeEach(async () => {
   await Connection.deleteMany({});
   await User.deleteMany({});
+  await Notification.deleteMany({});
   vi.clearAllMocks();
 
   // Mock global io
@@ -130,7 +122,7 @@ describe('Connection E2E Tests', () => {
       // --- GENDER ISOLATION CHECK (BROTHER only sees BROTHERs) ---
       const hasSisterInBrotherList = initListResponse.body.data.some((p: any) => p.role === USER_ROLES.SISTER);
       expect(hasSisterInBrotherList).toBe(false);
-      
+
       const userBInInitList = initListResponse.body.data.find(
         (p: any) => (p.id || p._id) === userB._id.toString()
       );
@@ -147,7 +139,7 @@ describe('Connection E2E Tests', () => {
       const sisterListResponse = await request(app)
         .get('/api/v1/users/profiles')
         .set('Authorization', `Bearer ${tokenC}`);
-      
+
       logApi('GET', '/api/v1/users/profiles', {}, sisterListResponse.body, 'INITIAL-LIST-PROFILES-SISTER', 'User C (SISTER) fetches discovery list (should not see BROTHERs)');
       expect(sisterListResponse.status).toBe(200);
       const hasBrotherInSisterList = sisterListResponse.body.data.some((p: any) => p.role === USER_ROLES.BROTHER);
@@ -169,11 +161,12 @@ describe('Connection E2E Tests', () => {
       // --- ROLE MATCHING VALIDATION CHECK ---
       // User A (BROTHER) tries to send request to User C (SISTER) -> Expect 400 rejection (Cross-gender/role check)
       const crossRoleResponse = await request(app)
-        .post(`/api/v1/connections/request/${userC._id}`)
-        .set('Authorization', `Bearer ${tokenA}`);
+        .post(`/api/v1/connections`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ receiverId: userC._id.toString() });
 
-      logApi('POST', '/api/v1/connections/request/:userId', {
-        params: { userId: userC._id.toString() },
+      logApi('POST', '/api/v1/connections', {
+        body: { receiverId: userC._id.toString() },
       }, crossRoleResponse.body, 'ROLE-CHECK', 'User A (BROTHER) tries to request User C (SISTER) -> Rejection expected');
 
       expect(crossRoleResponse.status).toBe(400);
@@ -183,11 +176,12 @@ describe('Connection E2E Tests', () => {
       // --- SELF-CONNECT VALIDATION CHECK ---
       // User A (BROTHER) tries to connect with themselves -> Expect 400 rejection
       const selfConnectResponse = await request(app)
-        .post(`/api/v1/connections/request/${userA._id}`)
-        .set('Authorization', `Bearer ${tokenA}`);
+        .post(`/api/v1/connections`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ receiverId: userA._id.toString() });
 
-      logApi('POST', '/api/v1/connections/request/:userId', {
-        params: { userId: userA._id.toString() },
+      logApi('POST', '/api/v1/connections', {
+        body: { receiverId: userA._id.toString() },
       }, selfConnectResponse.body, 'SELF-CHECK', 'User A (BROTHER) tries to connect with themselves -> Rejection expected');
 
       expect(selfConnectResponse.status).toBe(400);
@@ -197,11 +191,12 @@ describe('Connection E2E Tests', () => {
       // --- VALID REQUEST CREATION ---
       // User A (BROTHER) sends request to User B (BROTHER) -> Expect 201 Created
       const sendResponse = await request(app)
-        .post(`/api/v1/connections/request/${userB._id}`)
-        .set('Authorization', `Bearer ${tokenA}`);
+        .post(`/api/v1/connections`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ receiverId: userB._id.toString() });
 
-      logApi('POST', '/api/v1/connections/request/:userId', {
-        params: { userId: userB._id.toString() },
+      logApi('POST', '/api/v1/connections', {
+        body: { receiverId: userB._id.toString() },
       }, sendResponse.body, 'VALID-REQUEST', 'User A sends a valid connection request to User B');
 
       expect(sendResponse.status).toBe(201);
@@ -210,6 +205,56 @@ describe('Connection E2E Tests', () => {
       expect(connectionId).toBeDefined();
       expect(sendResponse.body.data.status).toBe(CONNECTION_STATUS.PENDING);
       expect(sendResponse.body.data.receiver.id).toBe(userB._id.toString());
+
+      // --- NOTIFICATION VERIFICATION: CONNECTION REQUEST SENT ---
+      // sendNotifications runs for real, so the Notification document is in the DB.
+      // Verify via direct DB query first, then confirm via the API endpoint.
+      const requestNotification = await Notification.findOne({
+        receiver: userB._id,
+        type: 'CONNECTION_REQUEST',
+      });
+      expect(requestNotification).not.toBeNull();
+      expect(requestNotification!.schemaVersion).toBe(1);
+      expect(requestNotification!.text).toBe(`${userA.name} wants to connect`);
+      expect(requestNotification!.resourceType).toBe('User');
+      expect(requestNotification!.resourceId).toBe(userA._id.toString());
+      expect((requestNotification!.metadata as any).actor.id).toBe(userA._id.toString());
+      expect((requestNotification!.metadata as any).subject.id).toBe(connectionId);
+
+      // User B hits GET /api/v1/notifications/me and sees the notification in the response
+      const notificationsResponseB = await request(app)
+        .get('/api/v1/notifications/me')
+        .set('Authorization', `Bearer ${tokenB}`);
+      logApi('GET', '/api/v1/notifications/me', {}, notificationsResponseB.body, 'NOTIFICATION-REQUEST-SENT', 'User B fetches notifications (should contain connection request notification)');
+      expect(notificationsResponseB.status).toBe(200);
+      expect(notificationsResponseB.body.success).toBe(true);
+      // Cursor pagination meta — flat shape: limit + nextCursor + hasNext + unreadCount
+      // all at the same level. No nested `pagination` wrapper.
+      expect(notificationsResponseB.body.meta.unreadCount).toBe(1);
+      expect(notificationsResponseB.body.meta).toMatchObject({
+        limit: expect.any(Number),
+        hasNext: false,
+        nextCursor: null,
+        unreadCount: 1,
+      });
+      const requestNotifInApi = notificationsResponseB.body.data.find(
+        (n: any) => n.type === 'CONNECTION_REQUEST',
+      );
+      expect(requestNotifInApi).toBeDefined();
+      expect(requestNotifInApi.schemaVersion).toBe(1);
+      expect(requestNotifInApi.isRead).toBe(false);
+      expect(requestNotifInApi.readAt).toBeNull();
+      // actor — denormalized sender data
+      expect(requestNotifInApi.actor.id).toBe(userA._id.toString());
+      expect(requestNotifInApi.actor.name).toBe(userA.name);
+      expect(requestNotifInApi.actor.profileImage).toBeDefined();
+      // subject — the connection record
+      expect(requestNotifInApi.subject.type).toBe('Connection');
+      expect(requestNotifInApi.subject.id).toBe(connectionId);
+      // actions — client uses these to render buttons
+      expect(requestNotifInApi.actions).toContainEqual({ type: 'ACCEPT' });
+      expect(requestNotifInApi.actions).toContainEqual({ type: 'REJECT' });
+      expect(requestNotifInApi.actions).toContainEqual({ type: 'VIEW_PROFILE' });
 
       // --- PENDING STATE PROFILE STATUS CHECKS (User A is Sender) ---
       // User A (sender) checks User B's profile -> connectionStatus: 'PENDING', connectionDirection: 'SENT'
@@ -270,11 +315,12 @@ describe('Connection E2E Tests', () => {
       // --- DUPLICATE REQUEST CHECK ---
       // User A attempts to request User B again -> Expect 409 Conflict
       const duplicateResponse = await request(app)
-        .post(`/api/v1/connections/request/${userB._id}`)
-        .set('Authorization', `Bearer ${tokenA}`);
+        .post(`/api/v1/connections`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ receiverId: userB._id.toString() });
 
-      logApi('POST', '/api/v1/connections/request/:userId', {
-        params: { userId: userB._id.toString() },
+      logApi('POST', '/api/v1/connections', {
+        body: { receiverId: userB._id.toString() },
       }, duplicateResponse.body, 'DUPLICATE-CHECK', 'User A tries to request User B again -> Conflict expected');
 
       expect(duplicateResponse.status).toBe(409);
@@ -285,25 +331,26 @@ describe('Connection E2E Tests', () => {
       // User B (receiver) tries to send a request back to User A while A's request is still PENDING.
       // The connectionKey is deterministic (min_max of IDs), so the existing record collides.
       const reverseDuplicateResponse = await request(app)
-        .post(`/api/v1/connections/request/${userA._id}`)
-        .set('Authorization', `Bearer ${tokenB}`);
+        .post(`/api/v1/connections`)
+        .set('Authorization', `Bearer ${tokenB}`)
+        .send({ receiverId: userA._id.toString() });
 
-      logApi('POST', '/api/v1/connections/request/:userId', {
-        params: { userId: userA._id.toString() },
+      logApi('POST', '/api/v1/connections', {
+        body: { receiverId: userA._id.toString() },
       }, reverseDuplicateResponse.body, 'REVERSE-DUPLICATE-CHECK', 'User B tries to request User A while A has a pending request -> 409 expected');
 
       expect(reverseDuplicateResponse.status).toBe(409);
       expect(reverseDuplicateResponse.body.success).toBe(false);
       expect(reverseDuplicateResponse.body.message).toBe('Connection request already exists');
 
-      // --- RETRIEVE PENDING REQUESTS (type=received) ---
+      // --- RETRIEVE PENDING REQUESTS (direction=received) ---
       // User B (receiver) retrieves pending received requests -> Expect list containing User A's request
       const pendingReceivedResponse = await request(app)
-        .get('/api/v1/connections/requests?type=received')
+        .get('/api/v1/connections/requests?direction=received')
         .set('Authorization', `Bearer ${tokenB}`);
 
       logApi('GET', '/api/v1/connections/requests', {
-        query: { type: 'received' },
+        query: { direction: 'received' },
       }, pendingReceivedResponse.body, 'PENDING-LIST-RECEIVED', 'User B fetches received requests list');
 
       expect(pendingReceivedResponse.status).toBe(200);
@@ -312,14 +359,14 @@ describe('Connection E2E Tests', () => {
       expect(pendingReceivedResponse.body.data[0].connectionId).toBe(connectionId);
       expect(pendingReceivedResponse.body.data[0].sender.id).toBe(userA._id.toString());
 
-      // --- RETRIEVE PENDING REQUESTS (type=sent) ---
+      // --- RETRIEVE PENDING REQUESTS (direction=sent) ---
       // User A (sender) retrieves their outgoing pending requests -> Expect list containing their request to User B
       const pendingSentResponse = await request(app)
-        .get('/api/v1/connections/requests?type=sent')
+        .get('/api/v1/connections/requests?direction=sent')
         .set('Authorization', `Bearer ${tokenA}`);
 
       logApi('GET', '/api/v1/connections/requests', {
-        query: { type: 'sent' },
+        query: { direction: 'sent' },
       }, pendingSentResponse.body, 'PENDING-LIST-SENT', 'User A fetches sent requests list');
 
       expect(pendingSentResponse.status).toBe(200);
@@ -332,10 +379,10 @@ describe('Connection E2E Tests', () => {
       // User B (receiver) attempts to cancel User A's pending request -> Expect 403 Forbidden
       // Only the original sender is allowed to cancel; the receiver must use REJECT instead.
       const receiverCancelResponse = await request(app)
-        .delete(`/api/v1/connections/${connectionId}/request`)
+        .post(`/api/v1/connections/${connectionId}/cancel`)
         .set('Authorization', `Bearer ${tokenB}`);
 
-      logApi('DELETE', '/api/v1/connections/:connectionId/request', {
+      logApi('POST', '/api/v1/connections/:connectionId/cancel', {
         params: { connectionId },
       }, receiverCancelResponse.body, 'RECEIVER-CANCEL-GUARD', 'User B (receiver) tries to cancel User A\'s request -> 403 expected');
 
@@ -346,10 +393,10 @@ describe('Connection E2E Tests', () => {
 
       // User A (sender) cancels the pending connection request -> Expect 200 OK
       const cancelResponse = await request(app)
-        .delete(`/api/v1/connections/${connectionId}/request`)
+        .post(`/api/v1/connections/${connectionId}/cancel`)
         .set('Authorization', `Bearer ${tokenA}`);
 
-      logApi('DELETE', '/api/v1/connections/:connectionId/request', {
+      logApi('POST', '/api/v1/connections/:connectionId/cancel', {
         params: { connectionId },
       }, cancelResponse.body, 'CANCELLATION', 'User A cancels the pending connection request');
 
@@ -376,12 +423,12 @@ describe('Connection E2E Tests', () => {
 
       // --- USER B CANCELLATION CHECK PERSPECTIVE ---
       // Verify that User B's received requests list is now empty
-      const cancelListResponseB = await request(app)
-        .get('/api/v1/connections/requests?type=received')
+      const checkPendingResponse = await request(app)
+        .get('/api/v1/connections/requests?direction=received')
         .set('Authorization', `Bearer ${tokenB}`);
-      logApi('GET', '/api/v1/connections/requests', { query: { type: 'received' } }, cancelListResponseB.body, 'CANCELLED-RECEIVED-LIST', 'User B fetches received requests list (after cancellation - should be empty)');
-      expect(cancelListResponseB.status).toBe(200);
-      expect(cancelListResponseB.body.data).toHaveLength(0);
+      logApi('GET', '/api/v1/connections/requests', { query: { direction: 'received' } }, checkPendingResponse.body, 'CANCELLED-RECEIVED-LIST', 'User B fetches received requests list (after cancellation - should be empty)');
+      expect(checkPendingResponse.status).toBe(200);
+      expect(checkPendingResponse.body.data).toHaveLength(0);
 
       // Verify User B's profile view of User A is null
       const cancelProfileResponseB = await request(app)
@@ -393,34 +440,32 @@ describe('Connection E2E Tests', () => {
       // --- REQUEST RE-CREATION & REJECTION ---
       // Re-create request for testing rejection
       const sendRecreateResponse = await request(app)
-        .post(`/api/v1/connections/request/${userB._id}`)
-        .set('Authorization', `Bearer ${tokenA}`);
+        .post(`/api/v1/connections`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ receiverId: userB._id.toString() });
       const recreatedId = sendRecreateResponse.body.data.id;
 
-      // --- POLISH: INVALID ACTION VALUE SCHEMA GUARD (e.g. BANANA) ---
-      const bananaResponse = await request(app)
-        .patch(`/api/v1/connections/${recreatedId}`)
-        .set('Authorization', `Bearer ${tokenB}`)
-        .send({ action: 'BANANA' });
+      // --- POLISH: SENDER REJECT GUARD ---
+      // User A (sender) tries to reject their own outgoing request -> 403 Forbidden expected
+      const senderRejectResponse = await request(app)
+        .post(`/api/v1/connections/${recreatedId}/reject`)
+        .set('Authorization', `Bearer ${tokenA}`);
 
-      logApi('PATCH', '/api/v1/connections/:connectionId', {
+      logApi('POST', '/api/v1/connections/:connectionId/reject', {
         params: { connectionId: recreatedId },
-        body: { action: 'BANANA' },
-      }, bananaResponse.body, 'INVALID-ACTION-GUARD', 'User B responds with action BANANA -> 400 expected');
+      }, senderRejectResponse.body, 'SENDER-REJECT-GUARD', 'User A (sender) tries to reject own request -> 403 expected');
 
-      expect(bananaResponse.status).toBe(400);
-      expect(bananaResponse.body.success).toBe(false);
+      expect(senderRejectResponse.status).toBe(403);
+      expect(senderRejectResponse.body.success).toBe(false);
 
-      // --- POLISH: SENDER RESPONDING GUARD ---
-      // User A (sender) tries to respond to their own outgoing request -> 403 Forbidden expected
+      // --- POLISH: SENDER ACCEPT GUARD ---
+      // User A (sender) tries to accept their own outgoing request -> 403 Forbidden expected
       const senderAcceptResponse = await request(app)
-        .patch(`/api/v1/connections/${recreatedId}`)
-        .set('Authorization', `Bearer ${tokenA}`)
-        .send({ action: CONNECTION_ACTION.ACCEPT });
+        .post(`/api/v1/connections/${recreatedId}/accept`)
+        .set('Authorization', `Bearer ${tokenA}`);
 
-      logApi('PATCH', '/api/v1/connections/:connectionId', {
+      logApi('POST', '/api/v1/connections/:connectionId/accept', {
         params: { connectionId: recreatedId },
-        body: { action: CONNECTION_ACTION.ACCEPT },
       }, senderAcceptResponse.body, 'SENDER-RESPOND-GUARD', 'User A (sender) tries to accept own request -> 403 expected');
 
       expect(senderAcceptResponse.status).toBe(403);
@@ -428,13 +473,11 @@ describe('Connection E2E Tests', () => {
 
       // User B (receiver) rejects User A's request -> Expect 200 OK with data: { id, status: 'NONE' }
       const rejectResponse = await request(app)
-        .patch(`/api/v1/connections/${recreatedId}`)
-        .set('Authorization', `Bearer ${tokenB}`)
-        .send({ action: CONNECTION_ACTION.REJECT });
+        .post(`/api/v1/connections/${recreatedId}/reject`)
+        .set('Authorization', `Bearer ${tokenB}`);
 
-      logApi('PATCH', '/api/v1/connections/:connectionId', {
+      logApi('POST', '/api/v1/connections/:connectionId/reject', {
         params: { connectionId: recreatedId },
-        body: { action: CONNECTION_ACTION.REJECT },
       }, rejectResponse.body, 'REJECTION', 'User B rejects User A\'s connection request');
 
       expect(rejectResponse.status).toBe(200);
@@ -462,16 +505,17 @@ describe('Connection E2E Tests', () => {
       // We explicitly test that immediate re-requesting is allowed post-rejection.
       // Since the connection record was deleted, there is no cooldown, and the state returned to 'NONE'.
       const sendRecreate2Response = await request(app)
-        .post(`/api/v1/connections/request/${userB._id}`)
-        .set('Authorization', `Bearer ${tokenA}`);
-      
-      logApi('POST', '/api/v1/connections/request/:userId', {
-        params: { userId: userB._id.toString() },
+        .post(`/api/v1/connections`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ receiverId: userB._id.toString() });
+
+      logApi('POST', '/api/v1/connections', {
+        body: { receiverId: userB._id.toString() },
       }, sendRecreate2Response.body, 'RE-REQUEST-AFTER-REJECTION', 'User A immediately re-requests User B after rejection -> Expect 201 Created and new connection ID');
 
       expect(sendRecreate2Response.status).toBe(201);
       expect(sendRecreate2Response.body.success).toBe(true);
-      
+
       const finalConnectionId = sendRecreate2Response.body.data.id;
       expect(finalConnectionId).toBeDefined();
       expect(finalConnectionId).not.toBe(recreatedId); // Verify a brand new connection ID is generated
@@ -479,13 +523,11 @@ describe('Connection E2E Tests', () => {
 
       // User B (receiver) accepts User A's request -> Expect 200 OK with clean `{ id, status, chatId }` payload
       const acceptResponse = await request(app)
-        .patch(`/api/v1/connections/${finalConnectionId}`)
-        .set('Authorization', `Bearer ${tokenB}`)
-        .send({ action: CONNECTION_ACTION.ACCEPT });
+        .post(`/api/v1/connections/${finalConnectionId}/accept`)
+        .set('Authorization', `Bearer ${tokenB}`);
 
-      logApi('PATCH', '/api/v1/connections/:connectionId', {
+      logApi('POST', '/api/v1/connections/:connectionId/accept', {
         params: { connectionId: finalConnectionId },
-        body: { action: CONNECTION_ACTION.ACCEPT },
       }, acceptResponse.body, 'ACCEPTANCE', 'User B accepts User A\'s connection request');
 
       expect(acceptResponse.status).toBe(200);
@@ -495,16 +537,62 @@ describe('Connection E2E Tests', () => {
       expect(acceptResponse.body.data.chatId).toBeDefined();
       const chatId = acceptResponse.body.data.chatId;
 
+      // --- NOTIFICATION VERIFICATION: CONNECTION ACCEPTED ---
+      // sendNotifications runs for real, so the Notification document is in the DB.
+      // Verify via direct DB query first, then confirm via the API endpoint.
+      const acceptedNotification = await Notification.findOne({
+        receiver: userA._id,
+        type: 'CONNECTION_ACCEPTED',
+      });
+      expect(acceptedNotification).not.toBeNull();
+      expect(acceptedNotification!.schemaVersion).toBe(1);
+      expect(acceptedNotification!.text).toBe(`${userB.name} accepted your connection request`);
+      expect(acceptedNotification!.resourceType).toBe('User');
+      expect(acceptedNotification!.resourceId).toBe(userB._id.toString());
+      expect((acceptedNotification!.metadata as any).actor.id).toBe(userB._id.toString());
+      expect((acceptedNotification!.metadata as any).subject.chatId).toBe(chatId);
+
+      // User A hits GET /api/v1/notifications/me and sees the accepted notification
+      const notificationsResponseA = await request(app)
+        .get('/api/v1/notifications/me')
+        .set('Authorization', `Bearer ${tokenA}`);
+      logApi('GET', '/api/v1/notifications/me', {}, notificationsResponseA.body, 'NOTIFICATION-CONNECTION-ACCEPTED', 'User A fetches notifications (should contain connection accepted notification)');
+      expect(notificationsResponseA.status).toBe(200);
+      expect(notificationsResponseA.body.success).toBe(true);
+      // Cursor pagination meta — flat shape
+      expect(notificationsResponseA.body.meta.unreadCount).toBe(1);
+      expect(notificationsResponseA.body.meta).toMatchObject({
+        limit: expect.any(Number),
+        hasNext: false,
+        nextCursor: null,
+        unreadCount: 1,
+      });
+      const acceptedNotifInApi = notificationsResponseA.body.data.find(
+        (n: any) => n.type === 'CONNECTION_ACCEPTED',
+      );
+      expect(acceptedNotifInApi).toBeDefined();
+      expect(acceptedNotifInApi.schemaVersion).toBe(1);
+      expect(acceptedNotifInApi.isRead).toBe(false);
+      expect(acceptedNotifInApi.readAt).toBeNull();
+      // actor — denormalized acceptor data
+      expect(acceptedNotifInApi.actor.id).toBe(userB._id.toString());
+      expect(acceptedNotifInApi.actor.name).toBe(userB.name);
+      expect(acceptedNotifInApi.actor.profileImage).toBeDefined();
+      // subject — connection + chatId so client can open chat directly
+      expect(acceptedNotifInApi.subject.type).toBe('Connection');
+      expect(acceptedNotifInApi.subject.chatId).toBe(chatId);
+      // actions — client uses these to render buttons
+      expect(acceptedNotifInApi.actions).toContainEqual({ type: 'OPEN_CHAT' });
+      expect(acceptedNotifInApi.actions).toContainEqual({ type: 'VIEW_PROFILE' });
+
       // --- POLISH: ACCEPTING AN ALREADY-ACCEPTED CONNECTION ---
       // User B tries to accept again -> Expect 400 Bad Request (not pending anymore)
       const doubleAcceptResponse = await request(app)
-        .patch(`/api/v1/connections/${finalConnectionId}`)
-        .set('Authorization', `Bearer ${tokenB}`)
-        .send({ action: CONNECTION_ACTION.ACCEPT });
+        .post(`/api/v1/connections/${finalConnectionId}/accept`)
+        .set('Authorization', `Bearer ${tokenB}`);
 
-      logApi('PATCH', '/api/v1/connections/:connectionId', {
+      logApi('POST', '/api/v1/connections/:connectionId/accept', {
         params: { connectionId: finalConnectionId },
-        body: { action: CONNECTION_ACTION.ACCEPT },
       }, doubleAcceptResponse.body, 'DOUBLE-ACCEPTANCE-GUARD', 'User B tries to accept an already-accepted connection request -> Expect 400 Bad Request');
 
       expect(doubleAcceptResponse.status).toBe(400);
@@ -572,10 +660,10 @@ describe('Connection E2E Tests', () => {
       // --- REMOVE CONNECTION SECURITY GUARD ---
       // User C (not in connection) tries to remove connection between User A & User B -> Expect 403 Forbidden
       const foreignRemoveResponse = await request(app)
-        .delete(`/api/v1/connections/${finalConnectionId}`)
+        .post(`/api/v1/connections/${finalConnectionId}/remove`)
         .set('Authorization', `Bearer ${tokenC}`);
 
-      logApi('DELETE', '/api/v1/connections/:connectionId', {
+      logApi('POST', '/api/v1/connections/:connectionId/remove', {
         params: { connectionId: finalConnectionId },
       }, foreignRemoveResponse.body, 'FOREIGN-REMOVAL-GUARD', 'User C (not in connection) tries to remove connection -> 403 expected');
 
@@ -585,10 +673,10 @@ describe('Connection E2E Tests', () => {
       // --- REMOVE CONNECTION (User B is Receiver of original request) ---
       // Either user can remove. We have User B (receiver) perform the removal to verify both sender/receiver capability.
       const removeResponse = await request(app)
-        .delete(`/api/v1/connections/${finalConnectionId}`)
+        .post(`/api/v1/connections/${finalConnectionId}/remove`)
         .set('Authorization', `Bearer ${tokenB}`);
 
-      logApi('DELETE', '/api/v1/connections/:connectionId', {
+      logApi('POST', '/api/v1/connections/:connectionId/remove', {
         params: { connectionId: finalConnectionId },
       }, removeResponse.body, 'REMOVAL', 'User B removes the accepted active connection');
 
@@ -645,11 +733,12 @@ describe('Connection E2E Tests', () => {
       // After removing an accepted connection, the DB record is deleted.
       // Verify the sender can immediately re-request — different DB state than post-rejection.
       const reRequestAfterRemovalResponse = await request(app)
-        .post(`/api/v1/connections/request/${userB._id}`)
-        .set('Authorization', `Bearer ${tokenA}`);
+        .post(`/api/v1/connections`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .send({ receiverId: userB._id.toString() });
 
-      logApi('POST', '/api/v1/connections/request/:userId', {
-        params: { userId: userB._id.toString() },
+      logApi('POST', '/api/v1/connections', {
+        body: { receiverId: userB._id.toString() },
       }, reRequestAfterRemovalResponse.body, 'RE-REQUEST-AFTER-REMOVAL', 'User A re-requests User B after active connection removal -> 201 expected');
 
       expect(reRequestAfterRemovalResponse.status).toBe(201);
@@ -664,16 +753,17 @@ describe('Connection E2E Tests', () => {
     it('should return 401 Forbidden on all connection endpoints when no token is provided', async () => {
       const fakeId = new mongoose.Types.ObjectId().toString();
 
-      const endpoints: Array<{ method: 'get' | 'post' | 'patch' | 'delete'; url: string; body?: Record<string, unknown> }> = [
-        { method: 'get',    url: '/api/v1/connections' },
-        { method: 'get',    url: '/api/v1/connections/requests?type=received' },
-        { method: 'post',   url: `/api/v1/connections/request/${fakeId}` },
-        { method: 'patch',  url: `/api/v1/connections/${fakeId}`, body: { action: 'ACCEPT' } },
-        { method: 'delete', url: `/api/v1/connections/${fakeId}/request` },
-        { method: 'delete', url: `/api/v1/connections/${fakeId}` },
+      const endpoints: Array<{ method: 'get' | 'post'; url: string; body?: Record<string, unknown> }> = [
+        { method: 'get', url: '/api/v1/connections' },
+        { method: 'get', url: '/api/v1/connections/requests?direction=received' },
+        { method: 'post', url: '/api/v1/connections', body: { receiverId: fakeId } },
+        { method: 'post', url: `/api/v1/connections/${fakeId}/accept` },
+        { method: 'post', url: `/api/v1/connections/${fakeId}/reject` },
+        { method: 'post', url: `/api/v1/connections/${fakeId}/cancel` },
+        { method: 'post', url: `/api/v1/connections/${fakeId}/remove` },
         // User module endpoints that require auth
-        { method: 'get',    url: '/api/v1/users/profiles' },
-        { method: 'get',    url: `/api/v1/users/${fakeId}/public` },
+        { method: 'get', url: '/api/v1/users/profiles' },
+        { method: 'get', url: `/api/v1/users/${fakeId}/public` },
       ];
 
       for (const ep of endpoints) {

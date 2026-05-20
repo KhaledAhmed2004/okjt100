@@ -4,6 +4,6 @@ export const CONNECTION_STATUS = {
 } as const;
 
 export const CONNECTION_ACTION = {
-  ACCEPT: 'ACCEPT',
-  REJECT: 'REJECT',
+  ACCEPTED: 'ACCEPTED',
+  REJECTED: 'REJECTED',
 } as const;

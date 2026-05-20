@@ -6,14 +6,11 @@ Content-Type: application/json
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Returns a single JSON envelope containing every piece of data the system stores **about** the requesting user. Satisfies GDPR Article 15 (right of access). Synchronous — the entire payload is in the HTTP response. Mobile-store policies (Apple §5.1.1(v), Google Play account-deletion policy) require this surface to exist for accounts in EU jurisdictions.
+> Returns a single JSON envelope containing every piece of data the system stores **about** the requesting user. Satisfies GDPR Article 15 (right of access). Synchronous — the entire payload is in the HTTP response. Mobile-store policies (Apple §5.1.1(v), Google Play account-deletion policy) require this surface to exist for accounts in EU jurisdictions.
+>
+> The response includes data from 6 collections: User profile, Notifications, Subscription history (current + audit events), and Group activity (memberships, posts, likes, comments), plus Ask-Imam questions. Sensitive credentials are stripped — see §2.5.
 
-The response includes data from 6 collections: User profile, Notifications, Subscription history (current + audit events), and Group activity (memberships, posts, likes, comments), plus Ask-Imam questions. Sensitive credentials are stripped — see §2.5.
-
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

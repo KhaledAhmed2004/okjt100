@@ -1,7 +1,7 @@
 # 02. List Groups
 
 ```http
-GET /groups?page=1&limit=10&searchTerm=Quran
+GET /api/v1/groups?page=1&limit=10&searchTerm=Quran
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```

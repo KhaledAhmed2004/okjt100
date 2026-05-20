@@ -1,7 +1,7 @@
 # 10. Leave Group
 
 ```http
-POST /groups/:groupId/leave
+POST /api/v1/groups/:groupId/leave
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 

@@ -6,10 +6,7 @@ Content-Type: application/json
 Auth: None (Public — anti-enumeration silent-success)
 ```
 
-## 1. Overview
-Initiates the password-reset flow by sending a 6-digit OTP to the user's email. Designed with **silent success** — the response is identical whether the email belongs to a real account or not. An attacker who pastes a list of emails into this endpoint cannot tell which ones are registered. The actual reset happens in two more steps: [02-verify-otp.md](./02-verify-otp.md) (issues a `resetToken`) → [04-reset-password.md](./04-reset-password.md) (commits the new password).
-
----
+> Initiates the password-reset flow by sending a 6-digit OTP to the user's email. Designed with **silent success** — the response is identical whether the email belongs to a real account or not. An attacker who pastes a list of emails into this endpoint cannot tell which ones are registered. The actual reset happens in two more steps: [02-verify-otp.md](./02-verify-otp.md) (issues a `resetToken`) → [04-reset-password.md](./04-reset-password.md) (commits the new password).
 
 ## 2. Business Rules (Source of Truth)
 

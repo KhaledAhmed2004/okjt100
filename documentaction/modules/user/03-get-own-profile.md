@@ -5,12 +5,9 @@ GET /users/me
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Returns the **full** profile of the currently authenticated user, including private fields hidden from the public endpoint. Read-only — no DB writes, no side effects.
+> Returns the **full** profile of the currently authenticated user, including private fields hidden from the public endpoint. Read-only — no DB writes, no side effects.
 
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

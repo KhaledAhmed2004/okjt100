@@ -17,10 +17,7 @@ const getNotificationFromDB = catchAsync(
       statusCode: StatusCodes.OK,
       success: true,
       message: 'Notifications retrieved successfully',
-      meta: {
-        pagination: result.pagination,
-        unreadCount: result.unreadCount,
-      },
+      meta: result.meta,
       data: result.data,
     });
   }

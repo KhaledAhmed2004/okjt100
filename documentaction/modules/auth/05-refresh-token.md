@@ -6,12 +6,9 @@ Content-Type: application/json
 Auth: Refresh Token (from httpOnly cookie OR body)
 ```
 
-## 1. Overview
-Rotates a refresh token. Verifies the inbound refresh JWT, compares its embedded `tokenVersion` against the DB value (**reuse detection**), bumps the DB `tokenVersion`, and issues a fresh access + refresh pair. If a previously-rotated refresh token is replayed (typical attacker behavior with a stolen token after the legitimate client has already rotated), the version check fails and every JWT for the user is invalidated — the user must log in again.
-
-The refresh token is read from the `httpOnly` cookie by default; the body is a fallback for non-browser clients.
-
----
+> Rotates a refresh token. Verifies the inbound refresh JWT, compares its embedded `tokenVersion` against the DB value (**reuse detection**), bumps the DB `tokenVersion`, and issues a fresh access + refresh pair. If a previously-rotated refresh token is replayed (typical attacker behavior with a stolen token after the legitimate client has already rotated), the version check fails and every JWT for the user is invalidated — the user must log in again.
+>
+> The refresh token is read from the `httpOnly` cookie by default; the body is a fallback for non-browser clients.
 
 ## 2. Business Rules (Source of Truth)
 

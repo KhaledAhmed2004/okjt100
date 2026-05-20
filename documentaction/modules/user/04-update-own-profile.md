@@ -6,12 +6,9 @@ Content-Type: multipart/form-data
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Allows the currently authenticated user to update their own profile (text fields and an optional new `profileImage`). The previous profile image is unlinked from disk when a new one is uploaded.
+> Allows the currently authenticated user to update their own profile (text fields and an optional new `profileImage`). The previous profile image is unlinked from disk when a new one is uploaded.
 
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

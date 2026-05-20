@@ -23,33 +23,41 @@ router.get(
 
 // Send connection request
 router.post(
-  '/request/:userId',
+  '/',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
   validateRequest(ConnectionValidation.sendConnectionRequestSchema),
   ConnectionController.sendConnectionRequest
 );
 
-// Accept or reject request
-router.patch(
-  '/:connectionId',
+// Accept a pending connection request
+router.post(
+  '/:connectionId/accept',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.respondToConnectionRequestSchema),
-  ConnectionController.respondToConnectionRequest
+  validateRequest(ConnectionValidation.connectionIdParamSchema),
+  ConnectionController.acceptConnection
 );
 
-// Cancel pending request (DELETE = undo the sent request)
-router.delete(
-  '/:connectionId/request',
+// Reject a pending connection request
+router.post(
+  '/:connectionId/reject',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.getConnectionByIdParamsSchema),
+  validateRequest(ConnectionValidation.connectionIdParamSchema),
+  ConnectionController.rejectConnection
+);
+
+// Cancel a pending request (sender undoes their own request)
+router.post(
+  '/:connectionId/cancel',
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
+  validateRequest(ConnectionValidation.connectionIdParamSchema),
   ConnectionController.cancelConnectionRequest
 );
 
-// Remove accepted connection
-router.delete(
-  '/:connectionId',
+// Remove an accepted connection
+router.post(
+  '/:connectionId/remove',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
-  validateRequest(ConnectionValidation.getConnectionByIdParamsSchema),
+  validateRequest(ConnectionValidation.connectionIdParamSchema),
   ConnectionController.removeConnection
 );
 

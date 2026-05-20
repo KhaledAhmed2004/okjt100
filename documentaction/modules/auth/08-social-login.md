@@ -6,10 +6,7 @@ Content-Type: application/json
 Auth: None (Public — provider ID token validated inline)
 ```
 
-## 1. Overview
-Unified sign-in / sign-up via Google or Apple ID tokens. Verifies the provider-issued JWT cryptographically (Google: RSA against `googleAudience` array of iOS/Android/Web client IDs; Apple: RSA + nonce-hash match), then either logs an existing user in (matched strictly by `googleId` / `appleId`) or creates a new account. Refuses to auto-link a provider identity to an existing email-based account — that's an OWASP-flagged account-hijack vector. Returns the same `{ accessToken, refreshToken }` envelope as [01-login.md](./01-login.md).
-
----
+> Unified sign-in / sign-up via Google or Apple ID tokens. Verifies the provider-issued JWT cryptographically (Google: RSA against `googleAudience` array of iOS/Android/Web client IDs; Apple: RSA + nonce-hash match), then either logs an existing user in (matched strictly by `googleId` / `appleId`) or creates a new account. Refuses to auto-link a provider identity to an existing email-based account — that's an OWASP-flagged account-hijack vector. Returns the same `{ accessToken, refreshToken }` envelope as [01-login.md](./01-login.md).
 
 ## 2. Business Rules (Source of Truth)
 

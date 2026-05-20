@@ -3,6 +3,12 @@ import { Model, Types } from 'mongoose';
 export const NOTIFICATION_TYPES = [
   'ADMIN',
   'SYSTEM',
+  // ── Connection events ──────────────────────────────────────────────────────
+  'CONNECTION_REQUEST',
+  'CONNECTION_ACCEPTED',
+  // ── Messaging events ───────────────────────────────────────────────────────
+  'NEW_MESSAGE',
+  // ── Community events ───────────────────────────────────────────────────────
   'QUESTION_ANSWERED',
   'NEW_QUESTION',
   'POST_LIKED',
@@ -39,12 +45,20 @@ export type INotification = {
   text: string;
   isRead: boolean;
   readAt?: Date | null;
-  
-  // Polymorphic reference
+
+  // Schema version — used to distinguish typed v1 notifications (with actor/subject/actions
+  // stored in metadata) from legacy flat notifications. Defaults to 0 for old records.
+  schemaVersion?: number;
+
+  // Polymorphic reference (legacy + used as fallback for old records)
   resourceType?: NotificationResourceType;
   resourceId?: string;
-  
+
   link?: NotificationLink;
+
+  // v1 typed payload — stored here at write time so reads are zero-join.
+  // Shape for CONNECTION_REQUEST / CONNECTION_ACCEPTED:
+  //   { actor: { id, name, profileImage }, subject: { type, id, chatId? }, actions: { type }[] }
   metadata?: Record<string, unknown>;
 
   icon?: string;

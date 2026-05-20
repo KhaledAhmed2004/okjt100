@@ -6,12 +6,9 @@ Content-Type: application/json
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Ends the **current device's** push session and clears the `refreshToken` browser cookie. Removes the supplied `deviceToken` from the user's `deviceTokens[]` array so the device stops receiving FCM/APNs notifications. **Does NOT bump `tokenVersion`** — the JWT itself remains valid until natural expiry (short-lived access token; refresh-token flow will continue to work on this device until the user logs back in elsewhere). To globally invalidate every session on every device, use [user/12-revoke-all-sessions.md](../user/12-revoke-all-sessions.md) (bumps `tokenVersion`).
-
-This is a per-device logout — typical "sign out on this phone" button behavior.
-
----
+> Ends the **current device's** push session and clears the `refreshToken` browser cookie. Removes the supplied `deviceToken` from the user's `deviceTokens[]` array so the device stops receiving FCM/APNs notifications. **Does NOT bump `tokenVersion`** — the JWT itself remains valid until natural expiry (short-lived access token; refresh-token flow will continue to work on this device until the user logs back in elsewhere). To globally invalidate every session on every device, use [user/12-revoke-all-sessions.md](../user/12-revoke-all-sessions.md) (bumps `tokenVersion`).
+>
+> This is a per-device logout — typical "sign out on this phone" button behavior.
 
 ## 2. Business Rules (Source of Truth)
 

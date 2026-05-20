@@ -7,6 +7,7 @@ const createGroupZodSchema = z.object({
     description: z.string({ required_error: 'Description is required' }),
     userType: z.enum([USER_ROLES.BROTHER, USER_ROLES.SISTER], { required_error: 'User type is required' }),
     category: z.string({ required_error: 'Category name is required' }),
+    coverImage: z.string().optional(),
   }),
 });
 
@@ -43,6 +44,7 @@ const updateGroupZodSchema = z.object({
     description: z.string().optional(),
     userType: z.enum([USER_ROLES.BROTHER, USER_ROLES.SISTER]).optional(),
     category: z.string().optional(),
+    coverImage: z.string().optional(),
   }),
 });
 

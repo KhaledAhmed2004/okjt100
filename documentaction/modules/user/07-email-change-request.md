@@ -6,17 +6,14 @@ Content-Type: application/json
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Step 1 of the self-service email-change flow. The user supplies a new email address and their current password; the server validates the password, checks the new email isn't already in use, stores the pending change on the user document, and:
+> Step 1 of the self-service email-change flow. The user supplies a new email address and their current password; the server validates the password, checks the new email isn't already in use, stores the pending change on the user document, and:
+>
+> - sends a **6-digit OTP** to the **new** email address (proves the user controls that inbox)
+> - sends a **heads-up notification** to the **old** email address (catches takeover attempts where an attacker has the password but not the original inbox)
+>
+> The change is **not committed yet**. Step 2 ([08-email-change-confirm.md](./08-email-change-confirm.md)) verifies the OTP and commits the new email.
 
-- sends a **6-digit OTP** to the **new** email address (proves the user controls that inbox)
-- sends a **heads-up notification** to the **old** email address (catches takeover attempts where an attacker has the password but not the original inbox)
-
-The change is **not committed yet**. Step 2 ([08-email-change-confirm.md](./08-email-change-confirm.md)) verifies the OTP and commits the new email.
-
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

@@ -14,12 +14,9 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 
 ---
 
-## 1. Overview
-Fetches all chat conversations for the logged-in user, including last message preview, unread count, and participant presence.
+> Fetches all chat conversations for the logged-in user, including last message preview, unread count, and participant presence.
 
----
-
-## 2. Business Rules
+## 2. Business Rules (Source of Truth)
 - **Search**: `searchTerm` query parameter use hoy onno participant er name filter korar jonno (case-insensitive).
 - **Last Message**: Prottek chat er shobar shesh message description e thake.
 - **Unread Count**: Login kora user er koto gulo message unread ache sheta return kore.

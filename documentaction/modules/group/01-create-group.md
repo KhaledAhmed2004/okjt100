@@ -1,7 +1,7 @@
 # 01. Create Group
 
 ```http
-POST /groups
+POST /api/v1/groups
 Content-Type: application/json
 Auth: Admin
 ```

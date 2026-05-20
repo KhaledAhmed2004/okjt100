@@ -5,12 +5,9 @@ DELETE /users/me/sessions/:tokenId
 Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
 ```
 
-## 1. Overview
-Removes **one** specific device session from the authenticated user's `deviceTokens[]`. The device stops receiving push notifications immediately. The JWT issued to that device **remains valid until natural expiry** — `tokenVersion` is intentionally not bumped (bumping it would invalidate every session, not just this one). For a true "logout this device, invalidate its token now" use [auth/06-logout.md](../auth/06-logout.md) **on the device itself**, or use [12-revoke-all-sessions.md](./12-revoke-all-sessions.md) to nuke everything.
+> Removes **one** specific device session from the authenticated user's `deviceTokens[]`. The device stops receiving push notifications immediately. The JWT issued to that device **remains valid until natural expiry** — `tokenVersion` is intentionally not bumped (bumping it would invalidate every session, not just this one). For a true "logout this device, invalidate its token now" use [auth/06-logout.md](../auth/06-logout.md) **on the device itself**, or use [12-revoke-all-sessions.md](./12-revoke-all-sessions.md) to nuke everything.
 
----
-
-## 2. Business Rules (Source of Truth)
+## 1. Business Rules (Source of Truth)
 
 ### 2.1 Authentication Rules
 Enforced by the `auth` middleware before the controller is reached.

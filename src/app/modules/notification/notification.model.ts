@@ -12,6 +12,9 @@ const NotificationSchema = new Schema<INotification>(
     title: { type: String, required: true },
     text: { type: String, required: true },
 
+    // 0 = legacy flat notification, 1 = typed notification with actor/subject/actions in metadata
+    schemaVersion: { type: Number, default: 0 },
+
     resourceType: { type: String },
     resourceId: { type: String },
 

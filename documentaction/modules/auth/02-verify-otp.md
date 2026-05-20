@@ -6,17 +6,14 @@ Content-Type: application/json
 Auth: None (Public — OTP validated inline)
 ```
 
-## 1. Overview
-Single endpoint that handles **two distinct flows** based on the user's `isVerified` state at the moment of OTP submission:
-
-- **Registration flow** (`isVerified: false`): flips the user to `isVerified: true` and clears the OTP.
-    - If user status is `PENDING` (new users): Returns a success message but **no tokens**. The user must wait for admin approval.
-    - If user status is `ACTIVE` (e.g. email change): **Auto-logs the user in** by issuing tokens.
-- **Forgot-password flow** (`isVerified: true`): sets the one-time `authentication.isResetPassword = true` flag, clears the OTP, and returns a freshly-generated `resetToken`.
-
-The branch is decided server-side from the user's existing `isVerified` state.
-
----
+> Single endpoint that handles **two distinct flows** based on the user's `isVerified` state at the moment of OTP submission:
+>
+> - **Registration flow** (`isVerified: false`): flips the user to `isVerified: true` and clears the OTP.
+>     - If user status is `PENDING` (new users): Returns a success message but **no tokens**. The user must wait for admin approval.
+>     - If user status is `ACTIVE` (e.g. email change): **Auto-logs the user in** by issuing tokens.
+> - **Forgot-password flow** (`isVerified: true`): sets the one-time `authentication.isResetPassword = true` flag, clears the OTP, and returns a freshly-generated `resetToken`.
+>
+> The branch is decided server-side from the user's existing `isVerified` state.
 
 ## 2. Business Rules (Source of Truth)
 

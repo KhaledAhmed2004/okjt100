@@ -1,19 +1,16 @@
-# 06. List Connection Requests
+# 07. List Connection Requests
 
 ```http
 GET /connections/requests
 Auth: Bearer {{accessToken}} (BROTHER, SISTER)
 ```
 
-## 1. Overview
-Fetches a cursor-paginated list of pending connection requests, either sent by the user (`type=sent`) or received by them (`type=received`).
+> Fetches a cursor-paginated list of pending connection requests, either sent by the user (`direction=sent`) or received by them (`direction=received`).
 
----
-
-## 2. Query Parameters
+## 1. Query Parameters
 | Parameter | Description | Default | Example |
 | :--- | :--- | :--- | :--- |
-| `type` | Whether to fetch requests you `sent` or `received` | `received` | `sent` |
+| `direction` | Whether to fetch requests you `sent` or `received` | `received` | `sent` |
 | `nextCursor` | Base64 encoded cursor value of the last item from the previous page for cursor pagination | — | `NjY0YTFiMmMzZDRlNWY2YTdiOGM5ZDFh` |
 | `limit` | Pagination limit | `10` | `10` |
 | `sort` | Sort field (prefix with `-` for descending) | `-createdAt` | `-createdAt` |
@@ -23,13 +20,13 @@ Fetches a cursor-paginated list of pending connection requests, either sent by t
 
 ## 3. Responses
 
-### Success (200) - Received Requests (`type=received`)
+### Success (200) - Received Requests (`direction=received`)
 ```json
 {
   "success": true,
   "statusCode": 200,
   "message": "Received connection requests fetched successfully",
-  "meta": {
+  "pagination": {
     "limit": 10,
     "nextCursor": "NjY0YTFiMmMzZDRlNWY2YTdiOGM5ZDFh",
     "hasNext": false
@@ -49,13 +46,13 @@ Fetches a cursor-paginated list of pending connection requests, either sent by t
 }
 ```
 
-### Success (200) - Sent Requests (`type=sent`)
+### Success (200) - Sent Requests (`direction=sent`)
 ```json
 {
   "success": true,
   "statusCode": 200,
   "message": "Sent connection requests fetched successfully",
-  "meta": {
+  "pagination": {
     "limit": 10,
     "nextCursor": "NjY0YTFiMmMzZDRlNWY2YTdiOGM5ZDFj",
     "hasNext": false

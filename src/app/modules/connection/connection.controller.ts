@@ -3,11 +3,12 @@ import { StatusCodes } from 'http-status-codes';
 import catchAsync from '../../../shared/catchAsync';
 import sendResponse from '../../../shared/sendResponse';
 import { ConnectionService } from './connection.service';
+import { CONNECTION_ACTION } from './connection.constants';
 import { JwtPayload } from 'jsonwebtoken';
 
 const sendConnectionRequest = catchAsync(async (req: Request, res: Response) => {
   const senderId = (req.user as JwtPayload).id;
-  const receiverId = req.params.userId;
+  const receiverId = req.body.receiverId;
 
   const result = await ConnectionService.sendConnectionRequest(senderId, receiverId);
 
@@ -19,17 +20,38 @@ const sendConnectionRequest = catchAsync(async (req: Request, res: Response) => 
   });
 });
 
-const respondToConnectionRequest = catchAsync(async (req: Request, res: Response) => {
+const acceptConnection = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as JwtPayload).id;
   const connectionId = req.params.connectionId;
-  const action = req.body.action;
 
-  const result = await ConnectionService.respondToConnectionRequest(connectionId, userId, action);
+  const result = await ConnectionService.respondToConnectionRequest(
+    connectionId,
+    userId,
+    CONNECTION_ACTION.ACCEPTED
+  );
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: `Connection request ${action.toLowerCase()}ed successfully`,
+    message: 'Connection request accepted successfully',
+    data: result,
+  });
+});
+
+const rejectConnection = catchAsync(async (req: Request, res: Response) => {
+  const userId = (req.user as JwtPayload).id;
+  const connectionId = req.params.connectionId;
+
+  const result = await ConnectionService.respondToConnectionRequest(
+    connectionId,
+    userId,
+    CONNECTION_ACTION.REJECTED
+  );
+
+  sendResponse(res, {
+    statusCode: StatusCodes.OK,
+    success: true,
+    message: 'Connection request rejected successfully',
     data: result,
   });
 });
@@ -77,18 +99,18 @@ const getMyConnections = catchAsync(async (req: Request, res: Response) => {
 
 const getPendingConnectionRequests = catchAsync(async (req: Request, res: Response) => {
   const userId = (req.user as JwtPayload).id;
-  const type = (req.query.type as 'sent' | 'received') || 'received';
+  const direction = (req.query.direction as 'sent' | 'received') || 'received';
 
-  // Clone query and remove 'type' so QueryBuilder doesn't try to filter the DB by it
+  // Clone query and remove 'direction' so QueryBuilder doesn't try to filter the DB by it
   const queryObj = { ...req.query };
-  delete queryObj.type;
+  delete queryObj.direction;
 
-  const result = await ConnectionService.getPendingConnectionRequests(userId, type, queryObj);
+  const result = await ConnectionService.getPendingConnectionRequests(userId, direction, queryObj);
 
   sendResponse(res, {
     statusCode: StatusCodes.OK,
     success: true,
-    message: type === 'sent' ? 'Sent connection requests fetched successfully' : 'Received connection requests fetched successfully',
+    message: direction === 'sent' ? 'Sent connection requests fetched successfully' : 'Received connection requests fetched successfully',
     data: result.data,
     meta: result.pagination,
   });
@@ -96,7 +118,8 @@ const getPendingConnectionRequests = catchAsync(async (req: Request, res: Respon
 
 export const ConnectionController = {
   sendConnectionRequest,
-  respondToConnectionRequest,
+  acceptConnection,
+  rejectConnection,
   cancelConnectionRequest,
   removeConnection,
   getMyConnections,

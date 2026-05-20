@@ -1,7 +1,7 @@
 # 13. Get Group Details
 
 ```http
-GET /groups/:groupId
+GET /api/v1/groups/:groupId
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 

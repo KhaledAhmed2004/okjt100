@@ -1,7 +1,7 @@
 # 11. Update Group
 
 ```http
-PATCH /groups/:groupId
+PATCH /api/v1/groups/:groupId
 Auth: Bearer {{accessToken}} (ADMIN, SUPER_ADMIN)
 ```
 

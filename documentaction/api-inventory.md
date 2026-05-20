@@ -66,6 +66,15 @@
 | 4.5 | GET | `/groups/feed` | User | ✅ | [Module 4.5](./modules/group/05-get-feed.md) | — |
 | 4.6 | POST | `/groups/posts/:postId/like` | User | ✅ | [Module 4.6](./modules/group/06-like-post.md) | — |
 | 4.7 | POST | `/groups/posts/:postId/comments` | User | ✅ | [Module 4.7](./modules/group/07-add-comment.md) | — |
+| 4.8 | DELETE | `/groups/posts/:postId` | Author / Admin | ✅ | [Module 4.8](./modules/group/08-delete-post.md) | — |
+| 4.9 | DELETE | `/groups/comments/:commentId` | Author / Admin | ✅ | [Module 4.9](./modules/group/09-delete-comment.md) | — |
+| 4.10 | POST | `/groups/:groupId/leave` | User | ✅ | [Module 4.10](./modules/group/10-leave-group.md) | — |
+| 4.11 | PATCH | `/groups/:groupId` | Admin | ✅ | [Module 4.11](./modules/group/11-update-group.md) | — |
+| 4.12 | DELETE | `/groups/:groupId` | Admin | ✅ | [Module 4.12](./modules/group/12-delete-group.md) | — |
+| 4.13 | GET | `/groups/:groupId` | User | ✅ | [Module 4.13](./modules/group/13-get-group.md) | — |
+| 4.14 | GET | `/groups/posts/:postId/comments` | User | ✅ | [Module 4.14](./modules/group/14-get-comments.md) | — |
+| 4.15 | DELETE | `/groups/:groupId/members/:userId` | Admin | ✅ | [Module 4.15](./modules/group/15-kick-member.md) | — |
+| 4.16 | PATCH | `/groups/posts/:postId/pin` | Admin | ✅ | [Module 4.16](./modules/group/16-pin-post.md) | — |
 
 ## Khutbah Module
 
@@ -165,13 +174,13 @@
 
 | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
 |---|---|---|---|:---:|---|---|
-| 14.1 | POST | `/connections/request/:userId` | BROTHER, SISTER | ✅ | [Module 14.1](./modules/connection/01-send-connection-request.md) | — |
-| 14.2 | PATCH | `/connections/:connectionId/respond` | BROTHER, SISTER | ✅ | [Module 14.2](./modules/connection/02-respond-to-request.md) | — |
-| 14.3 | DELETE | `/connections/:connectionId/request` | BROTHER, SISTER | ✅ | [Module 14.3](./modules/connection/03-cancel-request.md) | — |
-| 14.4 | DELETE | `/connections/:connectionId` | BROTHER, SISTER | ✅ | [Module 14.4](./modules/connection/04-remove-connection.md) | — |
-| 14.5 | GET | `/connections` | BROTHER, SISTER | ✅ | [Module 14.5](./modules/connection/05-list-my-connections.md) | — |
-| 14.6 | GET | `/connections/requests` | BROTHER, SISTER | ✅ | [Module 14.6](./modules/connection/06-list-pending-requests.md) | — |
-| 14.7 | GET | `/connections/status/:userId` | BROTHER, SISTER | ✅ | [Module 14.7](./modules/connection/07-check-connection-status.md) | — |
+| 14.1 | POST | `/connections` | BROTHER, SISTER | ✅ | [Send Request](./modules/connection/01-send-connection-request.md) | — |
+| 14.2 | POST | `/connections/:connectionId/accept` | BROTHER, SISTER | ✅ | [Accept Request](./modules/connection/02-accept-request.md) | — |
+| 14.3 | POST | `/connections/:connectionId/reject` | BROTHER, SISTER | ✅ | [Reject Request](./modules/connection/03-reject-request.md) | — |
+| 14.4 | POST | `/connections/:connectionId/cancel` | BROTHER, SISTER | ✅ | [Cancel Request](./modules/connection/04-cancel-request.md) | — |
+| 14.5 | POST | `/connections/:connectionId/remove` | BROTHER, SISTER | ✅ | [Remove Connection](./modules/connection/05-remove-connection.md) | — |
+| 14.6 | GET | `/connections` | BROTHER, SISTER | ✅ | [My Connections](./modules/connection/06-list-my-connections.md) | — |
+| 14.7 | GET | `/connections/requests` | BROTHER, SISTER | ✅ | [Pending Requests](./modules/connection/07-list-pending-requests.md) | — |
 
 ## Chat Module
 

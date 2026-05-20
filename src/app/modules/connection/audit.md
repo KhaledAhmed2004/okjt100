@@ -25,3 +25,36 @@ This document outlines the issues discovered during the architecture audit of th
 ## 6. Asymmetric Mutation Response Shapes (Medium)
 **Issue:** The three "deletion" mutations (`REJECT`, `CANCEL`, `REMOVE`) returned either `data: null` (REJECT) or omitted the `data` key entirely (CANCEL, REMOVE). The `ACCEPT` action, by contrast, returned a rich object `{ id, status, chatId }`. This asymmetry forced front-end clients to either special-case each mutation or perform an additional round-trip fetch just to synchronise their local cache after a deletion.
 **Fix:** All three deletion/rejection operations now return a uniform `{ id: connectionId, status: 'NONE' }` object. `'NONE'` is an **API-layer sentinel** — it is never stored in the database (the record is still physically deleted). The shape gives the client everything it needs to immediately invalidate or transition a cached entry without a second network request, which is the standard pattern expected by cache libraries such as RTK Query and React Query.
+
+## 7. Action-Based API Design (World-Class Refactor)
+**Issue:** Previously, the module used generic HTTP methods (`PATCH`, `DELETE`) with body-based `action` parameters (e.g., `PATCH /connections/:id` with `{ action: 'ACCEPT' }`). This followed a strict "Resource-based" REST model which often obscures the **User Intent** and leads to complex logic branching inside a single controller.
+
+**Fix:** Refactored the entire module to an **Action-Based API** model. 
+
+### 🔥 The Mental Model: Intent vs Resource
+
+In world-class backend engineering, HTTP method selection isn't just about "side effects." It's about **how the API is understood by humans.**
+
+| Aspect | Resource-based (Old) | Action-based (New) |
+| :--- | :--- | :--- |
+| **Focus** | Data Structure (Resource) | User Intention (Action) |
+| **Method** | `PATCH`, `DELETE` | `POST` |
+| **Endpoints** | `/connections/:id` | `/connections/:id/accept`, `/connections/:id/cancel` |
+| **Clarity** | Medium (Technical) | Very High (Business) |
+
+### 🚀 Why POST for everything?
+Contrary to popular belief, `POST` isn't used just because "side effects exist" (PATCH and DELETE also have side effects). In action-based APIs, **POST is used because intent clarity and external usability matter more than strict REST semantics.**
+
+- **Intent thinking:** Instead of saying "I am modifying the balance resource" (`PATCH /account`), we say "I want to deposit money" (`POST /deposit`).
+- **Safety:** It minimizes developer mistakes by making actions explicit.
+- **Scalability:** It's easier to add new business actions without overloading a single `PATCH` or `DELETE` endpoint.
+
+**Refactor Outcome:**
+- `POST /connections` (Send Request)
+- `POST /connections/:id/accept` (Accept)
+- `POST /connections/:id/reject` (Reject)
+- `POST /connections/:id/cancel` (Cancel)
+- `POST /connections/:id/remove` (Remove)
+
+Each action now has its own dedicated endpoint, making the system prioritizes **explicit user intent, safer client interaction, and clearer business semantics.**
+

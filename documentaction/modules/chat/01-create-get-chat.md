@@ -16,12 +16,9 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 
 ---
 
-## 1. Overview
-Creates a new chat between the logged-in user and another user, or retrieves an existing one if it already exists.
+> Creates a new chat between the logged-in user and another user, or retrieves an existing one if it already exists.
 
----
-
-## 2. Business Rules
+## 2. Business Rules (Source of Truth)
 - **Idempotency**: Jodi same participants niye chat agei thake, tobe shetai return hobe, notun kore create hobe na.
 - **Reactivation**: Jodi existing chat inactive thake (`status: false`), tobe sheta auto-reactivate hobe (`status: true`).
 

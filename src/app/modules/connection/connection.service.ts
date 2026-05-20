@@ -67,12 +67,28 @@ const sendConnectionRequest = async (senderId: string, receiverId: string) => {
   // Send in-app notification & push/socket
   await sendNotifications({
     receiver: new mongoose.Types.ObjectId(receiverId),
-    type: 'SYSTEM',
+    type: 'CONNECTION_REQUEST',
     title: 'New Connection Request',
-    text: `${senderUser?.name} wants to connect`,
+    text: `${senderUser.name} wants to connect`,
     resourceType: 'User',
     resourceId: senderId,
-    userId: receiverId, // passed for push/socket helper compatibility
+    schemaVersion: 1,
+    metadata: {
+      actor: {
+        id: senderUser._id.toString(),
+        name: senderUser.name,
+        profileImage: senderUser.profileImage,
+      },
+      subject: {
+        type: 'Connection',
+        id: connection._id.toString(),
+      },
+      actions: [
+        { type: 'ACCEPT' },
+        { type: 'REJECT' },
+        { type: 'VIEW_PROFILE' },
+      ],
+    },
   } as any);
 
   // @ts-ignore
@@ -117,7 +133,7 @@ const respondToConnectionRequest = async (connectionId: string, userId: string, 
     // @ts-ignore
     const io = global.io;
 
-    if (action === CONNECTION_ACTION.REJECT) {
+    if (action === CONNECTION_ACTION.REJECTED) {
       // Delete the connection
       await Connection.findByIdAndDelete(connectionId).session(session);
       await session.commitTransaction();
@@ -151,12 +167,28 @@ const respondToConnectionRequest = async (connectionId: string, userId: string, 
     // Notify sender
     await sendNotifications({
       receiver: new mongoose.Types.ObjectId(String(connection.sender)),
-      type: 'SYSTEM',
+      type: 'CONNECTION_ACCEPTED',
       title: 'Connection Accepted',
       text: `${receiverUser?.name} accepted your connection request`,
       resourceType: 'User',
       resourceId: userId,
-      userId: String(connection.sender), // passed for push/socket helper compatibility
+      schemaVersion: 1,
+      metadata: {
+        actor: {
+          id: receiverUser?._id.toString(),
+          name: receiverUser?.name,
+          profileImage: receiverUser?.profileImage,
+        },
+        subject: {
+          type: 'Connection',
+          id: connectionId,
+          chatId: (chat as any)._id.toString(),
+        },
+        actions: [
+          { type: 'OPEN_CHAT' },
+          { type: 'VIEW_PROFILE' },
+        ],
+      },
     } as any);
 
     if (io) {
@@ -286,9 +318,9 @@ const getMyConnections = async (userId: string, query: Record<string, unknown>) 
   };
 };
 
-const getPendingConnectionRequests = async (userId: string, type: 'sent' | 'received', query: Record<string, unknown>) => {
-  const filter = type === 'sent' ? { sender: userId, status: CONNECTION_STATUS.PENDING } : { receiver: userId, status: CONNECTION_STATUS.PENDING };
-  const populateField = type === 'sent' ? 'receiver' : 'sender';
+const getPendingConnectionRequests = async (userId: string, direction: 'sent' | 'received', query: Record<string, unknown>) => {
+  const filter = direction === 'sent' ? { sender: userId, status: CONNECTION_STATUS.PENDING } : { receiver: userId, status: CONNECTION_STATUS.PENDING };
+  const populateField = direction === 'sent' ? 'receiver' : 'sender';
 
   const connectionQuery = new QueryBuilder<IConnection>(
     Connection.find(filter).populate({ path: populateField, select: 'name profileImage role' }),
@@ -301,7 +333,7 @@ const getPendingConnectionRequests = async (userId: string, type: 'sent' | 'rece
   const { data, meta } = await connectionQuery.cursorPaginate('_id');
 
   const formattedData = data.map((conn: any) => {
-    if (type === 'sent') {
+    if (direction === 'sent') {
       return {
         connectionId: conn._id,
         receiver: conn.receiver ? {
