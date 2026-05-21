@@ -164,7 +164,7 @@ function createUser(suffix) {
             const receiver = yield createUser('receiver');
             const connection = yield connection_service_1.ConnectionService.sendConnectionRequest(sender._id.toString(), receiver._id.toString());
             vitest_1.vi.clearAllMocks(); // Clear io and notifications from send Request
-            const accepted = yield connection_service_1.ConnectionService.respondToConnectionRequest(connection.id.toString(), receiver._id.toString(), connection_constants_1.CONNECTION_ACTION.ACCEPT);
+            const accepted = yield connection_service_1.ConnectionService.respondToConnectionRequest(connection.id.toString(), receiver._id.toString(), connection_constants_1.CONNECTION_ACTION.ACCEPTED);
             console.log('--- respondToConnectionRequest (ACCEPT) Response ---\n', JSON.stringify(accepted, null, 2));
             (0, vitest_1.expect)(accepted).toBeDefined();
             (0, vitest_1.expect)(accepted === null || accepted === void 0 ? void 0 : accepted.status).toBe(connection_constants_1.CONNECTION_STATUS.ACCEPTED);
@@ -179,9 +179,9 @@ function createUser(suffix) {
             const sender = yield createUser('sender');
             const receiver = yield createUser('receiver');
             const connection = yield connection_service_1.ConnectionService.sendConnectionRequest(sender._id.toString(), receiver._id.toString());
-            const rejected = yield connection_service_1.ConnectionService.respondToConnectionRequest(connection.id.toString(), receiver._id.toString(), connection_constants_1.CONNECTION_ACTION.REJECT);
+            const rejected = yield connection_service_1.ConnectionService.respondToConnectionRequest(connection.id.toString(), receiver._id.toString(), connection_constants_1.CONNECTION_ACTION.REJECTED);
             console.log('--- respondToConnectionRequest (REJECT) Response ---\n', JSON.stringify(rejected, null, 2));
-            (0, vitest_1.expect)(rejected).toBeNull();
+            (0, vitest_1.expect)(rejected).toEqual({ id: connection.id, status: 'NONE' });
             // Verify DB is clean
             const dbCheck = yield connection_model_1.Connection.findById(connection.id);
             (0, vitest_1.expect)(dbCheck).toBeNull();
@@ -191,7 +191,7 @@ function createUser(suffix) {
             const receiver = yield createUser('receiver');
             const hacker = yield createUser('hacker');
             const connection = yield connection_service_1.ConnectionService.sendConnectionRequest(sender._id.toString(), receiver._id.toString());
-            yield (0, vitest_1.expect)(connection_service_1.ConnectionService.respondToConnectionRequest(connection.id.toString(), hacker._id.toString(), connection_constants_1.CONNECTION_ACTION.ACCEPT)).rejects.toMatchObject({
+            yield (0, vitest_1.expect)(connection_service_1.ConnectionService.respondToConnectionRequest(connection.id.toString(), hacker._id.toString(), connection_constants_1.CONNECTION_ACTION.ACCEPTED)).rejects.toMatchObject({
                 statusCode: 403,
                 message: 'Only the receiver can respond to this request',
             });
@@ -222,7 +222,7 @@ function createUser(suffix) {
             const sender = yield createUser('sender');
             const receiver = yield createUser('receiver');
             const connection = yield connection_service_1.ConnectionService.sendConnectionRequest(sender._id.toString(), receiver._id.toString());
-            yield connection_service_1.ConnectionService.respondToConnectionRequest(connection.id.toString(), receiver._id.toString(), connection_constants_1.CONNECTION_ACTION.ACCEPT);
+            yield connection_service_1.ConnectionService.respondToConnectionRequest(connection.id.toString(), receiver._id.toString(), connection_constants_1.CONNECTION_ACTION.ACCEPTED);
             yield connection_service_1.ConnectionService.removeConnection(connection.id.toString(), sender._id.toString() // sender removes it
             );
             const dbCheck = yield connection_model_1.Connection.findById(connection.id);

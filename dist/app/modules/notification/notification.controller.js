@@ -24,10 +24,7 @@ const getNotificationFromDB = (0, catchAsync_1.default)((req, res) => __awaiter(
         statusCode: http_status_codes_1.StatusCodes.OK,
         success: true,
         message: 'Notifications retrieved successfully',
-        meta: {
-            pagination: result.pagination,
-            unreadCount: result.unreadCount,
-        },
+        meta: result.meta,
         data: result.data,
     });
 }));

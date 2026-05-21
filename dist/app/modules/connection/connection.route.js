@@ -16,11 +16,13 @@ router.get('/requests', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.US
 // List my accepted connections
 router.get('/', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), connection_controller_1.ConnectionController.getMyConnections);
 // Send connection request
-router.post('/request/:userId', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.sendConnectionRequestSchema), connection_controller_1.ConnectionController.sendConnectionRequest);
-// Accept or reject request
-router.patch('/:connectionId', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.respondToConnectionRequestSchema), connection_controller_1.ConnectionController.respondToConnectionRequest);
-// Cancel pending request (DELETE = undo the sent request)
-router.delete('/:connectionId/request', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.getConnectionByIdParamsSchema), connection_controller_1.ConnectionController.cancelConnectionRequest);
-// Remove accepted connection
-router.delete('/:connectionId', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.getConnectionByIdParamsSchema), connection_controller_1.ConnectionController.removeConnection);
+router.post('/', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.sendConnectionRequestSchema), connection_controller_1.ConnectionController.sendConnectionRequest);
+// Accept a pending connection request
+router.post('/:connectionId/accept', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.connectionIdParamSchema), connection_controller_1.ConnectionController.acceptConnection);
+// Reject a pending connection request
+router.post('/:connectionId/reject', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.connectionIdParamSchema), connection_controller_1.ConnectionController.rejectConnection);
+// Cancel a pending request (sender undoes their own request)
+router.post('/:connectionId/cancel', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.connectionIdParamSchema), connection_controller_1.ConnectionController.cancelConnectionRequest);
+// Remove an accepted connection
+router.post('/:connectionId/remove', (0, auth_1.default)(user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER), (0, validateRequest_1.default)(connection_validation_1.ConnectionValidation.connectionIdParamSchema), connection_controller_1.ConnectionController.removeConnection);
 exports.ConnectionRoutes = router;

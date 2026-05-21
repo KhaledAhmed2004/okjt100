@@ -4,6 +4,12 @@ exports.NOTIFICATION_TYPES = void 0;
 exports.NOTIFICATION_TYPES = [
     'ADMIN',
     'SYSTEM',
+    // ── Connection events ──────────────────────────────────────────────────────
+    'CONNECTION_REQUEST',
+    'CONNECTION_ACCEPTED',
+    // ── Messaging events ───────────────────────────────────────────────────────
+    'NEW_MESSAGE',
+    // ── Community events ───────────────────────────────────────────────────────
     'QUESTION_ANSWERED',
     'NEW_QUESTION',
     'POST_LIKED',

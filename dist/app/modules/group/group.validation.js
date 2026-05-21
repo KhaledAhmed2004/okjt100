@@ -9,6 +9,7 @@ const createGroupZodSchema = zod_1.z.object({
         description: zod_1.z.string({ required_error: 'Description is required' }),
         userType: zod_1.z.enum([user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER], { required_error: 'User type is required' }),
         category: zod_1.z.string({ required_error: 'Category name is required' }),
+        coverImage: zod_1.z.string().optional(),
     }),
 });
 const createPostZodSchema = zod_1.z.object({
@@ -40,6 +41,7 @@ const updateGroupZodSchema = zod_1.z.object({
         description: zod_1.z.string().optional(),
         userType: zod_1.z.enum([user_1.USER_ROLES.BROTHER, user_1.USER_ROLES.SISTER]).optional(),
         category: zod_1.z.string().optional(),
+        coverImage: zod_1.z.string().optional(),
     }),
 });
 exports.GroupValidation = {

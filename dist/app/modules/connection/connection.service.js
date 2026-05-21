@@ -66,12 +66,28 @@ const sendConnectionRequest = (senderId, receiverId) => __awaiter(void 0, void 0
     // Send in-app notification & push/socket
     yield (0, notificationsHelper_1.sendNotifications)({
         receiver: new mongoose_1.default.Types.ObjectId(receiverId),
-        type: 'SYSTEM',
+        type: 'CONNECTION_REQUEST',
         title: 'New Connection Request',
-        text: `${senderUser === null || senderUser === void 0 ? void 0 : senderUser.name} wants to connect`,
+        text: `${senderUser.name} wants to connect`,
         resourceType: 'User',
         resourceId: senderId,
-        userId: receiverId, // passed for push/socket helper compatibility
+        schemaVersion: 1,
+        metadata: {
+            actor: {
+                id: senderUser._id.toString(),
+                name: senderUser.name,
+                profileImage: senderUser.profileImage,
+            },
+            subject: {
+                type: 'Connection',
+                id: connection._id.toString(),
+            },
+            actions: [
+                { type: 'ACCEPT' },
+                { type: 'REJECT' },
+                { type: 'VIEW_PROFILE' },
+            ],
+        },
     });
     // @ts-ignore
     const io = global.io;
@@ -107,7 +123,7 @@ const respondToConnectionRequest = (connectionId, userId, action) => __awaiter(v
         }
         // @ts-ignore
         const io = global.io;
-        if (action === connection_constants_1.CONNECTION_ACTION.REJECT) {
+        if (action === connection_constants_1.CONNECTION_ACTION.REJECTED) {
             // Delete the connection
             yield connection_model_1.Connection.findByIdAndDelete(connectionId).session(session);
             yield session.commitTransaction();
@@ -116,7 +132,9 @@ const respondToConnectionRequest = (connectionId, userId, action) => __awaiter(v
                     connectionId: connection._id,
                 });
             }
-            return null;
+            // Return the processed id with a 'NONE' status so the client can
+            // immediately update its local cache without a second request.
+            return { id: connection._id, status: 'NONE' };
         }
         // Action is ACCEPT
         const participants = [String(connection.sender), String(connection.receiver)];
@@ -131,12 +149,28 @@ const respondToConnectionRequest = (connectionId, userId, action) => __awaiter(v
         // Notify sender
         yield (0, notificationsHelper_1.sendNotifications)({
             receiver: new mongoose_1.default.Types.ObjectId(String(connection.sender)),
-            type: 'SYSTEM',
+            type: 'CONNECTION_ACCEPTED',
             title: 'Connection Accepted',
             text: `${receiverUser === null || receiverUser === void 0 ? void 0 : receiverUser.name} accepted your connection request`,
             resourceType: 'User',
             resourceId: userId,
-            userId: String(connection.sender), // passed for push/socket helper compatibility
+            schemaVersion: 1,
+            metadata: {
+                actor: {
+                    id: receiverUser === null || receiverUser === void 0 ? void 0 : receiverUser._id.toString(),
+                    name: receiverUser === null || receiverUser === void 0 ? void 0 : receiverUser.name,
+                    profileImage: receiverUser === null || receiverUser === void 0 ? void 0 : receiverUser.profileImage,
+                },
+                subject: {
+                    type: 'Connection',
+                    id: connectionId,
+                    chatId: chat._id.toString(),
+                },
+                actions: [
+                    { type: 'OPEN_CHAT' },
+                    { type: 'VIEW_PROFILE' },
+                ],
+            },
         });
         if (io) {
             io.to(`user::${String(connection.sender)}`).emit('CONNECTION_ACCEPTED', {
@@ -171,7 +205,9 @@ const cancelConnectionRequest = (connectionId, userId) => __awaiter(void 0, void
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'This request is no longer pending');
     }
     yield connection_model_1.Connection.findByIdAndDelete(connectionId);
-    return null;
+    // Return the processed id with a 'NONE' status so the client can
+    // immediately update its local cache without a second request.
+    return { id: connection._id, status: 'NONE' };
 });
 const removeConnection = (connectionId, userId) => __awaiter(void 0, void 0, void 0, function* () {
     const session = yield mongoose_1.default.startSession();
@@ -195,7 +231,9 @@ const removeConnection = (connectionId, userId) => __awaiter(void 0, void 0, voi
                 chatId: connection.chatId,
             });
         }
-        return null;
+        // Return the processed id with a 'NONE' status so the client can
+        // immediately update its local cache without a second request.
+        return { id: connection._id, status: 'NONE' };
     }
     catch (error) {
         yield session.abortTransaction();
@@ -241,16 +279,16 @@ const getMyConnections = (userId, query) => __awaiter(void 0, void 0, void 0, fu
         pagination: meta,
     };
 });
-const getPendingConnectionRequests = (userId, type, query) => __awaiter(void 0, void 0, void 0, function* () {
-    const filter = type === 'sent' ? { sender: userId, status: connection_constants_1.CONNECTION_STATUS.PENDING } : { receiver: userId, status: connection_constants_1.CONNECTION_STATUS.PENDING };
-    const populateField = type === 'sent' ? 'receiver' : 'sender';
+const getPendingConnectionRequests = (userId, direction, query) => __awaiter(void 0, void 0, void 0, function* () {
+    const filter = direction === 'sent' ? { sender: userId, status: connection_constants_1.CONNECTION_STATUS.PENDING } : { receiver: userId, status: connection_constants_1.CONNECTION_STATUS.PENDING };
+    const populateField = direction === 'sent' ? 'receiver' : 'sender';
     const connectionQuery = new QueryBuilder_1.default(connection_model_1.Connection.find(filter).populate({ path: populateField, select: 'name profileImage role' }), query)
         .filter()
         .sort()
         .fields();
     const { data, meta } = yield connectionQuery.cursorPaginate('_id');
     const formattedData = data.map((conn) => {
-        if (type === 'sent') {
+        if (direction === 'sent') {
             return {
                 connectionId: conn._id,
                 receiver: conn.receiver ? {

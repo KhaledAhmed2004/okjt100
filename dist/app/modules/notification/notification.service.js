@@ -21,40 +21,70 @@ const notification_model_1 = require("./notification.model");
 const sentNotification_model_1 = require("./sentNotification.model");
 const user_model_1 = require("../user/user.model");
 const user_1 = require("../../../enums/user");
-// get notifications
+// ── Notification formatter ────────────────────────────────────────────────────
+//
+// v1 typed notifications (schemaVersion === 1) store a rich payload in `metadata`
+// at write time: { actor, subject, actions }. The formatter reads that directly —
+// zero extra DB joins at read time.
+//
+// Legacy notifications (schemaVersion === 0 or missing) fall back to the old flat
+// shape so existing records keep rendering correctly.
+//
+const formatNotification = (doc) => {
+    var _a, _b, _c, _d, _e;
+    const base = {
+        id: doc._id,
+        type: doc.type,
+        isRead: doc.isRead,
+        readAt: (_a = doc.readAt) !== null && _a !== void 0 ? _a : null,
+        createdAt: doc.createdAt,
+        schemaVersion: (_b = doc.schemaVersion) !== null && _b !== void 0 ? _b : 0,
+    };
+    if (doc.schemaVersion === 1 && ((_c = doc.metadata) === null || _c === void 0 ? void 0 : _c.actor)) {
+        // Typed notification — return structured actor/subject/actions
+        return Object.assign(Object.assign({}, base), { actor: doc.metadata.actor, subject: (_d = doc.metadata.subject) !== null && _d !== void 0 ? _d : null, actions: (_e = doc.metadata.actions) !== null && _e !== void 0 ? _e : [] });
+    }
+    // Legacy flat notification — keep title/text/resource for backward compatibility
+    return Object.assign(Object.assign({}, base), { title: doc.title, text: doc.text, subject: doc.resourceType
+            ? { type: doc.resourceType, id: doc.resourceId }
+            : null, actor: null, actions: [] });
+};
+// get notifications — cursor-based pagination
+//
+// Offset/page pagination is intentionally NOT used here. Notification feeds are
+// high-frequency real-time streams: new items arrive between page loads, causing
+// page drift (skipped or duplicated items) with skip/limit. Cursor pagination
+// anchors each page to the last-seen document ID, making it drift-proof.
+//
+// Client usage:
+//   First page : GET /api/v1/notifications/me
+//   Next page  : GET /api/v1/notifications/me?nextCursor=<token>
+//   No more    : meta.hasNext === false
 const getNotificationFromDB = (user, query) => __awaiter(void 0, void 0, void 0, function* () {
     const notificationQuery = new QueryBuilder_1.default(notification_model_1.Notification.find({ receiver: user.id }), query)
         .search(['title', 'text'])
         .filter()
         .sort()
-        .paginate()
         .fields();
-    const data = yield notificationQuery.modelQuery;
-    const pagination = yield notificationQuery.getPaginationInfo();
-    // Format data to match the requested structure
-    const formattedData = data.map((item) => {
-        const doc = item.toObject();
-        return {
-            id: doc._id,
-            type: doc.type,
-            title: doc.title,
-            text: doc.text,
-            isRead: doc.isRead,
-            createdAt: doc.createdAt,
-            resource: doc.resourceType ? {
-                type: doc.resourceType,
-                id: doc.resourceId
-            } : null
-        };
-    });
+    // cursorPaginate executes the query internally and returns { data, meta }
+    const { data, meta } = yield notificationQuery.cursorPaginate('_id');
+    const formattedData = data.map((item) => formatNotification(item.toObject()));
     const unreadCount = yield notification_model_1.Notification.countDocuments({
         receiver: user.id,
         isRead: false,
     });
+    // Flatten cursor fields and unreadCount into a single meta object.
+    // unreadCount is notification-domain data; limit/nextCursor/hasNext are
+    // transport metadata. Both live at the same level — no nested `pagination`
+    // wrapper — matching the Twitter v2 pattern: { meta: { result_count, next_token } }.
     return {
         data: formattedData,
-        pagination,
-        unreadCount,
+        meta: {
+            limit: meta.limit,
+            nextCursor: meta.nextCursor,
+            hasNext: meta.hasNext,
+            unreadCount,
+        },
     };
 });
 const markNotificationAsReadIntoDB = (notificationId, userId) => __awaiter(void 0, void 0, void 0, function* () {

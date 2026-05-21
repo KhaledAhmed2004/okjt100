@@ -89,10 +89,7 @@ beforeAll(async () => {
     await mongoose.disconnect();
   }
   replSet = await MongoMemoryReplSet.create({ 
-    replSet: { count: 1 },
-    instance: {
-      storageEngine: 'wiredTiger', // WiredTiger is more stable for replica sets
-    }
+    replSet: { count: 1 }
   });
   const uri = replSet.getUri();
   await mongoose.connect(uri, {
@@ -259,7 +256,7 @@ describe('Group E2E Tests', () => {
       expect(feedResponse.status).toBe(200);
       expect(feedResponse.body.data[0].id).toBe(postId);
       expect(feedResponse.body.data[0].likesCount).toBe(1);
-      expect(feedResponse.body.data[0].commentsCount).toBe(1);
+      expect(feedResponse.body.data[0].commentsCount).toBe(2); // 1 main comment + 1 reply
 
       // --- PIN POST (ADMIN) ---
       const pinResponse = await request(app)
