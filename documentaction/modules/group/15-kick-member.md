@@ -1,7 +1,7 @@
 # 15. Kick Member
 
 ```http
-DELETE /api/v1/groups/:groupId/members/:userId
+DELETE /groups/:groupId/members/:userId
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (SUPER_ADMIN)
 ```

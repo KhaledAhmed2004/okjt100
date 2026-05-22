@@ -1,7 +1,7 @@
 # 07. Add Comment
 
 ```http
-POST /api/v1/groups/posts/:postId/comments
+POST /groups/posts/:postId/comments
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```

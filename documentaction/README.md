@@ -3,7 +3,7 @@
 Screen-by-screen API flow — **Student App** ebong **Admin Dashboard** dutor jonno documentation. 
 Each screen e APIs called, method/URL, auth requirement, ebong expected response shape ache.
 
-> Base URL: `{{baseUrl}}` = `http://localhost:5000/api/v1`
+> Base URL: `{{baseUrl}}` (Already includes `/api/v1`, e.g., `http://localhost:5000/api/v1`)
 > **[🗺️ User Journey & UX Flow Overview](./user-journey.md)** — Complete cross-screen user journeys with ASCII flow diagrams.
 > **[API Inventory & Implementation Tracker](./api-inventory.md)** — All APIs at a glance.
 > **[Database Design & Relationships](./database-design.md)** — Entity map ebong schema structure.

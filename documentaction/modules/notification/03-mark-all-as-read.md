@@ -1,7 +1,7 @@
 # 03. Mark All as Read
 
 ```http
-PATCH /api/v1/notifications/read-all
+PATCH /notifications/read-all
 Auth: Bearer {{accessToken}}
 ```
 

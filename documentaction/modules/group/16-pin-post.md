@@ -1,7 +1,7 @@
 # 16. Pin/Unpin Post
 
 ```http
-PATCH /api/v1/groups/posts/:postId/pin
+PATCH /groups/posts/:postId/pin
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (SUPER_ADMIN)
 ```

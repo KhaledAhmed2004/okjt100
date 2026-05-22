@@ -1,7 +1,7 @@
 # 01. Get My Notifications
 
 ```http
-GET /api/v1/notifications/me
+GET /notifications/me
 Auth: Bearer {{accessToken}}
 ```
 

@@ -1,7 +1,7 @@
 # 14. Get Post Comments
 
 ```http
-GET /api/v1/groups/posts/:postId/comments?page=1&limit=10
+GET /groups/posts/:postId/comments?page=1&limit=10
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```

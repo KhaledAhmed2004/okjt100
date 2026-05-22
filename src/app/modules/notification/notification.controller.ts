@@ -72,9 +72,7 @@ const getSentHistory = catchAsync(async (req: Request, res: Response) => {
     statusCode: StatusCodes.OK,
     success: true,
     message: 'Sent notification history retrieved successfully',
-    meta: {
-      pagination: result.pagination,
-    },
+    meta: result.pagination,
     data: result.data,
   });
 });

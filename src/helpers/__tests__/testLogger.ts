@@ -7,6 +7,7 @@ interface RequestData {
   params?: any;
   query?: any;
   body?: any;
+  [key: string]: any;
 }
 
 // Custom JSON syntax highlighter that bolds all tokens to make them look larger and thicker
@@ -111,6 +112,33 @@ export function logApi(
   const resLines = colorizeJson(responseData).split('\n');
   resLines.forEach(line => {
     // Bold the entire line to make braces/colons/brackets look thicker and bigger
+    console.log(`${chalk.bold(line)}`);
+  });
+  console.log('\n');
+}
+
+export function logSocket(
+  type: 'EMIT' | 'RECEIVE',
+  event: string,
+  payload: any,
+  badge?: string,
+  description?: string
+) {
+  const typeColors = {
+    EMIT: chalk.bgBlue.whiteBright.bold,      // Blue
+    RECEIVE: chalk.bgGreen.black.bold,       // Green
+  };
+
+  const typeColor = typeColors[type] || chalk.bgWhite.black.bold;
+  const badgeStr = badge ? chalk.bold.magenta(` [${badge}]`) : '';
+  const descStr = description ? chalk.dim.white(` - ${description}`) : '';
+
+  console.log('\n');
+  console.log(`${typeColor(` ${type} `)}${chalk.reset('  ')}${chalk.bold.white(event)}${badgeStr}${descStr}`);
+  
+  console.log(chalk.bgCyan.black.bold(' PAYLOAD ') + '\x1b[0m');
+  const payloadLines = colorizeJson(payload).split('\n');
+  payloadLines.forEach(line => {
     console.log(`${chalk.bold(line)}`);
   });
   console.log('\n');

@@ -10,7 +10,7 @@
 
 | Item | Value |
 |---|---|
-| Base URL | `{{baseUrl}}/api/v1` |
+| Base URL | `{{baseUrl}}` |
 | Version strategy | Path-based (`/api/v1`, `/api/v2`) — never query string |
 | Content-Type | `application/json` (unless multipart upload) |
 | Charset | UTF-8 |

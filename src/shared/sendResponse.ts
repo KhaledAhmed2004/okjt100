@@ -50,6 +50,40 @@ const formatData = (obj: any, seen = new WeakSet()): any => {
   }, {});
 };
 
+/**
+ * Unified API response envelope used by every endpoint in this codebase.
+ *
+ * Shape:
+ * ```json
+ * {
+ *   "success":    true | false,
+ *   "statusCode": 200,
+ *   "message":    "Human-readable description",
+ *   "meta":       { ...see convention below },
+ *   "data":       { ...payload }
+ * }
+ * ```
+ *
+ * ── meta convention ──────────────────────────────────────────────────────────
+ *
+ * `meta` is optional. When present, all fields sit flat at the top level —
+ * no nested `pagination` sub-object. See RESPONSE_STANDARD.md for the full
+ * contract.
+ *
+ * Cursor pagination (real-time feeds — notifications, profiles, connections):
+ *   { limit, nextCursor, hasNext, ...domainCounts }
+ *   e.g. { limit: 10, nextCursor: "abc==", hasNext: true, unreadCount: 3 }
+ *
+ * Offset pagination (stable admin lists — tickets, broadcasts, user admin):
+ *   { page, limit, total, totalPages, hasNext, hasPrev }
+ *   e.g. { page: 1, limit: 10, total: 47, totalPages: 5, hasNext: true, hasPrev: false }
+ *
+ * Domain-only meta (no pagination — metrics, analytics):
+ *   { comparisonPeriod, ...otherDomainFields }
+ *   e.g. { comparisonPeriod: "month" }
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
 type IData<T> = {
   success: boolean;
   statusCode: number;

@@ -1420,13 +1420,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/users/profiles?latitude=23.8103&longitude=90.4125",
+              "raw": "{{baseUrl}}/users/profiles?latitude=23.8103&longitude=90.4125",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "users",
                 "profiles"
               ],
@@ -1747,13 +1745,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups",
+              "raw": "{{baseUrl}}/groups",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups"
               ]
             },
@@ -1785,13 +1781,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups?page=1&limit=10&searchTerm=Quran",
+              "raw": "{{baseUrl}}/groups?page=1&limit=10&searchTerm=Quran",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups"
               ],
               "query": [
@@ -1806,6 +1800,11 @@
                 {
                   "key": "searchTerm",
                   "value": "Quran"
+                },
+                {
+                  "key": "userType",
+                  "value": "",
+                  "description": "**Admin only:** Filter by `BROTHER` or `SISTER`"
                 }
               ]
             },
@@ -1835,13 +1834,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/join",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/join",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "{{groupId}}",
                 "join"
@@ -1874,18 +1871,16 @@
             "header": [
               {
                 "key": "Content-Type",
-                "value": "application/json",
+                "value": "multipart/form-data",
                 "type": "text"
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/posts",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/posts",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "{{groupId}}",
                 "posts"
@@ -1897,7 +1892,7 @@
                 }
               ]
             },
-            "description": "Members can create posts with text and optional attachments within a group.",
+            "description": "Members can create posts with text and optional attachments within a group. This endpoint supports both JSON payloads and `multipart/form-data` file uploads.",
             "auth": {
               "type": "bearer",
               "bearer": [
@@ -1909,13 +1904,21 @@
               ]
             },
             "body": {
-              "mode": "raw",
-              "raw": "{\n  \"content\": \"Assalamu alaikum, looking forward to the next session!\", // Text content of the post\n  \"attachments\": [] // (Optional) List of image/file URLs\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "content",
+                  "value": "",
+                  "type": "text",
+                  "description": "Text content of the post"
+                },
+                {
+                  "key": "attachments",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional attachment URLs or files to upload (Max 5)"
                 }
-              }
+              ]
             }
           },
           "response": []
@@ -1932,13 +1935,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/posts?page=1&limit=10&searchTerm=keyword",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/posts?page=1&limit=10&searchTerm=keyword",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "{{groupId}}",
                 "posts"
@@ -1990,13 +1991,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}/like",
+              "raw": "{{baseUrl}}/groups/posts/{{postId}}/like",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "posts",
                 "{{postId}}",
@@ -2035,13 +2034,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}/comments",
+              "raw": "{{baseUrl}}/groups/posts/{{postId}}/comments",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "posts",
                 "{{postId}}",
@@ -2089,13 +2086,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}",
+              "raw": "{{baseUrl}}/groups/posts/{{postId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "posts",
                 "{{postId}}"
@@ -2133,13 +2128,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/comments/{{commentId}}",
+              "raw": "{{baseUrl}}/groups/comments/{{commentId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "comments",
                 "{{commentId}}"
@@ -2177,13 +2170,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/leave",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/leave",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "{{groupId}}",
                 "leave"
@@ -2221,13 +2212,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}",
+              "raw": "{{baseUrl}}/groups/{{groupId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "{{groupId}}"
               ],
@@ -2264,13 +2253,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}",
+              "raw": "{{baseUrl}}/groups/{{groupId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "{{groupId}}"
               ],
@@ -2307,13 +2294,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}",
+              "raw": "{{baseUrl}}/groups/{{groupId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "{{groupId}}"
               ],
@@ -2350,13 +2335,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}/comments?page=1&limit=10",
+              "raw": "{{baseUrl}}/groups/posts/{{postId}}/comments?page=1&limit=10",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "posts",
                 "{{postId}}",
@@ -2405,13 +2388,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/{{groupId}}/members/{{userId}}",
+              "raw": "{{baseUrl}}/groups/{{groupId}}/members/{{userId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "{{groupId}}",
                 "members",
@@ -2454,13 +2435,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/groups/posts/{{postId}}/pin",
+              "raw": "{{baseUrl}}/groups/posts/{{postId}}/pin",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "groups",
                 "posts",
                 "{{postId}}",
@@ -2481,6 +2460,71 @@
                   "key": "token",
                   "value": "{{accessToken}}",
                   "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.17 Update Post",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "multipart/form-data",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/groups/posts/{{postId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "groups",
+                "posts",
+                "{{postId}}"
+              ],
+              "variable": [
+                {
+                  "key": "postId",
+                  "value": ""
+                }
+              ]
+            },
+            "description": "Members can edit their own posts with text and optional attachments. This endpoint supports both JSON payloads and `multipart/form-data` file uploads.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "content",
+                  "value": "",
+                  "type": "text",
+                  "description": "Text content of the post"
+                },
+                {
+                  "key": "attachments",
+                  "type": "file",
+                  "src": [],
+                  "description": "Optional attachment URLs or files to upload (Max 5)"
+                },
+                {
+                  "key": "existingAttachments",
+                  "value": "",
+                  "type": "text",
+                  "description": "Optional list of existing attachment URLs to retain"
                 }
               ]
             }
@@ -3124,13 +3168,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/notifications/me",
+              "raw": "{{baseUrl}}/notifications/me",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "notifications",
                 "me"
               ]
@@ -3161,13 +3203,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/notifications/{{notificationId}}/read",
+              "raw": "{{baseUrl}}/notifications/{{notificationId}}/read",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "notifications",
                 "{{notificationId}}",
                 "read"
@@ -3205,13 +3245,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/notifications/read-all",
+              "raw": "{{baseUrl}}/notifications/read-all",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "notifications",
                 "read-all"
               ]
@@ -3242,13 +3280,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/notifications/broadcasts",
+              "raw": "{{baseUrl}}/notifications/broadcasts",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "notifications",
                 "broadcasts"
               ]
@@ -3288,13 +3324,11 @@
               }
             ],
             "url": {
-              "raw": "{{baseUrl}}/api/v1/notifications/broadcasts",
+              "raw": "{{baseUrl}}/notifications/broadcasts",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
-                "v1",
                 "notifications",
                 "broadcasts"
               ]

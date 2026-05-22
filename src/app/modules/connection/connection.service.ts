@@ -249,6 +249,10 @@ const removeConnection = async (connectionId: string, userId: string) => {
       throw new ApiError(StatusCodes.FORBIDDEN, 'You are not part of this connection');
     }
 
+    if (connection.status !== CONNECTION_STATUS.ACCEPTED) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, 'You can only remove an accepted connection');
+    }
+
     const otherUserId = String(connection.sender) === userId ? String(connection.receiver) : String(connection.sender);
 
     await Connection.findByIdAndDelete(connectionId).session(session);

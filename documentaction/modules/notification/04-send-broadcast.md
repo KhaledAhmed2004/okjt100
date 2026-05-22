@@ -1,7 +1,7 @@
 # 04. Send Broadcast
 
 ```http
-POST /api/v1/notifications/broadcasts
+POST /notifications/broadcasts
 Auth: Bearer {{accessToken}}
 ```
 

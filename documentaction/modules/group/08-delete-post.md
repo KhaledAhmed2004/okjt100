@@ -1,7 +1,7 @@
 # 08. Delete Post
 
 ```http
-DELETE /api/v1/groups/posts/:postId
+DELETE /groups/posts/:postId
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 

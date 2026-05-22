@@ -151,6 +151,42 @@ describe('Group E2E Tests', () => {
       const groupId = createGroupResponse.body.data.id;
       expect(groupId).toBeDefined();
 
+      // --- ADMIN CREATES SISTER GROUP (FOR FILTERING TEST) ---
+      const sisterGroupData = {
+        name: 'Sisterhood Circle',
+        description: 'A group for sisters.',
+        userType: USER_ROLES.SISTER,
+        category: 'Community',
+        coverImage: 'https://example.com/sister-cover.jpg',
+      };
+      await request(app)
+        .post('/api/v1/groups')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(sisterGroupData);
+
+      // --- ADMIN FETCHES ALL GROUPS ---
+      const adminAllGroupsResponse = await request(app)
+        .get('/api/v1/groups')
+        .set('Authorization', `Bearer ${adminToken}`);
+      logApi('GET', '/api/v1/groups', {}, adminAllGroupsResponse.body, 'LIST-GROUPS-ADMIN-ALL', 'Admin fetches all groups (should see both)');
+      expect(adminAllGroupsResponse.body.data).toHaveLength(2);
+
+      // --- ADMIN FILTERS BY USER TYPE (BROTHER) ---
+      const adminBrotherFilterResponse = await request(app)
+        .get('/api/v1/groups?userType=BROTHER')
+        .set('Authorization', `Bearer ${adminToken}`);
+      logApi('GET', '/api/v1/groups', { query: { userType: 'BROTHER' } }, adminBrotherFilterResponse.body, 'LIST-GROUPS-ADMIN-FILTER-BROTHER', 'Admin filters groups by userType=BROTHER');
+      expect(adminBrotherFilterResponse.body.data).toHaveLength(1);
+      expect(adminBrotherFilterResponse.body.data[0].userType).toBe(USER_ROLES.BROTHER);
+
+      // --- ADMIN FILTERS BY USER TYPE (SISTER) ---
+      const adminSisterFilterResponse = await request(app)
+        .get('/api/v1/groups?userType=SISTER')
+        .set('Authorization', `Bearer ${adminToken}`);
+      logApi('GET', '/api/v1/groups', { query: { userType: 'SISTER' } }, adminSisterFilterResponse.body, 'LIST-GROUPS-ADMIN-FILTER-SISTER', 'Admin filters groups by userType=SISTER');
+      expect(adminSisterFilterResponse.body.data).toHaveLength(1);
+      expect(adminSisterFilterResponse.body.data[0].userType).toBe(USER_ROLES.SISTER);
+
       // --- LIST GROUPS (GENDER ISOLATION CHECK) ---
       // User A (BROTHER) should see the group
       const brotherListResponse = await request(app)
@@ -158,6 +194,10 @@ describe('Group E2E Tests', () => {
         .set('Authorization', `Bearer ${tokenA}`);
       logApi('GET', '/api/v1/groups', {}, brotherListResponse.body, 'LIST-GROUPS-BROTHER', 'User A (BROTHER) fetches group list');
       expect(brotherListResponse.body.data.some((g: any) => g.id === groupId)).toBe(true);
+      
+      // Verify isMember is false before joining
+      const groupInListBeforeJoin = brotherListResponse.body.data.find((g: any) => g.id === groupId);
+      expect(groupInListBeforeJoin.isMember).toBe(false);
 
       // User C (SISTER) should NOT see the group (since it is userType: BROTHER)
       const sisterListResponse = await request(app)
@@ -166,6 +206,15 @@ describe('Group E2E Tests', () => {
       logApi('GET', '/api/v1/groups', {}, sisterListResponse.body, 'LIST-GROUPS-SISTER', 'User C (SISTER) fetches group list (should be empty/no brother groups)');
       expect(sisterListResponse.body.data.some((g: any) => g.id === groupId)).toBe(false);
 
+      // --- GET SINGLE GROUP DETAILS (USER A) ---
+      const singleGroupResponse = await request(app)
+        .get(`/api/v1/groups/${groupId}`)
+        .set('Authorization', `Bearer ${tokenA}`);
+      logApi('GET', `/api/v1/groups/:groupId`, { params: { groupId } }, singleGroupResponse.body, 'GET-SINGLE-GROUP', 'User A fetches group details (isMember: false)');
+      expect(singleGroupResponse.status).toBe(200);
+      expect(singleGroupResponse.body.data.id).toBe(groupId);
+      expect(singleGroupResponse.body.data.isMember).toBe(false);
+
       // --- JOIN GROUP ---
       const joinResponse = await request(app)
         .post(`/api/v1/groups/${groupId}/join`)
@@ -173,6 +222,13 @@ describe('Group E2E Tests', () => {
       logApi('POST', `/api/v1/groups/:groupId/join`, { params: { groupId } }, joinResponse.body, 'JOIN-GROUP', 'User A joins the group');
       expect(joinResponse.status).toBe(200);
       expect(joinResponse.body.success).toBe(true);
+
+      // Verify isMember is true after joining
+      const brotherListResponseAfterJoin = await request(app)
+        .get('/api/v1/groups')
+        .set('Authorization', `Bearer ${tokenA}`);
+      const groupInListAfterJoin = brotherListResponseAfterJoin.body.data.find((g: any) => g.id === groupId);
+      expect(groupInListAfterJoin.isMember).toBe(true);
 
       // User B also joins
       await request(app)
@@ -203,6 +259,32 @@ describe('Group E2E Tests', () => {
       logApi('PATCH', `/api/v1/groups/posts/:postId`, { params: { postId }, body: updatePostData }, updatePostResponse.body, 'UPDATE-POST', 'User A updates their post');
       expect(updatePostResponse.status).toBe(200);
       expect(updatePostResponse.body.data.content).toBe(updatePostData.content);
+
+      // --- CREATE POST WITH MULTIPART FILE UPLOAD ---
+      const fileBuffer = Buffer.from('dummy file content');
+      const uploadPostResponse = await request(app)
+        .post(`/api/v1/groups/${groupId}/posts`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('content', 'This post has a file attachment upload.')
+        .attach('attachments', fileBuffer, 'test-doc.pdf');
+      logApi('POST', `/api/v1/groups/:groupId/posts (multipart)`, {}, uploadPostResponse.body, 'CREATE-POST-MULTIPART', 'User A uploads a post with multipart attachment');
+      expect(uploadPostResponse.status).toBe(201);
+      expect(uploadPostResponse.body.data.attachments).toHaveLength(1);
+      expect(uploadPostResponse.body.data.attachments[0]).toContain('.pdf');
+      const uploadedPostId = uploadPostResponse.body.data.id;
+
+      // --- UPDATE POST WITH MULTIPART FILE UPLOAD AND EXISTING ATTACHMENTS ---
+      const updateUploadResponse = await request(app)
+        .patch(`/api/v1/groups/posts/${uploadedPostId}`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .field('content', 'Updated content with merged attachments.')
+        .field('existingAttachments', JSON.stringify([uploadPostResponse.body.data.attachments[0]]))
+        .attach('attachments', Buffer.from('another dummy file'), 'another-test-doc.pdf');
+      logApi('PATCH', `/api/v1/groups/posts/:postId (multipart)`, {}, updateUploadResponse.body, 'UPDATE-POST-MULTIPART', 'User A updates post and merges attachments');
+      expect(updateUploadResponse.status).toBe(200);
+      expect(updateUploadResponse.body.data.attachments).toHaveLength(2);
+      expect(updateUploadResponse.body.data.attachments[0]).toBe(uploadPostResponse.body.data.attachments[0]);
+      expect(updateUploadResponse.body.data.attachments[1]).toContain('.pdf');
 
       // --- LIKE POST ---
       const likeResponse = await request(app)
@@ -254,9 +336,10 @@ describe('Group E2E Tests', () => {
         .set('Authorization', `Bearer ${tokenA}`);
       logApi('GET', `/api/v1/groups/:groupId/posts`, { params: { groupId } }, feedResponse.body, 'GET-FEED', 'User A fetches group feed');
       expect(feedResponse.status).toBe(200);
-      expect(feedResponse.body.data[0].id).toBe(postId);
-      expect(feedResponse.body.data[0].likesCount).toBe(1);
-      expect(feedResponse.body.data[0].commentsCount).toBe(2); // 1 main comment + 1 reply
+      const feedPost = feedResponse.body.data.find((p: any) => p.id === postId);
+      expect(feedPost).toBeDefined();
+      expect(feedPost.likesCount).toBe(1);
+      expect(feedPost.commentsCount).toBe(2); // 1 main comment + 1 reply
 
       // --- PIN POST (ADMIN) ---
       const pinResponse = await request(app)

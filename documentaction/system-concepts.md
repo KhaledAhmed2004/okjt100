@@ -12,7 +12,7 @@
 | Staging | `https://staging-api.tbsosick.com/api/v1` |
 | Production | `https://api.tbsosick.com/api/v1` |
 
-Throughout the docs `{{baseUrl}}` is the placeholder. All endpoints are mounted under `/api/v1`.
+Throughout the docs `{{baseUrl}}` is the placeholder. It already includes the version prefix (e.g., `http://localhost:5000/api/v1`). All endpoints are relative to this base.
 
 ---
 

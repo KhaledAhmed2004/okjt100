@@ -49,7 +49,7 @@ const deleteGroup = catchAsync(async (req: Request, res: Response) => {
 
 const getAllGroups = catchAsync(async (req: Request, res: Response) => {
   const user = req.user as any;
-  const result = await GroupService.getAllGroupsFromDB(req.query, user.role);
+  const result = await GroupService.getAllGroupsFromDB(req.query, user.id, user.role);
   sendResponse(res, {
     success: true,
     statusCode: StatusCodes.OK,

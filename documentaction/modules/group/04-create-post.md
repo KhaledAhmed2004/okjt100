@@ -1,12 +1,12 @@
 # 04. Create Post
 
 ```http
-POST /api/v1/groups/:groupId/posts
-Content-Type: application/json
+POST /groups/:groupId/posts
+Content-Type: application/json OR multipart/form-data
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 
-> Members can create posts with text and optional attachments within a group.
+> Members can create posts with text and optional attachments within a group. This endpoint supports both JSON payloads and `multipart/form-data` file uploads.
 
 ## Path Parameters
 
@@ -14,21 +14,26 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 | :--- | :--- | :--- |
 | `groupId` | `string` | ID of the group |
 
-## Request Body
+## Request Body (JSON Format)
 
 ```json
 {
   "content": "Assalamu alaikum, looking forward to the next session!", // Text content of the post
-  "attachments": [] // (Optional) List of image/file URLs
+  "attachments": [] // (Optional) List of image/file URLs (Max 5)
 }
 ```
 
+## Request Body (multipart/form-data Format)
+
+- **`content`** (text): Post content
+- **`attachments`** (file, max 5 files): Newly uploaded image, video, audio, or document files.
+
 ## Request Body Details
 
-| Field | Type | Description |
-| :--- | :--- | :--- |
-| `content` | `string` | Text content of the post |
-| `attachments` | `array` | (Optional) List of image/file URLs (Max 5) |
+| Field | Type | Format | Description |
+| :--- | :--- | :--- | :--- |
+| `content` | `string` | Text | Text content of the post |
+| `attachments` | `array` / `files` | JSON Array or Files | Optional attachment URLs or files to upload (Max 5) |
 
 ## Implementation
 

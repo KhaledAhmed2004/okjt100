@@ -1,7 +1,7 @@
 # 09. Delete Comment
 
 ```http
-DELETE /api/v1/groups/comments/:commentId
+DELETE /groups/comments/:commentId
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
 

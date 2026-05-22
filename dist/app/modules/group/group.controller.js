@@ -58,7 +58,7 @@ const deleteGroup = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, vo
 }));
 const getAllGroups = (0, catchAsync_1.default)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const user = req.user;
-    const result = yield group_service_1.GroupService.getAllGroupsFromDB(req.query, user.role);
+    const result = yield group_service_1.GroupService.getAllGroupsFromDB(req.query, user.id, user.role);
     (0, sendResponse_1.default)(res, {
         success: true,
         statusCode: http_status_codes_1.StatusCodes.OK,

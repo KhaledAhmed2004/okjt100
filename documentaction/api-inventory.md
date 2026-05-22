@@ -75,6 +75,7 @@
 | 4.14 | GET | `/groups/posts/:postId/comments` | User | ✅ | [Module 4.14](./modules/group/14-get-comments.md) | — |
 | 4.15 | DELETE | `/groups/:groupId/members/:userId` | Admin | ✅ | [Module 4.15](./modules/group/15-kick-member.md) | — |
 | 4.16 | PATCH | `/groups/posts/:postId/pin` | Admin | ✅ | [Module 4.16](./modules/group/16-pin-post.md) | — |
+| 4.17 | PATCH | `/groups/posts/:postId` | User | ✅ | [Module 4.17](./modules/group/17-update-post.md) | — |
 
 ## Khutbah Module
 

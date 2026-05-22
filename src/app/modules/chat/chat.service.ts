@@ -2,13 +2,13 @@ import { StatusCodes } from 'http-status-codes';
 import mongoose from 'mongoose';
 import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
-import { IChat } from './chat.interface';
 import { Chat } from './chat.model';
+import { IChat, IPopulatedChat, IChatListResponse } from './chat.interface';
 import { isOnline, getLastActive } from '../../helpers/presenceHelper';
 import { getUnreadCountCached, setUnreadCount, batchGetUnreadCounts } from '../../helpers/unreadHelper';
 import { errorLogger } from '../../../shared/logger';
 
-const createOrGet = async (userId: string, otherUserId: string): Promise<IChat> => {
+const createOrGet = async (userId: string, otherUserId: string): Promise<IPopulatedChat> => {
   // Validate both IDs as valid ObjectIds
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid userId');
@@ -37,10 +37,13 @@ const createOrGet = async (userId: string, otherUserId: string): Promise<IChat> 
     chat = await Chat.create({ participants: [userId, otherUserId] });
   }
 
-  return chat;
+  // Populate participants
+  await chat.populate('participants', '_id name profileImage role');
+  
+  return chat.toObject() as any;
 };
 
-const getList = async (userId: string, searchTerm?: string): Promise<any[]> => {
+const getList = async (userId: string, searchTerm?: string): Promise<IChatListResponse[]> => {
   // Validate userId as a valid ObjectId (throw 400 if invalid)
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid userId');
@@ -49,7 +52,7 @@ const getList = async (userId: string, searchTerm?: string): Promise<any[]> => {
   // Single Chat.find with explicit populate and DB-side sort (Req 10)
   const chats = await Chat.find({ participants: userId })
     .sort({ 'lastMessage.createdAt': -1 })
-    .populate('participants', '_id name image role')
+    .populate('participants', '_id name profileImage role')
     .lean();
 
   // Return empty array when no chats found
@@ -86,9 +89,8 @@ const getList = async (userId: string, searchTerm?: string): Promise<any[]> => {
   // Attach unreadCount and strip the logged-in user from participants
   // so the response only contains the other person in the conversation
   return filteredChats.map((chat, index) => {
-    const participants = (chat.participants as any[]).filter(
-      p => String(p._id) !== String(userId)
-    );
+    const participants = (chat.participants as any[])
+      .filter(p => String(p._id) !== String(userId));
     return {
       ...chat,
       participants,

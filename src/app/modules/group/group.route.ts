@@ -1,11 +1,52 @@
-import express from 'express';
+import express, { NextFunction, Request, Response } from 'express';
 import { USER_ROLES } from '../../../enums/user';
 import auth from '../../middlewares/auth';
 import validateRequest from '../../middlewares/validateRequest';
 import { GroupController } from './group.controller';
 import { GroupValidation } from './group.validation';
+import { fileHandler } from '../../middlewares/fileHandler';
 
 const router = express.Router();
+
+const normalizeAttachments = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    let uploaded: string[] = [];
+    if (req.body.attachments) {
+      if (typeof req.body.attachments === 'string') {
+        uploaded = [req.body.attachments];
+      } else if (Array.isArray(req.body.attachments)) {
+        uploaded = req.body.attachments;
+      }
+    }
+
+    let existing: string[] = [];
+    if (req.body.existingAttachments) {
+      if (typeof req.body.existingAttachments === 'string') {
+        try {
+          existing = JSON.parse(req.body.existingAttachments);
+        } catch (err) {
+          existing = [req.body.existingAttachments];
+        }
+      } else if (Array.isArray(req.body.existingAttachments)) {
+        existing = req.body.existingAttachments;
+      }
+    }
+
+    const hasExisting = req.body.existingAttachments !== undefined;
+    const hasUploaded = req.body.attachments !== undefined;
+
+    const merged = [...existing, ...uploaded];
+    if (hasExisting || hasUploaded || merged.length > 0) {
+      req.body.attachments = merged;
+    }
+
+    // Clean up temporary helper field
+    delete req.body.existingAttachments;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
 
 // Admin routes
 router.post(
@@ -68,6 +109,8 @@ router.get(
 router.post(
   '/:groupId/posts',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
+  fileHandler([{ name: 'attachments', maxCount: 5 }]),
+  normalizeAttachments,
   validateRequest(GroupValidation.createPostZodSchema),
   GroupController.createPost,
 );
@@ -94,6 +137,8 @@ router.get(
 router.patch(
   '/posts/:postId',
   auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.SUPER_ADMIN),
+  fileHandler([{ name: 'attachments', maxCount: 5 }]),
+  normalizeAttachments,
   validateRequest(GroupValidation.updatePostZodSchema),
   GroupController.updatePost,
 );

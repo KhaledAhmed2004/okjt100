@@ -13,4 +13,19 @@ export type IChat = {
   updatedAt: Date;
 };
 
+export type IPopulatedParticipant = {
+  id: Types.ObjectId;
+  name: string;
+  role: string;
+  profileImage: string;
+};
+
+export type IPopulatedChat = Omit<IChat, 'participants'> & {
+  participants: IPopulatedParticipant[];
+};
+
+export type IChatListResponse = IPopulatedChat & {
+  unreadCount: number;
+};
+
 export type ChatModel = Model<IChat, Record<string, unknown>>;

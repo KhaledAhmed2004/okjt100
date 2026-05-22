@@ -83,7 +83,11 @@ const deleteGroupFromDB = async (groupId: string) => {
   }
 };
 
-const getAllGroupsFromDB = async (query: Record<string, unknown>, userRole: string) => {
+const getAllGroupsFromDB = async (
+  query: Record<string, unknown>,
+  userId: string,
+  userRole: string,
+) => {
   // Directly use the user's role to filter groups.
   // BROTHER sees BROTHER groups, SISTER sees SISTER groups.
   // SUPER_ADMIN sees ALL groups (no userType filter).
@@ -103,7 +107,24 @@ const getAllGroupsFromDB = async (query: Record<string, unknown>, userRole: stri
   const data = await groupQuery.modelQuery;
   const pagination = await groupQuery.getPaginationInfo();
 
-  return { data, pagination };
+  let dataWithMembership = data;
+  if (data && data.length > 0) {
+    const groupIds = data.map((group: any) => group._id);
+    const userMemberships = await GroupMember.find({
+      groupId: { $in: groupIds },
+      userId: userId,
+    });
+    const joinedGroupIds = new Set(userMemberships.map(m => m.groupId.toString()));
+
+    dataWithMembership = data.map((group: any) => ({
+      ...group.toObject(),
+      isMember: joinedGroupIds.has(group._id.toString()),
+    }));
+  } else {
+    dataWithMembership = [];
+  }
+
+  return { data: dataWithMembership, pagination };
 };
 
 const joinGroupInDB = async (groupId: string, userId: string, userRole: string) => {
@@ -391,6 +412,13 @@ const updatePostInDB = async (postId: string, userId: string, payload: Partial<I
 
   if (post.userId.toString() !== userId) {
     throw new ApiError(StatusCodes.FORBIDDEN, 'Not authorized to update this post');
+  }
+
+  // Delete orphaned attachments: files that were in the old post but not in the new payload
+  if (payload.attachments !== undefined && post.attachments && post.attachments.length > 0) {
+    const newAttachments = new Set(payload.attachments);
+    const orphaned = post.attachments.filter(file => !newAttachments.has(file));
+    orphaned.forEach(file => deleteFile(file).catch(() => {}));
   }
 
   const result = await GroupPost.findByIdAndUpdate(postId, payload, { new: true });

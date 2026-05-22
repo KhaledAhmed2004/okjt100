@@ -1,7 +1,7 @@
 # 22. List User Profiles (Community Discovery)
 
 ```http
-GET /api/v1/users/profiles?latitude=23.8103&longitude=90.4125
+GET /users/profiles?latitude=23.8103&longitude=90.4125
 Auth: Bearer {{accessToken}} (BROTHER, SISTER)
 ```
 

@@ -1,7 +1,7 @@
 # 06. Like Post
 
 ```http
-POST /api/v1/groups/posts/:postId/like
+POST /groups/posts/:postId/like
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```

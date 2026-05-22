@@ -1,7 +1,7 @@
 # 05. Get Sent History
 
 ```http
-GET /api/v1/notifications/broadcasts
+GET /notifications/broadcasts
 Auth: Bearer {{accessToken}}
 ```
 

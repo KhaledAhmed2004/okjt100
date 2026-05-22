@@ -1,7 +1,7 @@
 # 05. Get Group Feed
 
 ```http
-GET /api/v1/groups/:groupId/posts?page=1&limit=10&searchTerm=keyword
+GET /groups/:groupId/posts?page=1&limit=10&searchTerm=keyword
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```
@@ -21,9 +21,12 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 - **Service**: `group.service.ts` — `getGroupFeedFromDB`
 
 ### Business Logic
+- **Sort Order**: Posts are sorted by **pinned first** (`isPinned: -1`), then **newest first** (`createdAt: -1`). A custom `sort` query param overrides the default.
 - **`isLiked`**: Returns `true` if the current user has liked the post.
-- **Deleted Users**: Automatically filters out posts from users who have been deleted.
+- **`isPinned`**: Returns `true` if the post has been pinned by an admin. Pinned posts always appear at the top.
+- **Deleted Users**: Automatically filters out posts from users who have been deleted from the system.
 - **Search**: Supports content-based search via the `searchTerm` query parameter.
+- **Membership Required**: Only group members (or `SUPER_ADMIN`) can access the feed. Returns `403` if not a member.
 
 ## Responses
 

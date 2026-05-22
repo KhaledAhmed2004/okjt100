@@ -89,7 +89,7 @@ const deleteGroupFromDB = (groupId) => __awaiter(void 0, void 0, void 0, functio
         session.endSession();
     }
 });
-const getAllGroupsFromDB = (query, userRole) => __awaiter(void 0, void 0, void 0, function* () {
+const getAllGroupsFromDB = (query, userId, userRole) => __awaiter(void 0, void 0, void 0, function* () {
     // Directly use the user's role to filter groups.
     // BROTHER sees BROTHER groups, SISTER sees SISTER groups.
     // SUPER_ADMIN sees ALL groups (no userType filter).
@@ -105,7 +105,20 @@ const getAllGroupsFromDB = (query, userRole) => __awaiter(void 0, void 0, void 0
         .fields();
     const data = yield groupQuery.modelQuery;
     const pagination = yield groupQuery.getPaginationInfo();
-    return { data, pagination };
+    let dataWithMembership = data;
+    if (data && data.length > 0) {
+        const groupIds = data.map((group) => group._id);
+        const userMemberships = yield group_model_1.GroupMember.find({
+            groupId: { $in: groupIds },
+            userId: userId,
+        });
+        const joinedGroupIds = new Set(userMemberships.map(m => m.groupId.toString()));
+        dataWithMembership = data.map((group) => (Object.assign(Object.assign({}, group.toObject()), { isMember: joinedGroupIds.has(group._id.toString()) })));
+    }
+    else {
+        dataWithMembership = [];
+    }
+    return { data: dataWithMembership, pagination };
 });
 const joinGroupInDB = (groupId, userId, userRole) => __awaiter(void 0, void 0, void 0, function* () {
     const session = yield mongoose_1.default.startSession();
@@ -336,6 +349,12 @@ const updatePostInDB = (postId, userId, payload) => __awaiter(void 0, void 0, vo
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.NOT_FOUND, 'Post not found');
     if (post.userId.toString() !== userId) {
         throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'Not authorized to update this post');
+    }
+    // Delete orphaned attachments: files that were in the old post but not in the new payload
+    if (payload.attachments !== undefined && post.attachments && post.attachments.length > 0) {
+        const newAttachments = new Set(payload.attachments);
+        const orphaned = post.attachments.filter(file => !newAttachments.has(file));
+        orphaned.forEach(file => (0, fileHandler_1.deleteFile)(file).catch(() => { }));
     }
     const result = yield group_model_1.GroupPost.findByIdAndUpdate(postId, payload, { new: true });
     return result;

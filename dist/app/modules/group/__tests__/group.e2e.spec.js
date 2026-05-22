@@ -88,10 +88,7 @@ function createAuthUser() {
         yield mongoose_1.default.disconnect();
     }
     replSet = yield mongodb_memory_server_1.MongoMemoryReplSet.create({
-        replSet: { count: 1 },
-        instance: {
-            storageEngine: 'wiredTiger', // WiredTiger is more stable for replica sets
-        }
+        replSet: { count: 1 }
     });
     const uri = replSet.getUri();
     yield mongoose_1.default.connect(uri, {
@@ -145,6 +142,38 @@ function createAuthUser() {
             (0, vitest_1.expect)(createGroupResponse.status).toBe(201);
             const groupId = createGroupResponse.body.data.id;
             (0, vitest_1.expect)(groupId).toBeDefined();
+            // --- ADMIN CREATES SISTER GROUP (FOR FILTERING TEST) ---
+            const sisterGroupData = {
+                name: 'Sisterhood Circle',
+                description: 'A group for sisters.',
+                userType: user_1.USER_ROLES.SISTER,
+                category: 'Community',
+                coverImage: 'https://example.com/sister-cover.jpg',
+            };
+            yield (0, supertest_1.default)(app_1.default)
+                .post('/api/v1/groups')
+                .set('Authorization', `Bearer ${adminToken}`)
+                .send(sisterGroupData);
+            // --- ADMIN FETCHES ALL GROUPS ---
+            const adminAllGroupsResponse = yield (0, supertest_1.default)(app_1.default)
+                .get('/api/v1/groups')
+                .set('Authorization', `Bearer ${adminToken}`);
+            (0, testLogger_1.logApi)('GET', '/api/v1/groups', {}, adminAllGroupsResponse.body, 'LIST-GROUPS-ADMIN-ALL', 'Admin fetches all groups (should see both)');
+            (0, vitest_1.expect)(adminAllGroupsResponse.body.data).toHaveLength(2);
+            // --- ADMIN FILTERS BY USER TYPE (BROTHER) ---
+            const adminBrotherFilterResponse = yield (0, supertest_1.default)(app_1.default)
+                .get('/api/v1/groups?userType=BROTHER')
+                .set('Authorization', `Bearer ${adminToken}`);
+            (0, testLogger_1.logApi)('GET', '/api/v1/groups', { query: { userType: 'BROTHER' } }, adminBrotherFilterResponse.body, 'LIST-GROUPS-ADMIN-FILTER-BROTHER', 'Admin filters groups by userType=BROTHER');
+            (0, vitest_1.expect)(adminBrotherFilterResponse.body.data).toHaveLength(1);
+            (0, vitest_1.expect)(adminBrotherFilterResponse.body.data[0].userType).toBe(user_1.USER_ROLES.BROTHER);
+            // --- ADMIN FILTERS BY USER TYPE (SISTER) ---
+            const adminSisterFilterResponse = yield (0, supertest_1.default)(app_1.default)
+                .get('/api/v1/groups?userType=SISTER')
+                .set('Authorization', `Bearer ${adminToken}`);
+            (0, testLogger_1.logApi)('GET', '/api/v1/groups', { query: { userType: 'SISTER' } }, adminSisterFilterResponse.body, 'LIST-GROUPS-ADMIN-FILTER-SISTER', 'Admin filters groups by userType=SISTER');
+            (0, vitest_1.expect)(adminSisterFilterResponse.body.data).toHaveLength(1);
+            (0, vitest_1.expect)(adminSisterFilterResponse.body.data[0].userType).toBe(user_1.USER_ROLES.SISTER);
             // --- LIST GROUPS (GENDER ISOLATION CHECK) ---
             // User A (BROTHER) should see the group
             const brotherListResponse = yield (0, supertest_1.default)(app_1.default)
@@ -152,12 +181,23 @@ function createAuthUser() {
                 .set('Authorization', `Bearer ${tokenA}`);
             (0, testLogger_1.logApi)('GET', '/api/v1/groups', {}, brotherListResponse.body, 'LIST-GROUPS-BROTHER', 'User A (BROTHER) fetches group list');
             (0, vitest_1.expect)(brotherListResponse.body.data.some((g) => g.id === groupId)).toBe(true);
+            // Verify isMember is false before joining
+            const groupInListBeforeJoin = brotherListResponse.body.data.find((g) => g.id === groupId);
+            (0, vitest_1.expect)(groupInListBeforeJoin.isMember).toBe(false);
             // User C (SISTER) should NOT see the group (since it is userType: BROTHER)
             const sisterListResponse = yield (0, supertest_1.default)(app_1.default)
                 .get('/api/v1/groups')
                 .set('Authorization', `Bearer ${tokenC}`);
             (0, testLogger_1.logApi)('GET', '/api/v1/groups', {}, sisterListResponse.body, 'LIST-GROUPS-SISTER', 'User C (SISTER) fetches group list (should be empty/no brother groups)');
             (0, vitest_1.expect)(sisterListResponse.body.data.some((g) => g.id === groupId)).toBe(false);
+            // --- GET SINGLE GROUP DETAILS (USER A) ---
+            const singleGroupResponse = yield (0, supertest_1.default)(app_1.default)
+                .get(`/api/v1/groups/${groupId}`)
+                .set('Authorization', `Bearer ${tokenA}`);
+            (0, testLogger_1.logApi)('GET', `/api/v1/groups/:groupId`, { params: { groupId } }, singleGroupResponse.body, 'GET-SINGLE-GROUP', 'User A fetches group details (isMember: false)');
+            (0, vitest_1.expect)(singleGroupResponse.status).toBe(200);
+            (0, vitest_1.expect)(singleGroupResponse.body.data.id).toBe(groupId);
+            (0, vitest_1.expect)(singleGroupResponse.body.data.isMember).toBe(false);
             // --- JOIN GROUP ---
             const joinResponse = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/groups/${groupId}/join`)
@@ -165,6 +205,12 @@ function createAuthUser() {
             (0, testLogger_1.logApi)('POST', `/api/v1/groups/:groupId/join`, { params: { groupId } }, joinResponse.body, 'JOIN-GROUP', 'User A joins the group');
             (0, vitest_1.expect)(joinResponse.status).toBe(200);
             (0, vitest_1.expect)(joinResponse.body.success).toBe(true);
+            // Verify isMember is true after joining
+            const brotherListResponseAfterJoin = yield (0, supertest_1.default)(app_1.default)
+                .get('/api/v1/groups')
+                .set('Authorization', `Bearer ${tokenA}`);
+            const groupInListAfterJoin = brotherListResponseAfterJoin.body.data.find((g) => g.id === groupId);
+            (0, vitest_1.expect)(groupInListAfterJoin.isMember).toBe(true);
             // User B also joins
             yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/groups/${groupId}/join`)
@@ -192,6 +238,30 @@ function createAuthUser() {
             (0, testLogger_1.logApi)('PATCH', `/api/v1/groups/posts/:postId`, { params: { postId }, body: updatePostData }, updatePostResponse.body, 'UPDATE-POST', 'User A updates their post');
             (0, vitest_1.expect)(updatePostResponse.status).toBe(200);
             (0, vitest_1.expect)(updatePostResponse.body.data.content).toBe(updatePostData.content);
+            // --- CREATE POST WITH MULTIPART FILE UPLOAD ---
+            const fileBuffer = Buffer.from('dummy file content');
+            const uploadPostResponse = yield (0, supertest_1.default)(app_1.default)
+                .post(`/api/v1/groups/${groupId}/posts`)
+                .set('Authorization', `Bearer ${tokenA}`)
+                .field('content', 'This post has a file attachment upload.')
+                .attach('attachments', fileBuffer, 'test-doc.pdf');
+            (0, testLogger_1.logApi)('POST', `/api/v1/groups/:groupId/posts (multipart)`, {}, uploadPostResponse.body, 'CREATE-POST-MULTIPART', 'User A uploads a post with multipart attachment');
+            (0, vitest_1.expect)(uploadPostResponse.status).toBe(201);
+            (0, vitest_1.expect)(uploadPostResponse.body.data.attachments).toHaveLength(1);
+            (0, vitest_1.expect)(uploadPostResponse.body.data.attachments[0]).toContain('.pdf');
+            const uploadedPostId = uploadPostResponse.body.data.id;
+            // --- UPDATE POST WITH MULTIPART FILE UPLOAD AND EXISTING ATTACHMENTS ---
+            const updateUploadResponse = yield (0, supertest_1.default)(app_1.default)
+                .patch(`/api/v1/groups/posts/${uploadedPostId}`)
+                .set('Authorization', `Bearer ${tokenA}`)
+                .field('content', 'Updated content with merged attachments.')
+                .field('existingAttachments', JSON.stringify([uploadPostResponse.body.data.attachments[0]]))
+                .attach('attachments', Buffer.from('another dummy file'), 'another-test-doc.pdf');
+            (0, testLogger_1.logApi)('PATCH', `/api/v1/groups/posts/:postId (multipart)`, {}, updateUploadResponse.body, 'UPDATE-POST-MULTIPART', 'User A updates post and merges attachments');
+            (0, vitest_1.expect)(updateUploadResponse.status).toBe(200);
+            (0, vitest_1.expect)(updateUploadResponse.body.data.attachments).toHaveLength(2);
+            (0, vitest_1.expect)(updateUploadResponse.body.data.attachments[0]).toBe(uploadPostResponse.body.data.attachments[0]);
+            (0, vitest_1.expect)(updateUploadResponse.body.data.attachments[1]).toContain('.pdf');
             // --- LIKE POST ---
             const likeResponse = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/groups/posts/${postId}/like`)
@@ -238,9 +308,10 @@ function createAuthUser() {
                 .set('Authorization', `Bearer ${tokenA}`);
             (0, testLogger_1.logApi)('GET', `/api/v1/groups/:groupId/posts`, { params: { groupId } }, feedResponse.body, 'GET-FEED', 'User A fetches group feed');
             (0, vitest_1.expect)(feedResponse.status).toBe(200);
-            (0, vitest_1.expect)(feedResponse.body.data[0].id).toBe(postId);
-            (0, vitest_1.expect)(feedResponse.body.data[0].likesCount).toBe(1);
-            (0, vitest_1.expect)(feedResponse.body.data[0].commentsCount).toBe(2); // 1 main comment + 1 reply
+            const feedPost = feedResponse.body.data.find((p) => p.id === postId);
+            (0, vitest_1.expect)(feedPost).toBeDefined();
+            (0, vitest_1.expect)(feedPost.likesCount).toBe(1);
+            (0, vitest_1.expect)(feedPost.commentsCount).toBe(2); // 1 main comment + 1 reply
             // --- PIN POST (ADMIN) ---
             const pinResponse = yield (0, supertest_1.default)(app_1.default)
                 .patch(`/api/v1/groups/posts/${postId}/pin`)

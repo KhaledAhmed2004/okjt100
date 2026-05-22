@@ -220,6 +220,9 @@ const removeConnection = (connectionId, userId) => __awaiter(void 0, void 0, voi
         if (String(connection.sender) !== userId && String(connection.receiver) !== userId) {
             throw new ApiError_1.default(http_status_codes_1.StatusCodes.FORBIDDEN, 'You are not part of this connection');
         }
+        if (connection.status !== connection_constants_1.CONNECTION_STATUS.ACCEPTED) {
+            throw new ApiError_1.default(http_status_codes_1.StatusCodes.BAD_REQUEST, 'You can only remove an accepted connection');
+        }
         const otherUserId = String(connection.sender) === userId ? String(connection.receiver) : String(connection.sender);
         yield connection_model_1.Connection.findByIdAndDelete(connectionId).session(session);
         yield session.commitTransaction();

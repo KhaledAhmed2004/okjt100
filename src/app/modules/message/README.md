@@ -15,6 +15,13 @@ The Message module handles sending, retrieving, and reading messages within 1-on
 
 ---
 
+## Real-time Integration (Flutter)
+
+For real-time message handling (Socket.io), room management, and event inventory, see the:
+👉 **[Flutter Real-time Message Integration Guide](./FLUTTER_REALTIME_MESSAGE_GUIDE.md)**
+
+---
+
 ## API Endpoints
 
 All endpoints require a valid JWT in the `Authorization: Bearer <token>` header.

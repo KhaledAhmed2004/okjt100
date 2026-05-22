@@ -1,7 +1,7 @@
 # 03. Join Group
 
 ```http
-POST /api/v1/groups/:groupId/join
+POST /groups/:groupId/join
 Content-Type: application/json
 Auth: Bearer {{accessToken}} (BROTHER, SISTER, SUPER_ADMIN)
 ```

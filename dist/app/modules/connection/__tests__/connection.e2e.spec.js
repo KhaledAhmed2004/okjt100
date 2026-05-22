@@ -22,6 +22,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const vitest_1 = require("vitest");
 const mongoose_1 = __importDefault(require("mongoose"));
+const crypto_1 = require("crypto");
 const mongodb_memory_server_1 = require("mongodb-memory-server");
 const supertest_1 = __importDefault(require("supertest"));
 const app_1 = __importDefault(require("../../../../app"));
@@ -60,7 +61,7 @@ function createAuthUser() {
         const user = yield user_model_1.User.create({
             name: `Test ${role} ${nameSuffix}`,
             role,
-            email: `test-${role}-${nameSuffix}-${Date.now()}-${Math.random()}@example.com`,
+            email: `${(0, crypto_1.randomUUID)()}@test.com`,
             password: 'password123',
             isVerified: true,
             status: user_1.USER_STATUS.ACTIVE,
@@ -73,6 +74,34 @@ function createAuthUser() {
         });
         const token = jwtHelper_1.jwtHelper.createToken({ id: user._id, role: user.role, tokenVersion: user.tokenVersion }, config_1.default.jwt.jwt_secret, '1h');
         return { user, token };
+    });
+}
+// ── Setup helpers ─────────────────────────────────────────────────────────────
+function setupUsers() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const { user: userA, token: tokenA } = yield createAuthUser(user_1.USER_ROLES.BROTHER, 'userA');
+        const { user: userB, token: tokenB } = yield createAuthUser(user_1.USER_ROLES.BROTHER, 'userB');
+        const { user: userC, token: tokenC } = yield createAuthUser(user_1.USER_ROLES.SISTER, 'userC');
+        return { userA, tokenA, userB, tokenB, userC, tokenC };
+    });
+}
+function setupPendingConnection() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const users = yield setupUsers();
+        const res = yield (0, supertest_1.default)(app_1.default)
+            .post('/api/v1/connections')
+            .set('Authorization', `Bearer ${users.tokenA}`)
+            .send({ receiverId: users.userB._id.toString() });
+        return Object.assign(Object.assign({}, users), { connectionId: res.body.data.id });
+    });
+}
+function setupAcceptedConnection() {
+    return __awaiter(this, void 0, void 0, function* () {
+        const ctx = yield setupPendingConnection();
+        const res = yield (0, supertest_1.default)(app_1.default)
+            .post(`/api/v1/connections/${ctx.connectionId}/accept`)
+            .set('Authorization', `Bearer ${ctx.tokenB}`);
+        return Object.assign(Object.assign({}, ctx), { acceptedConnectionId: res.body.data.id, chatId: res.body.data.chatId });
     });
 }
 // ── Lifecycle ────────────────────────────────────────────────────────────────
@@ -97,15 +126,10 @@ function createAuthUser() {
 }));
 // ── Tests ────────────────────────────────────────────────────────────────────
 (0, vitest_1.describe)('Connection E2E Tests', () => {
-    (0, vitest_1.describe)('Multi-user E2E Flow Scenarios', () => {
-        (0, vitest_1.it)('comprehensive 3-user flow: handles initial status, validation checks, request creation, cancellation, list retrieval, rejection, acceptance, and active connection removal', () => __awaiter(void 0, void 0, void 0, function* () {
-            // Step 1: Create three registered users:
-            // User A (BROTHER), User B (BROTHER), and User C (SISTER)
-            const { user: userA, token: tokenA } = yield createAuthUser(user_1.USER_ROLES.BROTHER, 'userA');
-            const { user: userB, token: tokenB } = yield createAuthUser(user_1.USER_ROLES.BROTHER, 'userB');
-            const { user: userC } = yield createAuthUser(user_1.USER_ROLES.SISTER, 'userC');
-            // --- INITIAL STATE PROFILE STATUS CHECKS ---
-            // 1. User A first gets community discovery profiles list (to find a user to connect with)
+    (0, vitest_1.describe)('Discovery & Initial State', () => {
+        (0, vitest_1.it)('discovery list shows null connection for unconnected users and enforces gender isolation', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, userC, tokenC } = yield setupUsers();
+            // User A first gets community discovery profiles list (to find a user to connect with)
             const initListResponse = yield (0, supertest_1.default)(app_1.default)
                 .get('/api/v1/users/profiles')
                 .set('Authorization', `Bearer ${tokenA}`);
@@ -119,8 +143,7 @@ function createAuthUser() {
             (0, vitest_1.expect)(userBInInitList).toBeDefined();
             (0, vitest_1.expect)(userBInInitList.connection).toBeNull();
             // --- GENDER ISOLATION CHECK (SISTER only sees SISTERs) ---
-            // Create a quick token for User C (SISTER) to check her discovery view
-            const tokenC = jwtHelper_1.jwtHelper.createToken({ id: userC._id, role: userC.role, tokenVersion: userC.tokenVersion }, config_1.default.jwt.jwt_secret, '1h');
+            // User C (SISTER) checks her discovery view — should not see BROTHERs
             const sisterListResponse = yield (0, supertest_1.default)(app_1.default)
                 .get('/api/v1/users/profiles')
                 .set('Authorization', `Bearer ${tokenC}`);
@@ -131,7 +154,7 @@ function createAuthUser() {
             // Extract User B's ID directly from the profiles list payload to simulate discovery flow
             const userBIdFromList = userBInInitList.id || userBInInitList._id;
             (0, vitest_1.expect)(userBIdFromList).toBeDefined();
-            // 2. User A checks User B's profile via GET /api/v1/users/:userId/public using the discovery list ID
+            // User A checks User B's profile via GET /api/v1/users/:userId/public using the discovery list ID
             const initProfileResponse = yield (0, supertest_1.default)(app_1.default)
                 .get(`/api/v1/users/${userBIdFromList}/public`)
                 .set('Authorization', `Bearer ${tokenA}`);
@@ -139,8 +162,13 @@ function createAuthUser() {
             (0, vitest_1.expect)(initProfileResponse.status).toBe(200);
             (0, vitest_1.expect)(initProfileResponse.body.success).toBe(true);
             (0, vitest_1.expect)(initProfileResponse.body.data.connection).toBeNull();
+        }));
+    });
+    (0, vitest_1.describe)('Request Creation — Validation Guards', () => {
+        (0, vitest_1.it)('rejects self-connect, cross-role requests, and creates a valid request', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, tokenB, userC } = yield setupUsers();
             // --- ROLE MATCHING VALIDATION CHECK ---
-            // User A (BROTHER) tries to send request to User C (SISTER) -> Expect 400 rejection (Cross-gender/role check)
+            // User A (BROTHER) tries to send request to User C (SISTER) -> Expect 400 rejection
             const crossRoleResponse = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/connections`)
                 .set('Authorization', `Bearer ${tokenA}`)
@@ -178,9 +206,10 @@ function createAuthUser() {
             (0, vitest_1.expect)(connectionId).toBeDefined();
             (0, vitest_1.expect)(sendResponse.body.data.status).toBe(connection_constants_1.CONNECTION_STATUS.PENDING);
             (0, vitest_1.expect)(sendResponse.body.data.receiver.id).toBe(userB._id.toString());
+            // --- SOCKET.IO EMISSION: CONNECTION REQUEST ---
+            (0, vitest_1.expect)(global.io.to).toHaveBeenCalledWith(`user::${userB._id.toString()}`);
+            (0, vitest_1.expect)(global.io.emit).toHaveBeenCalledWith('CONNECTION_REQUEST', vitest_1.expect.objectContaining({ connectionId: vitest_1.expect.anything() }));
             // --- NOTIFICATION VERIFICATION: CONNECTION REQUEST SENT ---
-            // sendNotifications runs for real, so the Notification document is in the DB.
-            // Verify via direct DB query first, then confirm via the API endpoint.
             const requestNotification = yield notification_model_1.Notification.findOne({
                 receiver: userB._id,
                 type: 'CONNECTION_REQUEST',
@@ -199,8 +228,6 @@ function createAuthUser() {
             (0, testLogger_1.logApi)('GET', '/api/v1/notifications/me', {}, notificationsResponseB.body, 'NOTIFICATION-REQUEST-SENT', 'User B fetches notifications (should contain connection request notification)');
             (0, vitest_1.expect)(notificationsResponseB.status).toBe(200);
             (0, vitest_1.expect)(notificationsResponseB.body.success).toBe(true);
-            // Cursor pagination meta — flat shape: limit + nextCursor + hasNext + unreadCount
-            // all at the same level. No nested `pagination` wrapper.
             (0, vitest_1.expect)(notificationsResponseB.body.meta.unreadCount).toBe(1);
             (0, vitest_1.expect)(notificationsResponseB.body.meta).toMatchObject({
                 limit: vitest_1.expect.any(Number),
@@ -213,19 +240,20 @@ function createAuthUser() {
             (0, vitest_1.expect)(requestNotifInApi.schemaVersion).toBe(1);
             (0, vitest_1.expect)(requestNotifInApi.isRead).toBe(false);
             (0, vitest_1.expect)(requestNotifInApi.readAt).toBeNull();
-            // actor — denormalized sender data
             (0, vitest_1.expect)(requestNotifInApi.actor.id).toBe(userA._id.toString());
             (0, vitest_1.expect)(requestNotifInApi.actor.name).toBe(userA.name);
             (0, vitest_1.expect)(requestNotifInApi.actor.profileImage).toBeDefined();
-            // subject — the connection record
             (0, vitest_1.expect)(requestNotifInApi.subject.type).toBe('Connection');
             (0, vitest_1.expect)(requestNotifInApi.subject.id).toBe(connectionId);
-            // actions — client uses these to render buttons
             (0, vitest_1.expect)(requestNotifInApi.actions).toContainEqual({ type: 'ACCEPT' });
             (0, vitest_1.expect)(requestNotifInApi.actions).toContainEqual({ type: 'REJECT' });
             (0, vitest_1.expect)(requestNotifInApi.actions).toContainEqual({ type: 'VIEW_PROFILE' });
+        }));
+    });
+    (0, vitest_1.describe)('Pending State', () => {
+        (0, vitest_1.it)('both sides see correct direction in profile and discovery list', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, tokenB, connectionId } = yield setupPendingConnection();
             // --- PENDING STATE PROFILE STATUS CHECKS (User A is Sender) ---
-            // User A (sender) checks User B's profile -> connectionStatus: 'PENDING', connectionDirection: 'SENT'
             const pendingProfileAtoB = yield (0, supertest_1.default)(app_1.default)
                 .get(`/api/v1/users/${userB._id}/public`)
                 .set('Authorization', `Bearer ${tokenA}`);
@@ -249,7 +277,6 @@ function createAuthUser() {
             (0, vitest_1.expect)(userBInPendingListA.connection.direction).toBe('OUTGOING');
             (0, vitest_1.expect)(userBInPendingListA.connection.id).toBe(connectionId);
             // --- PENDING STATE PROFILE STATUS CHECKS (User B is Receiver) ---
-            // User B (receiver) checks User A's profile -> connectionStatus: 'PENDING', connectionDirection: 'RECEIVED'
             const pendingProfileBtoA = yield (0, supertest_1.default)(app_1.default)
                 .get(`/api/v1/users/${userA._id}/public`)
                 .set('Authorization', `Bearer ${tokenB}`);
@@ -272,8 +299,10 @@ function createAuthUser() {
             (0, vitest_1.expect)(userAInPendingListB.connection.status).toBe('PENDING');
             (0, vitest_1.expect)(userAInPendingListB.connection.direction).toBe('INCOMING');
             (0, vitest_1.expect)(userAInPendingListB.connection.id).toBe(connectionId);
+        }));
+        (0, vitest_1.it)('duplicate and reverse-duplicate requests return 409', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, tokenB } = yield setupPendingConnection();
             // --- DUPLICATE REQUEST CHECK ---
-            // User A attempts to request User B again -> Expect 409 Conflict
             const duplicateResponse = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/connections`)
                 .set('Authorization', `Bearer ${tokenA}`)
@@ -285,8 +314,6 @@ function createAuthUser() {
             (0, vitest_1.expect)(duplicateResponse.body.success).toBe(false);
             (0, vitest_1.expect)(duplicateResponse.body.message).toBe('Connection request already exists');
             // --- REVERSE DUPLICATE REQUEST CHECK ---
-            // User B (receiver) tries to send a request back to User A while A's request is still PENDING.
-            // The connectionKey is deterministic (min_max of IDs), so the existing record collides.
             const reverseDuplicateResponse = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/connections`)
                 .set('Authorization', `Bearer ${tokenB}`)
@@ -297,8 +324,10 @@ function createAuthUser() {
             (0, vitest_1.expect)(reverseDuplicateResponse.status).toBe(409);
             (0, vitest_1.expect)(reverseDuplicateResponse.body.success).toBe(false);
             (0, vitest_1.expect)(reverseDuplicateResponse.body.message).toBe('Connection request already exists');
+        }));
+        (0, vitest_1.it)('pending requests list returns correct data for sent and received directions', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, tokenB, connectionId } = yield setupPendingConnection();
             // --- RETRIEVE PENDING REQUESTS (direction=received) ---
-            // User B (receiver) retrieves pending received requests -> Expect list containing User A's request
             const pendingReceivedResponse = yield (0, supertest_1.default)(app_1.default)
                 .get('/api/v1/connections/requests?direction=received')
                 .set('Authorization', `Bearer ${tokenB}`);
@@ -311,7 +340,6 @@ function createAuthUser() {
             (0, vitest_1.expect)(pendingReceivedResponse.body.data[0].connectionId).toBe(connectionId);
             (0, vitest_1.expect)(pendingReceivedResponse.body.data[0].sender.id).toBe(userA._id.toString());
             // --- RETRIEVE PENDING REQUESTS (direction=sent) ---
-            // User A (sender) retrieves their outgoing pending requests -> Expect list containing their request to User B
             const pendingSentResponse = yield (0, supertest_1.default)(app_1.default)
                 .get('/api/v1/connections/requests?direction=sent')
                 .set('Authorization', `Bearer ${tokenA}`);
@@ -323,9 +351,12 @@ function createAuthUser() {
             (0, vitest_1.expect)(pendingSentResponse.body.data).toHaveLength(1);
             (0, vitest_1.expect)(pendingSentResponse.body.data[0].connectionId).toBe(connectionId);
             (0, vitest_1.expect)(pendingSentResponse.body.data[0].receiver.id).toBe(userB._id.toString());
+        }));
+    });
+    (0, vitest_1.describe)('Cancellation Flow', () => {
+        (0, vitest_1.it)('receiver cannot cancel; sender can cancel; state resets to null on both sides', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, tokenB, connectionId } = yield setupPendingConnection();
             // --- RECEIVER CANCELLATION GUARD ---
-            // User B (receiver) attempts to cancel User A's pending request -> Expect 403 Forbidden
-            // Only the original sender is allowed to cancel; the receiver must use REJECT instead.
             const receiverCancelResponse = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/connections/${connectionId}/cancel`)
                 .set('Authorization', `Bearer ${tokenB}`);
@@ -334,8 +365,16 @@ function createAuthUser() {
             }, receiverCancelResponse.body, 'RECEIVER-CANCEL-GUARD', 'User B (receiver) tries to cancel User A\'s request -> 403 expected');
             (0, vitest_1.expect)(receiverCancelResponse.status).toBe(403);
             (0, vitest_1.expect)(receiverCancelResponse.body.success).toBe(false);
+            // --- REMOVE-ON-PENDING GUARD ---
+            const removePendingResponse = yield (0, supertest_1.default)(app_1.default)
+                .post(`/api/v1/connections/${connectionId}/remove`)
+                .set('Authorization', `Bearer ${tokenA}`);
+            (0, testLogger_1.logApi)('POST', '/api/v1/connections/:connectionId/remove', {
+                params: { connectionId },
+            }, removePendingResponse.body, 'REMOVE-PENDING-GUARD', 'User A tries to /remove a PENDING connection -> 400 expected');
+            (0, vitest_1.expect)(removePendingResponse.status).toBe(400);
+            (0, vitest_1.expect)(removePendingResponse.body.success).toBe(false);
             // --- REQUEST CANCELLATION ---
-            // User A (sender) cancels the pending connection request -> Expect 200 OK
             const cancelResponse = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/connections/${connectionId}/cancel`)
                 .set('Authorization', `Bearer ${tokenA}`);
@@ -359,7 +398,6 @@ function createAuthUser() {
             const userBAfterCancel = cancelListResponse.body.data.find((p) => (p.id || p._id) === userB._id.toString());
             (0, vitest_1.expect)(userBAfterCancel.connection).toBeNull();
             // --- USER B CANCELLATION CHECK PERSPECTIVE ---
-            // Verify that User B's received requests list is now empty
             const checkPendingResponse = yield (0, supertest_1.default)(app_1.default)
                 .get('/api/v1/connections/requests?direction=received')
                 .set('Authorization', `Bearer ${tokenB}`);
@@ -372,43 +410,40 @@ function createAuthUser() {
                 .set('Authorization', `Bearer ${tokenB}`);
             (0, testLogger_1.logApi)('GET', '/api/v1/users/:userId/public', { params: { userId: userA._id.toString() } }, cancelProfileResponseB.body, 'CANCELLED-PROFILE-B', 'User B checks User A\'s profile (after cancellation - NONE status)');
             (0, vitest_1.expect)(cancelProfileResponseB.body.data.connection).toBeNull();
-            // --- REQUEST RE-CREATION & REJECTION ---
-            // Re-create request for testing rejection
-            const sendRecreateResponse = yield (0, supertest_1.default)(app_1.default)
-                .post(`/api/v1/connections`)
-                .set('Authorization', `Bearer ${tokenA}`)
-                .send({ receiverId: userB._id.toString() });
-            const recreatedId = sendRecreateResponse.body.data.id;
-            // --- POLISH: SENDER REJECT GUARD ---
-            // User A (sender) tries to reject their own outgoing request -> 403 Forbidden expected
+        }));
+    });
+    (0, vitest_1.describe)('Rejection Flow', () => {
+        (0, vitest_1.it)('sender cannot reject or accept own request; receiver can reject; state resets; immediate re-request allowed', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, tokenB, connectionId } = yield setupPendingConnection();
+            const rejectedConnectionId = connectionId;
+            // --- SENDER REJECT GUARD ---
             const senderRejectResponse = yield (0, supertest_1.default)(app_1.default)
-                .post(`/api/v1/connections/${recreatedId}/reject`)
+                .post(`/api/v1/connections/${rejectedConnectionId}/reject`)
                 .set('Authorization', `Bearer ${tokenA}`);
             (0, testLogger_1.logApi)('POST', '/api/v1/connections/:connectionId/reject', {
-                params: { connectionId: recreatedId },
+                params: { connectionId: rejectedConnectionId },
             }, senderRejectResponse.body, 'SENDER-REJECT-GUARD', 'User A (sender) tries to reject own request -> 403 expected');
             (0, vitest_1.expect)(senderRejectResponse.status).toBe(403);
             (0, vitest_1.expect)(senderRejectResponse.body.success).toBe(false);
-            // --- POLISH: SENDER ACCEPT GUARD ---
-            // User A (sender) tries to accept their own outgoing request -> 403 Forbidden expected
+            // --- SENDER ACCEPT GUARD ---
             const senderAcceptResponse = yield (0, supertest_1.default)(app_1.default)
-                .post(`/api/v1/connections/${recreatedId}/accept`)
+                .post(`/api/v1/connections/${rejectedConnectionId}/accept`)
                 .set('Authorization', `Bearer ${tokenA}`);
             (0, testLogger_1.logApi)('POST', '/api/v1/connections/:connectionId/accept', {
-                params: { connectionId: recreatedId },
+                params: { connectionId: rejectedConnectionId },
             }, senderAcceptResponse.body, 'SENDER-RESPOND-GUARD', 'User A (sender) tries to accept own request -> 403 expected');
             (0, vitest_1.expect)(senderAcceptResponse.status).toBe(403);
             (0, vitest_1.expect)(senderAcceptResponse.body.success).toBe(false);
-            // User B (receiver) rejects User A's request -> Expect 200 OK with data: { id, status: 'NONE' }
+            // User B (receiver) rejects User A's request -> Expect 200 OK
             const rejectResponse = yield (0, supertest_1.default)(app_1.default)
-                .post(`/api/v1/connections/${recreatedId}/reject`)
+                .post(`/api/v1/connections/${rejectedConnectionId}/reject`)
                 .set('Authorization', `Bearer ${tokenB}`);
             (0, testLogger_1.logApi)('POST', '/api/v1/connections/:connectionId/reject', {
-                params: { connectionId: recreatedId },
+                params: { connectionId: rejectedConnectionId },
             }, rejectResponse.body, 'REJECTION', 'User B rejects User A\'s connection request');
             (0, vitest_1.expect)(rejectResponse.status).toBe(200);
             (0, vitest_1.expect)(rejectResponse.body.success).toBe(true);
-            (0, vitest_1.expect)(rejectResponse.body.data.id).toBe(recreatedId);
+            (0, vitest_1.expect)(rejectResponse.body.data.id).toBe(rejectedConnectionId);
             (0, vitest_1.expect)(rejectResponse.body.data.status).toBe('NONE');
             // Verify profile and list endpoints are back to 'NONE' after rejection
             const rejectProfileResponse = yield (0, supertest_1.default)(app_1.default)
@@ -422,9 +457,7 @@ function createAuthUser() {
             (0, testLogger_1.logApi)('GET', '/api/v1/users/profiles', {}, rejectListResponse.body, 'REJECTED-LIST-PROFILES', 'User A fetches community discovery profiles list (after rejection - NONE status)');
             const userBAfterReject = rejectListResponse.body.data.find((p) => (p.id || p._id) === userB._id.toString());
             (0, vitest_1.expect)(userBAfterReject.connection).toBeNull();
-            // --- REQUEST RE-CREATION & ACCEPTANCE (TESTING IMMEDIATE RE-REQUEST BEHAVIOR) ---
-            // We explicitly test that immediate re-requesting is allowed post-rejection.
-            // Since the connection record was deleted, there is no cooldown, and the state returned to 'NONE'.
+            // --- REQUEST RE-CREATION (TESTING IMMEDIATE RE-REQUEST BEHAVIOR) ---
             const sendRecreate2Response = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/connections`)
                 .set('Authorization', `Bearer ${tokenA}`)
@@ -434,26 +467,32 @@ function createAuthUser() {
             }, sendRecreate2Response.body, 'RE-REQUEST-AFTER-REJECTION', 'User A immediately re-requests User B after rejection -> Expect 201 Created and new connection ID');
             (0, vitest_1.expect)(sendRecreate2Response.status).toBe(201);
             (0, vitest_1.expect)(sendRecreate2Response.body.success).toBe(true);
-            const finalConnectionId = sendRecreate2Response.body.data.id;
-            (0, vitest_1.expect)(finalConnectionId).toBeDefined();
-            (0, vitest_1.expect)(finalConnectionId).not.toBe(recreatedId); // Verify a brand new connection ID is generated
+            const newConnectionId = sendRecreate2Response.body.data.id;
+            (0, vitest_1.expect)(newConnectionId).toBeDefined();
+            (0, vitest_1.expect)(newConnectionId).not.toBe(rejectedConnectionId); // Verify a brand new connection ID is generated
             (0, vitest_1.expect)(sendRecreate2Response.body.data.status).toBe(connection_constants_1.CONNECTION_STATUS.PENDING);
-            // User B (receiver) accepts User A's request -> Expect 200 OK with clean `{ id, status, chatId }` payload
+        }));
+    });
+    (0, vitest_1.describe)('Acceptance Flow', () => {
+        (0, vitest_1.it)('receiver accepts request; chatId created; notifications fire; socket emits; state reflects ACCEPTED on both sides', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, tokenB, connectionId } = yield setupPendingConnection();
+            // User B (receiver) accepts User A's request -> Expect 200 OK with clean { id, status, chatId } payload
             const acceptResponse = yield (0, supertest_1.default)(app_1.default)
-                .post(`/api/v1/connections/${finalConnectionId}/accept`)
+                .post(`/api/v1/connections/${connectionId}/accept`)
                 .set('Authorization', `Bearer ${tokenB}`);
             (0, testLogger_1.logApi)('POST', '/api/v1/connections/:connectionId/accept', {
-                params: { connectionId: finalConnectionId },
+                params: { connectionId },
             }, acceptResponse.body, 'ACCEPTANCE', 'User B accepts User A\'s connection request');
             (0, vitest_1.expect)(acceptResponse.status).toBe(200);
             (0, vitest_1.expect)(acceptResponse.body.success).toBe(true);
-            (0, vitest_1.expect)(acceptResponse.body.data.id).toBe(finalConnectionId);
+            (0, vitest_1.expect)(acceptResponse.body.data.id).toBe(connectionId);
             (0, vitest_1.expect)(acceptResponse.body.data.status).toBe(connection_constants_1.CONNECTION_STATUS.ACCEPTED);
             (0, vitest_1.expect)(acceptResponse.body.data.chatId).toBeDefined();
             const chatId = acceptResponse.body.data.chatId;
+            // --- SOCKET.IO EMISSION: CONNECTION ACCEPTED ---
+            (0, vitest_1.expect)(global.io.to).toHaveBeenCalledWith(`user::${userA._id.toString()}`);
+            (0, vitest_1.expect)(global.io.emit).toHaveBeenCalledWith('CONNECTION_ACCEPTED', vitest_1.expect.objectContaining({ connectionId: vitest_1.expect.anything(), chatId: vitest_1.expect.anything() }));
             // --- NOTIFICATION VERIFICATION: CONNECTION ACCEPTED ---
-            // sendNotifications runs for real, so the Notification document is in the DB.
-            // Verify via direct DB query first, then confirm via the API endpoint.
             const acceptedNotification = yield notification_model_1.Notification.findOne({
                 receiver: userA._id,
                 type: 'CONNECTION_ACCEPTED',
@@ -472,7 +511,6 @@ function createAuthUser() {
             (0, testLogger_1.logApi)('GET', '/api/v1/notifications/me', {}, notificationsResponseA.body, 'NOTIFICATION-CONNECTION-ACCEPTED', 'User A fetches notifications (should contain connection accepted notification)');
             (0, vitest_1.expect)(notificationsResponseA.status).toBe(200);
             (0, vitest_1.expect)(notificationsResponseA.body.success).toBe(true);
-            // Cursor pagination meta — flat shape
             (0, vitest_1.expect)(notificationsResponseA.body.meta.unreadCount).toBe(1);
             (0, vitest_1.expect)(notificationsResponseA.body.meta).toMatchObject({
                 limit: vitest_1.expect.any(Number),
@@ -485,29 +523,24 @@ function createAuthUser() {
             (0, vitest_1.expect)(acceptedNotifInApi.schemaVersion).toBe(1);
             (0, vitest_1.expect)(acceptedNotifInApi.isRead).toBe(false);
             (0, vitest_1.expect)(acceptedNotifInApi.readAt).toBeNull();
-            // actor — denormalized acceptor data
             (0, vitest_1.expect)(acceptedNotifInApi.actor.id).toBe(userB._id.toString());
             (0, vitest_1.expect)(acceptedNotifInApi.actor.name).toBe(userB.name);
             (0, vitest_1.expect)(acceptedNotifInApi.actor.profileImage).toBeDefined();
-            // subject — connection + chatId so client can open chat directly
             (0, vitest_1.expect)(acceptedNotifInApi.subject.type).toBe('Connection');
             (0, vitest_1.expect)(acceptedNotifInApi.subject.chatId).toBe(chatId);
-            // actions — client uses these to render buttons
             (0, vitest_1.expect)(acceptedNotifInApi.actions).toContainEqual({ type: 'OPEN_CHAT' });
             (0, vitest_1.expect)(acceptedNotifInApi.actions).toContainEqual({ type: 'VIEW_PROFILE' });
-            // --- POLISH: ACCEPTING AN ALREADY-ACCEPTED CONNECTION ---
-            // User B tries to accept again -> Expect 400 Bad Request (not pending anymore)
+            // --- ACCEPTING AN ALREADY-ACCEPTED CONNECTION ---
             const doubleAcceptResponse = yield (0, supertest_1.default)(app_1.default)
-                .post(`/api/v1/connections/${finalConnectionId}/accept`)
+                .post(`/api/v1/connections/${connectionId}/accept`)
                 .set('Authorization', `Bearer ${tokenB}`);
             (0, testLogger_1.logApi)('POST', '/api/v1/connections/:connectionId/accept', {
-                params: { connectionId: finalConnectionId },
+                params: { connectionId },
             }, doubleAcceptResponse.body, 'DOUBLE-ACCEPTANCE-GUARD', 'User B tries to accept an already-accepted connection request -> Expect 400 Bad Request');
             (0, vitest_1.expect)(doubleAcceptResponse.status).toBe(400);
             (0, vitest_1.expect)(doubleAcceptResponse.body.success).toBe(false);
             (0, vitest_1.expect)(doubleAcceptResponse.body.message).toContain('no longer pending');
             // --- CONNECTED STATE PROFILE STATUS CHECKS ---
-            // User A fetching User B's profile -> connection status: 'ACCEPTED', connectionId, chatId (no direction)
             const connectedProfileResponse = yield (0, supertest_1.default)(app_1.default)
                 .get(`/api/v1/users/${userB._id}/public`)
                 .set('Authorization', `Bearer ${tokenA}`);
@@ -517,7 +550,7 @@ function createAuthUser() {
             (0, vitest_1.expect)(connectedProfileResponse.body.data.connection).toBeDefined();
             (0, vitest_1.expect)(connectedProfileResponse.body.data.connection.status).toBe('ACCEPTED');
             (0, vitest_1.expect)(connectedProfileResponse.body.data.connection.direction).toBeUndefined();
-            (0, vitest_1.expect)(connectedProfileResponse.body.data.connection.id).toBe(finalConnectionId);
+            (0, vitest_1.expect)(connectedProfileResponse.body.data.connection.id).toBe(connectionId);
             (0, vitest_1.expect)(connectedProfileResponse.body.data.connection.chatId).toBe(chatId);
             // User A checks profiles list
             const connectedListResponse = yield (0, supertest_1.default)(app_1.default)
@@ -530,9 +563,8 @@ function createAuthUser() {
             (0, vitest_1.expect)(userBInConnectedList.connection).toBeDefined();
             (0, vitest_1.expect)(userBInConnectedList.connection.status).toBe('ACCEPTED');
             (0, vitest_1.expect)(userBInConnectedList.connection.direction).toBeUndefined();
-            (0, vitest_1.expect)(userBInConnectedList.connection.id).toBe(finalConnectionId);
+            (0, vitest_1.expect)(userBInConnectedList.connection.id).toBe(connectionId);
             // --- RETRIEVE ACTIVE CONNECTIONS (BOTH SIDES) ---
-            // User A retrieves their active connections list -> Expect list containing User B
             const activeConnectionsResponseA = yield (0, supertest_1.default)(app_1.default)
                 .get('/api/v1/connections')
                 .set('Authorization', `Bearer ${tokenA}`);
@@ -540,10 +572,9 @@ function createAuthUser() {
             (0, vitest_1.expect)(activeConnectionsResponseA.status).toBe(200);
             (0, vitest_1.expect)(activeConnectionsResponseA.body.success).toBe(true);
             (0, vitest_1.expect)(activeConnectionsResponseA.body.data).toHaveLength(1);
-            (0, vitest_1.expect)(activeConnectionsResponseA.body.data[0].id || activeConnectionsResponseA.body.data[0]._id).toBe(finalConnectionId);
+            (0, vitest_1.expect)(activeConnectionsResponseA.body.data[0].id || activeConnectionsResponseA.body.data[0]._id).toBe(connectionId);
             (0, vitest_1.expect)(activeConnectionsResponseA.body.data[0].chatId).toBe(chatId);
             (0, vitest_1.expect)(activeConnectionsResponseA.body.data[0].connectedUser.id).toBe(userB._id.toString());
-            // User B retrieves their active connections list -> Expect list containing User A
             const activeConnectionsResponseB = yield (0, supertest_1.default)(app_1.default)
                 .get('/api/v1/connections')
                 .set('Authorization', `Bearer ${tokenB}`);
@@ -551,33 +582,38 @@ function createAuthUser() {
             (0, vitest_1.expect)(activeConnectionsResponseB.status).toBe(200);
             (0, vitest_1.expect)(activeConnectionsResponseB.body.success).toBe(true);
             (0, vitest_1.expect)(activeConnectionsResponseB.body.data).toHaveLength(1);
-            (0, vitest_1.expect)(activeConnectionsResponseB.body.data[0].id || activeConnectionsResponseB.body.data[0]._id).toBe(finalConnectionId);
+            (0, vitest_1.expect)(activeConnectionsResponseB.body.data[0].id || activeConnectionsResponseB.body.data[0]._id).toBe(connectionId);
             (0, vitest_1.expect)(activeConnectionsResponseB.body.data[0].chatId).toBe(chatId);
             (0, vitest_1.expect)(activeConnectionsResponseB.body.data[0].connectedUser.id).toBe(userA._id.toString());
+        }));
+    });
+    (0, vitest_1.describe)('Removal Flow', () => {
+        (0, vitest_1.it)('non-participant cannot remove; receiver can remove accepted connection; state resets; re-request allowed', () => __awaiter(void 0, void 0, void 0, function* () {
+            const { userA, tokenA, userB, tokenB, userC, tokenC, acceptedConnectionId, chatId } = yield setupAcceptedConnection();
             // --- REMOVE CONNECTION SECURITY GUARD ---
-            // User C (not in connection) tries to remove connection between User A & User B -> Expect 403 Forbidden
             const foreignRemoveResponse = yield (0, supertest_1.default)(app_1.default)
-                .post(`/api/v1/connections/${finalConnectionId}/remove`)
+                .post(`/api/v1/connections/${acceptedConnectionId}/remove`)
                 .set('Authorization', `Bearer ${tokenC}`);
             (0, testLogger_1.logApi)('POST', '/api/v1/connections/:connectionId/remove', {
-                params: { connectionId: finalConnectionId },
+                params: { connectionId: acceptedConnectionId },
             }, foreignRemoveResponse.body, 'FOREIGN-REMOVAL-GUARD', 'User C (not in connection) tries to remove connection -> 403 expected');
             (0, vitest_1.expect)(foreignRemoveResponse.status).toBe(403);
             (0, vitest_1.expect)(foreignRemoveResponse.body.success).toBe(false);
             // --- REMOVE CONNECTION (User B is Receiver of original request) ---
-            // Either user can remove. We have User B (receiver) perform the removal to verify both sender/receiver capability.
             const removeResponse = yield (0, supertest_1.default)(app_1.default)
-                .post(`/api/v1/connections/${finalConnectionId}/remove`)
+                .post(`/api/v1/connections/${acceptedConnectionId}/remove`)
                 .set('Authorization', `Bearer ${tokenB}`);
             (0, testLogger_1.logApi)('POST', '/api/v1/connections/:connectionId/remove', {
-                params: { connectionId: finalConnectionId },
+                params: { connectionId: acceptedConnectionId },
             }, removeResponse.body, 'REMOVAL', 'User B removes the accepted active connection');
             (0, vitest_1.expect)(removeResponse.status).toBe(200);
             (0, vitest_1.expect)(removeResponse.body.success).toBe(true);
-            (0, vitest_1.expect)(removeResponse.body.data.id).toBe(finalConnectionId);
+            (0, vitest_1.expect)(removeResponse.body.data.id).toBe(acceptedConnectionId);
             (0, vitest_1.expect)(removeResponse.body.data.status).toBe('NONE');
+            // --- SOCKET.IO EMISSION: CONNECTION REMOVED ---
+            (0, vitest_1.expect)(global.io.to).toHaveBeenCalledWith(`user::${userA._id.toString()}`);
+            (0, vitest_1.expect)(global.io.emit).toHaveBeenCalledWith('CONNECTION_REMOVED', vitest_1.expect.objectContaining({ connectionId: vitest_1.expect.anything() }));
             // --- VERIFY POST-REMOVAL STATE (USER A PERSPECTIVE) ---
-            // Verify profile and list endpoints are back to null for User A
             const removeProfileResponseA = yield (0, supertest_1.default)(app_1.default)
                 .get(`/api/v1/users/${userB._id}/public`)
                 .set('Authorization', `Bearer ${tokenA}`);
@@ -594,7 +630,6 @@ function createAuthUser() {
                 .set('Authorization', `Bearer ${tokenA}`);
             (0, vitest_1.expect)(emptyConnectionsA.body.data).toHaveLength(0);
             // --- VERIFY POST-REMOVAL STATE (USER B PERSPECTIVE) ---
-            // Verify profile and list endpoints are back to null for User B
             const removeProfileResponseB = yield (0, supertest_1.default)(app_1.default)
                 .get(`/api/v1/users/${userA._id}/public`)
                 .set('Authorization', `Bearer ${tokenB}`);
@@ -611,8 +646,6 @@ function createAuthUser() {
                 .set('Authorization', `Bearer ${tokenB}`);
             (0, vitest_1.expect)(emptyConnectionsB.body.data).toHaveLength(0);
             // --- RE-REQUEST AFTER REMOVAL ---
-            // After removing an accepted connection, the DB record is deleted.
-            // Verify the sender can immediately re-request — different DB state than post-rejection.
             const reRequestAfterRemovalResponse = yield (0, supertest_1.default)(app_1.default)
                 .post(`/api/v1/connections`)
                 .set('Authorization', `Bearer ${tokenA}`)
@@ -623,7 +656,7 @@ function createAuthUser() {
             (0, vitest_1.expect)(reRequestAfterRemovalResponse.status).toBe(201);
             (0, vitest_1.expect)(reRequestAfterRemovalResponse.body.success).toBe(true);
             (0, vitest_1.expect)(reRequestAfterRemovalResponse.body.data.id).toBeDefined();
-            (0, vitest_1.expect)(reRequestAfterRemovalResponse.body.data.id).not.toBe(finalConnectionId);
+            (0, vitest_1.expect)(reRequestAfterRemovalResponse.body.data.id).not.toBe(acceptedConnectionId);
             (0, vitest_1.expect)(reRequestAfterRemovalResponse.body.data.status).toBe(connection_constants_1.CONNECTION_STATUS.PENDING);
         }));
     });
