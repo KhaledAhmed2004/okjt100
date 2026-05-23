@@ -17,7 +17,7 @@ Stores user questions and imam answers.
 | Field | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `userId` | ObjectId | ✅ | Reference to the user (ref `User`) |
-| `userRole`| String | ✅ | The role of the user when asking (e.g., BROTHER, SISTER) |
+| `userRole`| String | ✅ | The role of the user when asking (e.g., BROTHER, SISTER, JUMMAH) |
 | `question` | String | ✅ | The question content (Max 2000 chars) |
 | `imageUrl` | String | ❌ | Optional image attachment (URL) |
 | `status` | String | ✅ | Enum: `pending`, `answered` (default: `pending`) |
@@ -37,8 +37,8 @@ Stores user questions and imam answers.
 
 | # | Method | Endpoint | Auth | Purpose & Status | Documentation |
 |---|---|---|---|---|---|
-| 01 | POST | `/ask-question` | `BROTHER`, `SISTER` | ✅ Done: Submits a new question. | [01-submit-question.md](./01-submit-question.md) |
+| 01 | POST | `/ask-question` | `BROTHER`, `SISTER`, `JUMMAH` | ✅ Done: Submits a new question. | [01-submit-question.md](./01-submit-question.md) |
 | 02 | GET | `/ask-question` | `SUPER_ADMIN` | ✅ Done: Fetches all questions for admin. | [02-get-all-questions.md](./02-get-all-questions.md) |
-| 03 | GET | `/ask-question/my-questions` | `BROTHER`, `SISTER` | ✅ Done: Fetches logged-in user's questions. | [03-get-my-questions.md](./03-get-my-questions.md) |
+| 03 | GET | `/ask-question/my-questions` | `BROTHER`, `SISTER`, `JUMMAH` | ✅ Done: Fetches logged-in user's questions. | [03-get-my-questions.md](./03-get-my-questions.md) |
 | 04 | PATCH | `/ask-question/:questionId/answer` | `SUPER_ADMIN` | ✅ Done: Admin provides an answer. | [04-answer-question.md](./04-answer-question.md) |
 | 05 | GET | `/ask-question/analytics` | `SUPER_ADMIN` | ✅ Done: Stats for pending/answered questions. | [05-get-analytics.md](./05-get-analytics.md) |

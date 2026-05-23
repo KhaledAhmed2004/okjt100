@@ -3,7 +3,7 @@
 ```http
 POST /users/me/data-export
 Content-Type: application/json
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Returns a single JSON envelope containing every piece of data the system stores **about** the requesting user. Satisfies GDPR Article 15 (right of access). Synchronous — the entire payload is in the HTTP response. Mobile-store policies (Apple §5.1.1(v), Google Play account-deletion policy) require this surface to exist for accounts in EU jurisdictions.
@@ -39,7 +39,7 @@ Enforced by the `auth` middleware before the controller is reached.
 > A soft-deleted user cannot reach this endpoint with their old token (auth middleware blocks). To export data on the way out, call this endpoint **before** [06-delete-account.md](./06-delete-account.md).
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation
@@ -94,7 +94,7 @@ None. Empty body or `{}`.
 - **Controller**: [src/app/modules/user/user.controller.ts](../../../src/app/modules/user/user.controller.ts) — `exportMyData`
 - **Service**: [src/app/modules/user/user.service.ts](../../../src/app/modules/user/user.service.ts) — `exportMyDataFromDB`
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `UserController.exportMyData`. No `fileHandler`, no `validateRequest`, no `rateLimitMiddleware`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `UserController.exportMyData`. No `fileHandler`, no `validateRequest`, no `rateLimitMiddleware`.
 
 ### Service flow (`exportMyDataFromDB`)
 1. Lazy-load cascade collection modules (Notification, GroupMember/Post/Like/Comment, AskImam, Subscription, SubscriptionEvent).

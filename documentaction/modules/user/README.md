@@ -34,7 +34,7 @@
 | 17 | PATCH | `/users/:userId` | SUPER_ADMIN | [17-update-user-admin.md](./17-update-user-admin.md) |
 | 18 | DELETE | `/users/:userId` | SUPER_ADMIN | [18-delete-user-admin.md](./18-delete-user-admin.md) |
 | 19 | PATCH | `/users/:userId/review` | SUPER_ADMIN | [21-review-user-admin.md](./21-review-user-admin.md) |
-| 22 | GET | `/users/profiles` | Bearer (BROTHER, SISTER) | [22-list-user-profiles.md](./22-list-user-profiles.md) |
+| 22 | GET | `/users/profiles` | Bearer (BROTHER, SISTER, JUMMAH) | [22-list-user-profiles.md](./22-list-user-profiles.md) |
 
 > Admin-side user-management endpoints (list, stats, update, delete, approve/reject) have been consolidated into this module under `/api/v1/users/*`.
 
@@ -65,4 +65,4 @@
 | 11 | `DELETE /users/me/sessions/:tokenId` | Done | User / Admin | Per-device revoke; no tokenVersion bump |
 | 12 | `POST /users/me/sessions/revoke-all` | Done | User / Admin | Logout-all-devices (bumps tokenVersion); idempotent |
 | 13 | `POST /users/reverify` | Done | Public (token) | Re-submit after admin rejection; 24h token; 5/hour rate limit; idempotent |
-| 22 | `GET /users/profiles` | Done | BROTHER, SISTER | Nearby/new-reverts community discovery; `$geoNear` proximity sort; `connectionStatus` + `connectionId` injected via single-pass `$lookup` |
+| 22 | `GET /users/profiles` | Done | BROTHER, SISTER, JUMMAH | Nearby/new-reverts community discovery; `$geoNear` proximity sort; `connectionStatus` + `connectionId` injected via single-pass `$lookup` |

@@ -108,7 +108,9 @@ const userSchema = new Schema<IUser>(
     },
     revertDate: {
       type: Date,
-      required: true,
+      required: function (this: IUser) {
+        return this.role === USER_ROLES.BROTHER || this.role === USER_ROLES.SISTER;
+      },
     },
     dateOfBirth: {
       type: Date,
@@ -124,11 +126,15 @@ const userSchema = new Schema<IUser>(
     },
     verificationImage: {
       type: String,
-      required: true,
+      required: function (this: IUser) {
+        return this.role === USER_ROLES.BROTHER || this.role === USER_ROLES.SISTER;
+      },
     },
     verificationVideo: {
       type: String,
-      required: true,
+      required: function (this: IUser) {
+        return this.role === USER_ROLES.BROTHER || this.role === USER_ROLES.SISTER;
+      },
     },
     aboutMe: {
       type: String,

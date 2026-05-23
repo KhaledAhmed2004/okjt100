@@ -3,7 +3,7 @@
 ```http
 POST /auth/logout
 Content-Type: application/json
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Ends the **current device's** push session and clears the `refreshToken` browser cookie. Removes the supplied `deviceToken` from the user's `deviceTokens[]` array so the device stops receiving FCM/APNs notifications. **Does NOT bump `tokenVersion`** — the JWT itself remains valid until natural expiry (short-lived access token; refresh-token flow will continue to work on this device until the user logs back in elsewhere). To globally invalidate every session on every device, use [user/12-revoke-all-sessions.md](../user/12-revoke-all-sessions.md) (bumps `tokenVersion`).
@@ -39,7 +39,7 @@ Enforced by the `auth` middleware before the controller is reached.
 A non-active user calling logout is an unusual case (the auth middleware will probably block them before they can call this) but the table is included for completeness.
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `ADMIN`, `BROTHER`, `SISTER` ([auth.route.ts:50](../../../src/app/modules/auth/auth.route.ts#L50)).
+- **Allowed roles**: `SUPER_ADMIN`, `ADMIN`, `BROTHER`, `SISTER`, `JUMMAH` ([auth.route.ts:50](../../../src/app/modules/auth/auth.route.ts#L50)).
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation
@@ -78,7 +78,7 @@ Or, for a session-only logout:
 - **Controller**: [src/app/modules/auth/auth.controller.ts](../../../src/app/modules/auth/auth.controller.ts) — `logoutUser`
 - **Service**: [src/app/modules/auth/auth.service.ts](../../../src/app/modules/auth/auth.service.ts) — `logoutUserFromDB`
 
-**Middleware order**: `auth(SUPER_ADMIN, ADMIN, BROTHER, SISTER)` -> `AuthController.logoutUser`. No `validateRequest`, no `rateLimitMiddleware`.
+**Middleware order**: `auth(SUPER_ADMIN, ADMIN, BROTHER, SISTER, JUMMAH)` -> `AuthController.logoutUser`. No `validateRequest`, no `rateLimitMiddleware`.
 
 ---
 

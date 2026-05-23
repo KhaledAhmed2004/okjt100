@@ -65,7 +65,7 @@ Some list endpoints add domain-specific keys to `meta` (for example, `meta.unrea
 
 | Role | Surface | Capability summary |
 |---|---|---|
-| `BROTHER` / `SISTER` | Mobile | Register / login (email or Google / Apple), manage profile and subscription, join groups, ask imams. |
+| `BROTHER` / `SISTER` / `JUMMAH` | Mobile | Register / login (email or Google / Apple), manage profile and subscription, join groups, ask imams. JUMMAH does not require admin verification and is auto-activated upon OTP verification. |
 | `SUPER_ADMIN` / `ADMIN` | Dashboard | Full admin surface: growth metrics, user CRUD + block, user verification, legal CMS. |
 | Public (unauth) | Either | Auth endpoints only (register, login, forgot / reset password, social login, refresh, resend OTP). |
 

@@ -11,8 +11,8 @@ const createUserZodSchema = z.object({
         .string({ required_error: 'Email is required' })
         .email('Invalid email address')
         .toLowerCase(),
-      role: z.enum([USER_ROLES.BROTHER, USER_ROLES.SISTER], { required_error: 'Role is required' }),
-      revertDate: z.string({ required_error: 'Revert date is required' }).datetime(),
+      role: z.enum([USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.JUMMAH], { required_error: 'Role is required' }),
+      revertDate: z.string().datetime().optional(),
       dateOfBirth: z.string({ required_error: 'Date of birth is required' }).datetime().refine((dob) => {
         const birthDate = new Date(dob);
         const today = new Date();
@@ -59,6 +59,16 @@ const createUserZodSchema = z.object({
             code: z.ZodIssueCode.custom,
             message: 'Password must include upper, lower, number, special and be 8+ chars',
             path: ['password']
+          });
+        }
+      }
+
+      if (data.role === USER_ROLES.BROTHER || data.role === USER_ROLES.SISTER) {
+        if (!data.revertDate) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Revert date is required',
+            path: ['revertDate']
           });
         }
       }
@@ -148,7 +158,8 @@ export const UserValidation = {
       role: z.enum([
         USER_ROLES.SUPER_ADMIN, 
         USER_ROLES.BROTHER, 
-        USER_ROLES.SISTER
+        USER_ROLES.SISTER,
+        USER_ROLES.JUMMAH
       ]).optional(),
       revertDate: z.string().datetime().optional(),
       aboutMe: z.string().optional(),
@@ -239,7 +250,7 @@ export const UserValidation = {
     query: z.object({
       searchTerm: z.string().optional(),
       email: z.string().optional(),
-      role: z.enum([USER_ROLES.SUPER_ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER]).optional(),
+      role: z.enum([USER_ROLES.SUPER_ADMIN, USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.JUMMAH]).optional(),
       status: z.enum([
         USER_STATUS.PENDING,
         USER_STATUS.ACTIVE,

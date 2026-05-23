@@ -15,7 +15,7 @@ Authorization: Bearer {{accessToken}}
 ### Business Logic
 1. **Retrieval**: Fetches the user by ID.
 2. **Access Control**: 
-   - Regular users (`BROTHER`/`SISTER`) can only view `ACTIVE` users of the same role.
+   - Regular users (`BROTHER`/`SISTER`/`JUMMAH`) can only view `ACTIVE` users of the same role.
 3. **Field Selection**: Only public fields are returned:
    - `id`, `name`, `role`, `profileImage`, `interests`, `isVerified`, `createdAt`
    - `location` (flattened to `country`, `city`, `latitude`, `longitude`)
@@ -35,7 +35,7 @@ Checked after the DB lookup in the auth middleware.
 | `RESTRICTED` | `403 Forbidden` (`"message": "Account is no longer active"`). |
 
 ### 2.3 Role-Based Access (Requester vs. Target)
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other requester roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 - **Cross-gender match** (the service enforces this beyond the route's `auth` allow-list):
     - `SUPER_ADMIN` may view any target regardless of role.
@@ -80,7 +80,7 @@ The service then **flattens** `location` into top-level `country` and `city` and
 - **Service**: [src/app/modules/user/user.service.ts](file:///src/app/modules/user/user.service.ts) — `getUserDetailsByIdFromDB`
 - **Validation**: [src/app/modules/user/user.validation.ts](file:///src/app/modules/user/user.validation.ts) — `UserValidation.getUserDetailsZodSchema`
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `rateLimitMiddleware({ windowMs: 60s, max: 60, routeName: 'public-user-details' })` -> `validateRequest(getUserDetailsZodSchema)` -> `UserController.getUserDetailsById`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `rateLimitMiddleware({ windowMs: 60s, max: 60, routeName: 'public-user-details' })` -> `validateRequest(getUserDetailsZodSchema)` -> `UserController.getUserDetailsById`.
 
 ### Service business logic (`getUserDetailsByIdFromDB`)
 1. `User.findById(userId).select('_id name role profileImage location isVerified revertDate aboutMe interests createdAt status deletedAt')` — projection includes `status` and `deletedAt` only for the visibility check.

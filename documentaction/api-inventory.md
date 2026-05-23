@@ -43,15 +43,15 @@
 | 2.17 | PATCH | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.17](./modules/user/17-update-user-admin.md) | — |
 | 2.18 | DELETE | `/users/:userId` | SUPER_ADMIN | ✅ | [Module 2.18](./modules/user/18-delete-user-admin.md) | — |
 | 2.19 | PATCH | `/users/:userId/review` | SUPER_ADMIN | ✅ | [Module 2.19](./modules/user/21-review-user-admin.md) | — |
-| 2.20 | GET | `/users/profiles` | BROTHER / SISTER | ✅ | [Module 2.20](./modules/user/22-list-user-profiles.md) | — |
+| 2.20 | GET | `/users/profiles` | BROTHER / SISTER / JUMMAH | ✅ | [Module 2.20](./modules/user/22-list-user-profiles.md) | — |
 
 ## Ask Question Module
 
 | ID | Method | Endpoint | Roles | Status | Spec | On a screen? |
 |---|---|---|---|:---:|---|---|
-| 3.1 | POST | `/ask-question` | User | ✅ | [Module 3.1](./modules/ask-question/01-submit-question.md) | — |
+| 3.1 | POST | `/ask-question` | User (BROTHER/SISTER/JUMMAH) | ✅ | [Module 3.1](./modules/ask-question/01-submit-question.md) | — |
 | 3.2 | GET | `/ask-question` | User / Imam | ✅ | [Module 3.2](./modules/ask-question/02-get-all-questions.md) | — |
-| 3.3 | GET | `/ask-question/my-questions` | User | ✅ | [Module 3.3](./modules/ask-question/03-get-my-questions.md) | — |
+| 3.3 | GET | `/ask-question/my-questions` | User (BROTHER/SISTER/JUMMAH) | ✅ | [Module 3.3](./modules/ask-question/03-get-my-questions.md) | — |
 | 3.4 | PATCH | `/ask-question/:questionId/answer` | Imam | ✅ | [Module 3.4](./modules/ask-question/04-answer-question.md) | — |
 | 3.5 | GET | `/ask-question/metrics` | Imam / Admin | ✅ | [Module 3.5](./modules/ask-question/05-get-analytics.md) | — |
 

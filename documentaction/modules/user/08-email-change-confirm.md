@@ -3,7 +3,7 @@
 ```http
 POST /users/me/email-change/confirm
 Content-Type: application/json
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Step 2 of the self-service email-change flow. The user submits the 6-digit OTP that was emailed to the **new** address by [07-email-change-request.md](./07-email-change-request.md). On a successful match the server commits the change: `email` is updated to the pending value, the `emailChange` subdoc is cleared, and `tokenVersion` is bumped — invalidating every JWT that was issued under the old email. The client must call [auth/01-login.md](../auth/01-login.md) again with the new email.
@@ -37,7 +37,7 @@ Enforced by the `auth` middleware before the controller is reached.
 | `RESTRICTED` | `403 Forbidden` (`"message": "Account is no longer active"`). |
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation (Zod — `confirmEmailChangeZodSchema`)
@@ -93,7 +93,7 @@ Schema violations -> `400 Bad Request` from `validateRequest` with the Zod error
 - **Service**: [src/app/modules/user/user.service.ts](../../../src/app/modules/user/user.service.ts) — `confirmEmailChangeFromDB`
 - **Validation**: [src/app/modules/user/user.validation.ts](../../../src/app/modules/user/user.validation.ts) — `UserValidation.confirmEmailChangeZodSchema`
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `validateRequest(confirmEmailChangeZodSchema)` -> `UserController.confirmEmailChange`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `validateRequest(confirmEmailChangeZodSchema)` -> `UserController.confirmEmailChange`.
 
 ---
 

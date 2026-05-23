@@ -5,8 +5,7 @@ import { StatusCodes } from 'http-status-codes';
 import { ChatService } from './chat.service';
 import { JwtPayload } from 'jsonwebtoken';
 
-// POST /api/v1/chats/:otherUserId
-// Requirements: 3.1 — createOrGet wired to HTTP route
+// Used API: POST /api/v1/chats/:otherUserId
 const createChat = catchAsync(async (req: Request, res: Response) => {
   const user = req.user as JwtPayload;
   const otherUserId = req.params.otherUserId;
@@ -21,8 +20,7 @@ const createChat = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
-// GET /api/v1/chats
-// Requirements: 4.1 — getList wired to HTTP route
+// Used API: GET /api/v1/chats
 const getChat = catchAsync(async (req: Request, res: Response) => {
   const user = req.user as JwtPayload;
   const searchTerm = req.query.searchTerm as string | undefined;

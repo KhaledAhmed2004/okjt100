@@ -41,7 +41,7 @@ erDiagram
 System er primary entity. Role-based access control (RBAC) eikhan theke managed hoy.
 - **Fields**: `name`, `email`, `password`, `role`, `status`, `isVerified`, `revertDate`, `age`, `profileImage`, `verificationVideo`.
 - **Logic**: `tokenVersion` use kora hoy token rotation ebong security-r jonno.
-- **Roles**: `BROTHER`, `SISTER`, `ADMIN`, `SUPER_ADMIN`.
+- **Roles**: `BROTHER`, `SISTER`, `JUMMAH`, `ADMIN`, `SUPER_ADMIN`.
 - **Default Role**: None (Must be selected during registration).
 
 ### 2. Preference Card Model (`preferencecards`)
@@ -90,14 +90,14 @@ System er sob users (Admin ebong Reverts) er data eikhane thake.
 | `name` | String | ✅ | User er Name |
 | `email` | String | ✅ | Unique, lowercase, indexed |
 | `password` | String | ⚠️ | Required for non-OAuth users only (hidden via `select: false`, min 8) |
-| `role` | String | ✅ | Enum `BROTHER`, `SISTER`, `ADMIN`, `SUPER_ADMIN` |
-| `status` | String | ❌ | Enum `ACTIVE`, `PENDING`, `RESTRICTED`, `REJECTED`, `SUSPENDED`, `DELETE` — Default **`PENDING`** for public registration. |
+| `role` | String | ✅ | Enum `BROTHER`, `SISTER`, `JUMMAH`, `ADMIN`, `SUPER_ADMIN` |
+| `status` | String | ❌ | Enum `ACTIVE`, `PENDING`, `RESTRICTED`, `REJECTED`, `SUSPENDED`, `DELETE` — Default **`PENDING`** for public registration (JUMMAH becomes `ACTIVE` automatically on OTP verification). |
 | `isVerified` | Boolean | ❌ | Email verification status — default **`false`**. Flipped to **`true`** after OTP. |
-| `revertDate` | String | ✅ | Time since becoming Muslim |
+| `revertDate` | String | ⚠️ | Required only for `BROTHER` and `SISTER`. |
 | `age` | Number | ✅ | User age (min 16) |
 | `profileImage` | String | ✅ | Public profile URL |
-| `verificationImage`| String | ✅ | Private verification image URL |
-| `verificationVideo`| String | ✅ | URL |
+| `verificationImage`| String | ⚠️ | Required only for `BROTHER` and `SISTER`. |
+| `verificationVideo`| String | ⚠️ | Required only for `BROTHER` and `SISTER`. |
 | `aboutMe` | String | ❌ | Short intro |
 | `revertStory` | String | ❌ | Personal journey |
 | `interests` | [String] | ❌ | Array of tags |

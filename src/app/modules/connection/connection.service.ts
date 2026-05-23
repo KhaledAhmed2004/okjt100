@@ -7,7 +7,6 @@ import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
 import { Connection } from './connection.model';
 import { ChatService } from '../chat/chat.service';
-import { Chat } from '../chat/chat.model';
 import { USER_STATUS } from '../../../enums/user';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { IConnection, ConnectionAction } from './connection.interface';

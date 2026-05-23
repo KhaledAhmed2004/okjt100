@@ -6,7 +6,7 @@ Content-Type: multipart/form-data
 Auth: None (Public Registration) | Bearer {{accessToken}} (SUPER_ADMIN create)
 ```
 
-> Single endpoint for both **public mobile registration** (`BROTHER` / `SISTER`) and **administrative account creation** (`SUPER_ADMIN`). The difference is detected at the controller level: if a valid `Bearer` token belonging to a `SUPER_ADMIN` is supplied, the request is treated as admin creation; otherwise it is public registration. There is **no `auth` middleware** on this route — the JWT is inspected inline. Any token error silently falls back to public registration.
+> Single endpoint for both **public mobile registration** (`BROTHER` / `SISTER` / `JUMMAH`) and **administrative account creation** (`SUPER_ADMIN`). The difference is detected at the controller level: if a valid `Bearer` token belonging to a `SUPER_ADMIN` is supplied, the request is treated as admin creation; otherwise it is public registration. There is **no `auth` middleware** on this route — the JWT is inspected inline. Any token error silently falls back to public registration.
 
 ## 1. Business Rules (Source of Truth)
 
@@ -36,10 +36,12 @@ Enforced by `createUserZodSchema.superRefine` when neither `googleId` nor `apple
 - **Password history**: registration starts with an empty `passwordHistory`. The current password isn't "previous" yet — history populates on the first change/reset. See [system-concepts.md — Password Policy](../../system-concepts.md#password-policy).
 
 ### 2.4 Role Assignment (RBAC)
-- The Zod schema accepts `role` as `BROTHER | SISTER` only — `SUPER_ADMIN` cannot be supplied through this route's body.
+- The Zod schema accepts `role` as `BROTHER | SISTER | JUMMAH` — `SUPER_ADMIN` cannot be supplied through this route's body.
 - Admin path forces `isVerified: true` and `status: ACTIVE` server-side regardless of body.
 - Public path forces `isVerified: false` and `status: PENDING`.
-- **Workflow**: Creation (`PENDING`) -> OTP Verification (`isVerified: true`) -> Admin Approval (`ACTIVE`).
+- **Workflow**:
+    - **BROTHER / SISTER**: Creation (`PENDING`) -> OTP Verification (`isVerified: true`, status stays `PENDING`) -> Admin Approval (`ACTIVE`).
+    - **JUMMAH**: Creation (`PENDING`) -> OTP Verification (`isVerified: true`, status auto-activated to `ACTIVE`).
 
 ### 2.5 File Handling
 File upload is processed by `fileHandler` **before** validation, with an explicit override for this route: `{ maxFileSizeMB: 100 }`.
@@ -53,9 +55,8 @@ File upload is processed by `fileHandler` **before** validation, with an explici
     - Images: `image/jpeg`, `image/png`, `image/jpg`, `image/webp`
     - Videos: `video/mp4`, `video/webm`
 - **File-validity rules** for the **public** path:
-    - `profileImage` required (image)
-    - `verificationImage` required (image)
-    - `verificationVideo` required (video)
+    - **BROTHER / SISTER**: `profileImage` required (image), `verificationImage` required (image), `verificationVideo` required (video).
+    - **JUMMAH**: These files are **optional**; only `name`, `email`, `password`, and `dateOfBirth` are required.
 - **Admin path**: all three are optional. The schema marks them optional and the service does not enforce them when `isAdmin === true`.
 - **Image processing**: 800px-width resize, PNG palette-compressed level 8, JPEG/WebP quality 80.
 - **Multer error mapping** (all -> `400 Bad Request`):
@@ -70,13 +71,13 @@ The body schema is `.strict()` — extra fields cause a `400 Bad Request`.
 | :--- | :--- | :--- | :--- |
 | `name` | `string` | Yes | min length 1 |
 | `email` | `string` | Yes | valid email format |
-| `role` | `enum` | Yes | `BROTHER` or `SISTER` |
-| `revertDate` | `string` | Yes | — |
+| `role` | `enum` | Yes | `BROTHER`, `SISTER`, or `JUMMAH` |
+| `revertDate` | `string` | Conditional | Required only for `BROTHER` and `SISTER`. |
 | `dateOfBirth` | `string` | Yes | full ISO 8601 timestamp, computed age must be `>= 16` |
 | `password` | `string` | Conditional | required if `googleId`/`appleId` absent; must match regex above |
 | `profileImage` | `string` | No (set by fileHandler) | — |
-| `verificationImage` | `string` | No (set by fileHandler) | — |
-| `verificationVideo` | `string` | No (set by fileHandler) | — |
+| `verificationImage` | `string` | Conditional | Required only for `BROTHER` and `SISTER` (in public path). |
+| `verificationVideo` | `string` | Conditional | Required only for `BROTHER` and `SISTER` (in public path). |
 | `googleId` | `string` | No | — |
 | `appleId` | `string` | No | — |
 | `aboutMe` | `string` | No | Short biography or intro |
@@ -137,14 +138,14 @@ Files persisted under `/uploads` with route-defined subfolders:
 | `name` | `string` | Yes | Yes | The user's full legal name as it should appear on their profile. | `Jane Doe` |
 | `email` | `string` | Yes | Yes | Primary email address. Must be globally unique and valid. | `jane@example.com` |
 | `password` | `string` | Yes (if no `googleId`/`appleId`) | Yes (if no `googleId`/`appleId`) | Account password. Must be 8+ chars with mixed case, digit, and special char. | `StrongPassword123!` |
-| `role` | `enum` | Yes (`BROTHER`/`SISTER`) | Yes (`BROTHER`/`SISTER`) | User role. Limited to `BROTHER` or `SISTER` during public registration. | `SISTER` |
-| `revertDate` | `string` | Yes | Yes | The date the user converted to Islam in Full ISO 8601 format. | `2024-05-11T00:00:00.000Z` |
+| `role` | `enum` | Yes (`BROTHER`/`SISTER`/`JUMMAH`) | Yes (`BROTHER`/`SISTER`/`JUMMAH`) | User role. Limited to `BROTHER`, `SISTER`, or `JUMMAH` during public registration. | `SISTER` |
+| `revertDate` | `string` | Conditional | Yes | The date the user converted to Islam in Full ISO 8601 format. Required only for `BROTHER` and `SISTER`. | `2024-05-11T00:00:00.000Z` |
 | `dateOfBirth` | `string` | Yes | Yes | User's birth date in Full ISO 8601 format. Must be 16+ years old. | `1995-05-15T00:00:00.000Z` |
 | `googleId` | `string` | No | No | Optional OAuth ID from Google. | `1234567890` |
 | `appleId` | `string` | No | No | Optional OAuth ID from Apple. | `000123.abc.0987` |
-| `profileImage` | `file` | Yes | No | Profile photo upload (multipart). | — |
-| `verificationImage` | `file` | Yes | No | Government ID or proof image for admin verification. | — |
-| `verificationVideo` | `file` | Yes | No | Short face-verification video for admin review. | — |
+| `profileImage` | `file` | No (Conditional) | No | Profile photo upload (multipart). Optional for `JUMMAH`. | — |
+| `verificationImage` | `file` | Conditional | No | Government ID or proof image for admin verification. Required only for `BROTHER` and `SISTER`. | — |
+| `verificationVideo` | `file` | Conditional | No | Short face-verification video for admin review. Required only for `BROTHER` and `SISTER`. | — |
 | `aboutMe` | `string` | No | No | A short biography or intro about the user. | `I am a teacher...` |
 | `revertStory` | `string` | No | No | The user's personal story of converting to Islam. | `I found Islam through...` |
 | `interests` | `array` | No | No | Array of strings representing user interests. | `["Quran", "Arabic"]` |

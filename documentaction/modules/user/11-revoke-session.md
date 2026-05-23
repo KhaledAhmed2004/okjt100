@@ -2,7 +2,7 @@
 
 ```http
 DELETE /users/me/sessions/:tokenId
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Removes **one** specific device session from the authenticated user's `deviceTokens[]`. The device stops receiving push notifications immediately. The JWT issued to that device **remains valid until natural expiry** — `tokenVersion` is intentionally not bumped (bumping it would invalidate every session, not just this one). For a true "logout this device, invalidate its token now" use [auth/06-logout.md](../auth/06-logout.md) **on the device itself**, or use [12-revoke-all-sessions.md](./12-revoke-all-sessions.md) to nuke everything.
@@ -34,7 +34,7 @@ Enforced by the `auth` middleware before the controller is reached.
 | `RESTRICTED` | `403 Forbidden` (`"message": "Account is no longer active"`). |
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation (Zod — `revokeSessionZodSchema`)
@@ -61,7 +61,7 @@ Enforced by the `auth` middleware before the controller is reached.
 - **Service**: [src/app/modules/user/user.service.ts](../../../src/app/modules/user/user.service.ts) — `revokeMySessionFromDB`
 - **Validation**: [src/app/modules/user/user.validation.ts](../../../src/app/modules/user/user.validation.ts) — `UserValidation.revokeSessionZodSchema`
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `validateRequest(revokeSessionZodSchema)` -> `UserController.revokeMySession`. Comes AFTER the fixed `/me/sessions/revoke-all` route in the file so Express doesn't match `revoke-all` as a `:tokenId`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `validateRequest(revokeSessionZodSchema)` -> `UserController.revokeMySession`. Comes AFTER the fixed `/me/sessions/revoke-all` route in the file so Express doesn't match `revoke-all` as a `:tokenId`.
 
 ---
 

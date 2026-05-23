@@ -3,7 +3,7 @@
 ```http
 POST /auth/change-password
 Content-Type: application/json
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > For an already-logged-in user who wants to change their password without going through the email OTP flow. Validates the current password (defense-in-depth against stolen-token mutation), enforces the password-strength regex on the new password, hashes and stores it, and **bumps `tokenVersion`** — every JWT the user holds becomes invalid on the next request (true global logout). The client must re-authenticate after success.
@@ -37,7 +37,7 @@ Enforced by the `auth` middleware before the controller is reached.
 | `RESTRICTED` | `403 Forbidden` (`"message": "Account is no longer active"`). |
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `ADMIN`, `BROTHER`, `SISTER` ([auth.route.ts:81](../../../src/app/modules/auth/auth.route.ts#L81)).
+- **Allowed roles**: `SUPER_ADMIN`, `ADMIN`, `BROTHER`, `SISTER`, `JUMMAH` ([auth.route.ts:81](../../../src/app/modules/auth/auth.route.ts#L81)).
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation (Zod — `createChangePasswordZodSchema`)
@@ -86,7 +86,7 @@ This is documented project-wide policy: changing the password rotates `tokenVers
 - **Service**: [src/app/modules/auth/auth.service.ts](../../../src/app/modules/auth/auth.service.ts) — `changePasswordToDB`
 - **Validation**: [src/app/modules/auth/auth.validation.ts](../../../src/app/modules/auth/auth.validation.ts) — `AuthValidation.createChangePasswordZodSchema`
 
-**Middleware order**: `auth(SUPER_ADMIN, ADMIN, BROTHER, SISTER)` -> `validateRequest(createChangePasswordZodSchema)` -> `AuthController.changePassword`.
+**Middleware order**: `auth(SUPER_ADMIN, ADMIN, BROTHER, SISTER, JUMMAH)` -> `validateRequest(createChangePasswordZodSchema)` -> `AuthController.changePassword`.
 
 ---
 

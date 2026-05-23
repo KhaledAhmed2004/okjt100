@@ -16,7 +16,7 @@ Two parallel surfaces consume the same backend:
 
 | Surface | Audience | Goal |
 |---|---|---|
-| **Mobile App** (Flutter) | Users (`BROTHER` / `SISTER` role) | Discover, favorite, download, and create content; manage personal calendar; subscribe to a paid plan. |
+| **Mobile App** (Flutter) | Users (`BROTHER` / `SISTER` / `JUMMAH` role) | Discover, favorite, download, and create content; manage personal calendar; subscribe to a paid plan. |
 | **Admin Dashboard** (Web) | Platform admins (`SUPER_ADMIN` / `ADMIN` role) | Moderate / verify users, manage content, edit legal pages, monitor growth metrics. |
 
 **Monetization**: Three-tier subscription (Free / Premium / Enterprise) sold through Apple App Store + Google Play with server-side IAP receipt verification. See §9.
@@ -39,7 +39,7 @@ Two parallel surfaces consume the same backend:
 
 | Role | Surface | Capabilities |
 |---|---|---|
-| `BROTHER` / `SISTER` | Mobile | Register/login (email or Google/Apple), manage profile/subscription, join groups, ask imams. |
+| `BROTHER` / `SISTER` / `JUMMAH` | Mobile | Register/login (email or Google/Apple), manage profile/subscription, join groups, ask imams. JUMMAH does not require admin verification and is auto-activated upon OTP verification. |
 | `SUPER_ADMIN` / `ADMIN` | Dashboard | Full admin surface: growth metrics, user CRUD + block, **user verification**, legal CMS. |
 | Public (unauth) | Either | Auth endpoints only (register, login, forgot/reset password, social login, refresh, resend OTP). |
 
@@ -113,7 +113,7 @@ Two parallel surfaces consume the same backend:
 ### Student / Surgeon (Mobile)
 
 ```
-Register → Verify OTP → Auto-Login → Home  (no onboarding screen, direct to Home)
+Register → Verify OTP → Auto-Login (JUMMAH only; BROTHER/SISTER status remains PENDING until admin approval) → Home  (no onboarding screen, direct to Home)
    │
    ├─ Browse / Search (Home + Library)
    │      └► Library tab is locked behind paywall for Free users
@@ -161,7 +161,7 @@ Login (SUPER_ADMIN) → Overview (Growth metrics + Trend charts)
 
 | Entity | Owner | Key Fields | Lifecycle |
 |---|---|---|---|
-| **User** | self / admin | `name`, `email`, `password` (optional for OAuth), `phone`, `country`, `role`, `status` (`ACTIVE` / `RESTRICTED`), `verified`, `favoriteCards[]`, `tokenVersion`, `deviceToken`, `subscriptionPlan`, `subscriptionExpiresAt` | Created → OTP-verified → Active → (optionally Restricted / Deleted) |
+| **User** | self / admin | `name`, `email`, `password` (optional for OAuth), `phone`, `country`, `role`, `status` (`ACTIVE` / `RESTRICTED`), `verified`, `favoriteCards[]`, `tokenVersion`, `deviceToken`, `subscriptionPlan`, `subscriptionExpiresAt` | Created → OTP-verified (JUMMAH auto-ACTIVE, others PENDING) → Active (after Admin approval for BROTHER/SISTER) → (optionally Restricted / Deleted) |
 | **PreferenceCard** | creator (USER) | `cardTitle`, `surgeon{ name, specialty, handPreference, contactNumber, musicPreference }`, `medication`, `supplies[]`, `sutures[]`, `instruments`, `positioningEquipment`, `prepping`, `workflow`, `keyNotes`, `photos[]`, `published`, `verificationStatus` (`UNVERIFIED` / `VERIFIED` / `REJECTED`), `visibility` (`public` / `private`), `downloadCount` | Created (always `UNVERIFIED`) → admin verifies (Enterprise creators only) → `VERIFIED` (visible in public library to paid users) |
 | **Supply** / **Suture** | admin | `name` (unique) | Master catalog entries; auto-created when referenced by name in card payloads. |
 | **Event** | user | `title`, `date`, `time`, `duration` (minutes), `location`, `eventType` (`surgery` \| `meeting` \| `consultation` \| `other`), `linkedPreferenceCard` (optional), `personnel: Array<{ name, role }>` (optional), `notes` (optional) | Created → Reminders fire at T-24h and T-1h |

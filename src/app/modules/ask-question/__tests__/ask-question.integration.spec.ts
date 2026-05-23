@@ -265,4 +265,159 @@ describe('AskQuestionService', () => {
       });
     });
   });
+  // ── JUMMAH role tests ──────────────────────────────────────────────────────
+
+  describe('JUMMAH role — submit and retrieve questions', () => {
+    /** Helper: create a minimal JUMMAH user (no revertDate / verificationImage / verificationVideo). */
+    async function createJummahUser(suffix?: string) {
+      const tag = suffix ?? `${Date.now()}-${Math.random()}`;
+      return User.create({
+        name: `Jummah User ${tag}`,
+        role: 'JUMMAH',
+        email: `jummah-${tag}@example.com`,
+        password: 'password123',
+        dateOfBirth: new Date('1995-06-15'),
+        profileImage: '/default-avatar.svg',
+        // revertDate / verificationImage / verificationVideo are intentionally omitted
+      });
+    }
+
+    it('JUMMAH user can submit a question (model accepts JUMMAH userRole)', async () => {
+      const user = await createJummahUser('submit');
+
+      const result = await AskQuestionService.submitQuestionIntoDB({
+        userId: user._id as any,
+        userRole: 'JUMMAH',
+        question: 'What time is Jummah prayer at the local mosque?',
+      });
+
+      expect(result).toBeDefined();
+      expect(result.userRole).toBe('JUMMAH');
+      expect(result.question).toBe('What time is Jummah prayer at the local mosque?');
+      expect(result.status).toBe('pending');
+      expect(result.answers).toHaveLength(0);
+    });
+
+    it('JUMMAH user can submit a question with an optional image', async () => {
+      const user = await createJummahUser('img');
+
+      const result = await AskQuestionService.submitQuestionIntoDB({
+        userId: user._id as any,
+        userRole: 'JUMMAH',
+        question: 'Is this prayer position correct?',
+        imageUrl: 'https://example.com/prayer-position.jpg',
+      });
+
+      expect(result.imageUrl).toBe('https://example.com/prayer-position.jpg');
+      expect(result.status).toBe('pending');
+    });
+
+    it('JUMMAH user can retrieve only their own questions via getMyQuestionsFromDB', async () => {
+      const jummahUser  = await createJummahUser('mine');
+      const brotherUser = await createUser('other');
+
+      await AskQuestion.create({
+        userId: jummahUser._id,
+        userRole: 'JUMMAH',
+        question: 'My Jummah question',
+      });
+      await AskQuestion.create({
+        userId: brotherUser._id,
+        userRole: 'BROTHER',
+        question: 'Brother question (not mine)',
+      });
+
+      const result = await AskQuestionService.getMyQuestionsFromDB(
+        jummahUser._id.toString(),
+        {},
+      );
+
+      expect(result.data).toHaveLength(1);
+      expect(result.data[0].question).toBe('My Jummah question');
+      expect(result.pagination.total).toBe(1);
+    });
+
+    it('getAllQuestionsFromDB returns JUMMAH, BROTHER, and SISTER questions together', async () => {
+      const jummahUser  = await createJummahUser('all-j');
+      const brotherUser = await createUser('all-b');
+
+      await AskQuestion.create({
+        userId: jummahUser._id,
+        userRole: 'JUMMAH',
+        question: 'Jummah question for admin',
+      });
+      await AskQuestion.create({
+        userId: brotherUser._id,
+        userRole: 'BROTHER',
+        question: 'Brother question for admin',
+      });
+
+      const result = await AskQuestionService.getAllQuestionsFromDB({});
+
+      expect(result.data).toHaveLength(2);
+      const roles = result.data.map((q: any) => q.userRole);
+      expect(roles).toContain('JUMMAH');
+      expect(roles).toContain('BROTHER');
+    });
+
+    it('getAllQuestionsFromDB can filter by userRole=JUMMAH', async () => {
+      const jummahUser  = await createJummahUser('filter-j');
+      const brotherUser = await createUser('filter-b');
+
+      await AskQuestion.create({
+        userId: jummahUser._id,
+        userRole: 'JUMMAH',
+        question: 'Only this should appear',
+      });
+      await AskQuestion.create({
+        userId: brotherUser._id,
+        userRole: 'BROTHER',
+        question: 'Should be filtered out',
+      });
+
+      const result = await AskQuestionService.getAllQuestionsFromDB({ userRole: 'JUMMAH' });
+
+      expect(result.data).toHaveLength(1);
+      expect((result.data[0] as any).userRole).toBe('JUMMAH');
+      expect(result.data[0].question).toBe('Only this should appear');
+    });
+
+    it('admin can answer a JUMMAH question and notification is sent', async () => {
+      const user = await createJummahUser('answer');
+      const question = await AskQuestion.create({
+        userId: user._id,
+        userRole: 'JUMMAH',
+        question: 'How many rakats in Jummah prayer?',
+      });
+
+      const result = await AskQuestionService.answerQuestionInDB(
+        (question as any)._id.toString(),
+        'Jummah prayer consists of 2 rakats.',
+      );
+
+      expect(result.status).toBe('answered');
+      expect(result.answers).toHaveLength(1);
+      expect(result.answers[0].text).toBe('Jummah prayer consists of 2 rakats.');
+      expect(result.answers[0].version).toBe(1);
+      expect(result.answers[0].isActive).toBe(true);
+
+      const NotificationBuilder = (
+        await import('../../../builder/NotificationBuilder/NotificationBuilder')
+      ).default;
+      expect(NotificationBuilder).toHaveBeenCalled();
+    });
+
+    it('model rejects an unrecognised userRole (e.g. "GUEST")', async () => {
+      const user = await createJummahUser('bad-role');
+
+      await expect(
+        AskQuestion.create({
+          userId: user._id,
+          userRole: 'GUEST', // invalid
+          question: 'Should be rejected by schema',
+        }),
+      ).rejects.toThrow();
+    });
+  });
 });
+

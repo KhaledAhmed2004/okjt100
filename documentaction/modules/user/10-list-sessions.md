@@ -2,7 +2,7 @@
 
 ```http
 GET /users/me/sessions
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Lists every device session for the authenticated user. A "session" is one entry in `User.deviceTokens[]` — typically created at login on each device (mobile / tablet / browser). The response returns metadata only: **the raw FCM/APNs push token is never exposed**, only the subdoc id (`tokenId`), `platform`, `appVersion`, and `lastSeenAt`. The client uses `tokenId` to address a specific session in [11-revoke-session.md](./11-revoke-session.md).
@@ -34,7 +34,7 @@ Enforced by the `auth` middleware before the controller is reached.
 | `RESTRICTED` | `403 Forbidden` (`"message": "Account is no longer active"`). |
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation
@@ -63,7 +63,7 @@ For each `deviceTokens[]` entry:
 - **Controller**: [src/app/modules/user/user.controller.ts](../../../src/app/modules/user/user.controller.ts) — `listMySessions`
 - **Service**: [src/app/modules/user/user.service.ts](../../../src/app/modules/user/user.service.ts) — `listMySessionsFromDB`
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `UserController.listMySessions`. No `fileHandler`, no `validateRequest`, no `rateLimitMiddleware`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `UserController.listMySessions`. No `fileHandler`, no `validateRequest`, no `rateLimitMiddleware`.
 
 ---
 

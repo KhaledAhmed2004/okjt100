@@ -2,10 +2,10 @@
 
 ```http
 GET /users/profiles?latitude=23.8103&longitude=90.4125
-Auth: Bearer {{accessToken}} (BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, JUMMAH)
 ```
 
-> Lists public profiles of users within the same community. Brothers see other Brothers, and Sisters see other Sisters. Only active users are listed. Includes distance calculation if coordinates are provided. **Each profile item includes a `connectionStatus` flag so the frontend can conditionally render the Connect button.**
+> Lists public profiles of users within the same community. Brothers see other Brothers, Sisters see other Sisters, and Jummah users see other Jummah users. Only active users are listed. Includes distance calculation if coordinates are provided. **Each profile item includes a `connectionStatus` flag so the frontend can conditionally render the Connect button.**
 
 ## Implementation
 - **Route**: [user.route.ts](file:///src/app/modules/user/user.route.ts)
@@ -13,7 +13,7 @@ Auth: Bearer {{accessToken}} (BROTHER, SISTER)
 - **Service**: [user.service.ts](file:///src/app/modules/user/user.service.ts) — `getUserProfilesFromDB`
 
 ### Business Logic (`getUserProfilesFromDB`)
-1. **Server-Side Scoping**: Automatically filters users by the requesting user's `role` (BROTHER/SISTER) and ensures only `ACTIVE` profiles are visible. Self is excluded.
+1. **Server-Side Scoping**: Automatically filters users by the requesting user's `role` (BROTHER/SISTER/JUMMAH) and ensures only `ACTIVE` profiles are visible. Self is excluded.
 2. **High-Performance Proximity**: Uses MongoDB's native `$geoNear` aggregation for industry-standard proximity sorting.
 3. **Injected Distance**: If `latitude` and `longitude` are provided, the system **always** calculates and injects `distanceInKm` directly at the database level, regardless of the `filter` used.
 4. **Flexible Sorting**:

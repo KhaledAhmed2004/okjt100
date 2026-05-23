@@ -3,12 +3,14 @@ import mongoose from 'mongoose';
 import ApiError from '../../../errors/ApiError';
 import { User } from '../user/user.model';
 import { Chat } from './chat.model';
-import { IChat, IPopulatedChat, IChatListResponse } from './chat.interface';
-import { isOnline, getLastActive } from '../../helpers/presenceHelper';
-import { getUnreadCountCached, setUnreadCount, batchGetUnreadCounts } from '../../helpers/unreadHelper';
+import { IPopulatedChat, IChatListResponse } from './chat.interface';
+import { batchGetUnreadCounts } from '../../helpers/unreadHelper';
 import { errorLogger } from '../../../shared/logger';
 
-const createOrGet = async (userId: string, otherUserId: string): Promise<IPopulatedChat> => {
+const createOrGet = async (
+  userId: string,
+  otherUserId: string,
+): Promise<IPopulatedChat> => {
   // Validate both IDs as valid ObjectIds
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid userId');
@@ -19,7 +21,10 @@ const createOrGet = async (userId: string, otherUserId: string): Promise<IPopula
 
   // Prevent self-chat
   if (userId === otherUserId) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, 'Cannot create a chat with yourself');
+    throw new ApiError(
+      StatusCodes.BAD_REQUEST,
+      'Cannot create a chat with yourself',
+    );
   }
 
   // Verify otherUserId exists in the User collection
@@ -39,11 +44,14 @@ const createOrGet = async (userId: string, otherUserId: string): Promise<IPopula
 
   // Populate participants
   await chat.populate('participants', '_id name profileImage role');
-  
+
   return chat.toObject() as any;
 };
 
-const getList = async (userId: string, searchTerm?: string): Promise<IChatListResponse[]> => {
+const getList = async (
+  userId: string,
+  searchTerm?: string,
+): Promise<IChatListResponse[]> => {
   // Validate userId as a valid ObjectId (throw 400 if invalid)
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new ApiError(StatusCodes.BAD_REQUEST, 'Invalid userId');
@@ -89,8 +97,9 @@ const getList = async (userId: string, searchTerm?: string): Promise<IChatListRe
   // Attach unreadCount and strip the logged-in user from participants
   // so the response only contains the other person in the conversation
   return filteredChats.map((chat, index) => {
-    const participants = (chat.participants as any[])
-      .filter(p => String(p._id) !== String(userId));
+    const participants = (chat.participants as any[]).filter(
+      p => String(p._id) !== String(userId),
+    );
     return {
       ...chat,
       participants,

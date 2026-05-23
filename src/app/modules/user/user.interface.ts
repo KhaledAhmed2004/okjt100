@@ -44,11 +44,11 @@ export interface IUser {
   email: string;
   password?: string;
   role: USER_ROLES;
-  revertDate: Date;
-  dateOfBirth: Date;
-  profileImage: string;
-  verificationImage: string;
-  verificationVideo: string;
+  revertDate?: Date;
+  dateOfBirth?: Date;
+  profileImage?: string;
+  verificationImage?: string;
+  verificationVideo?: string;
   aboutMe?: string;
   revertStory?: string;
   interests: string[];

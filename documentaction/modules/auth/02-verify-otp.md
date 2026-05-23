@@ -9,8 +9,9 @@ Auth: None (Public — OTP validated inline)
 > Single endpoint that handles **two distinct flows** based on the user's `isVerified` state at the moment of OTP submission:
 >
 > - **Registration flow** (`isVerified: false`): flips the user to `isVerified: true` and clears the OTP.
->     - If user status is `PENDING` (new users): Returns a success message but **no tokens**. The user must wait for admin approval.
->     - If user status is `ACTIVE` (e.g. email change): **Auto-logs the user in** by issuing tokens.
+>     - **BROTHER / SISTER role**: Status remains `PENDING` (new users). Returns a success message but **no tokens**. The user must wait for admin approval.
+>     - **JUMMAH role**: Status auto-transitions to `ACTIVE`. **Auto-logs the user in** by issuing tokens (`accessToken`, `refreshToken`).
+>     - **Existing users** (e.g. email change where status is already `ACTIVE`): **Auto-logs the user in** by issuing tokens.
 > - **Forgot-password flow** (`isVerified: true`): sets the one-time `authentication.isResetPassword = true` flag, clears the OTP, and returns a freshly-generated `resetToken`.
 >
 > The branch is decided server-side from the user's existing `isVerified` state.
@@ -29,10 +30,11 @@ Auth: None (Public — OTP validated inline)
 #### 2.6a — Registration flow (`isVerified === false`)
 On match:
 1. `isVerified = true`, `authentication.oneTimeCode = null`, `authentication.expireAt = null`.
-2. **Conditional Response**:
-    - If `status === 'PENDING'`: Returns success data with `email`, `isVerified`, and `status`. No tokens.
-    - If `status === 'ACTIVE'`: Issues `accessToken` + `refreshToken` and returns them in `data`.
-3. Message: `"Email verify successfully"` (or the pending-specific message: `"Email verified successfully. Your account is now pending admin approval. You will receive an email once an administrator approves your account."`).
+2. **Dynamic Auto-Activation for JUMMAH**:
+    - If `role === 'JUMMAH'`, status is automatically updated to `ACTIVE`.
+3. **Conditional Response**:
+    - If user status is `PENDING` (applicable to `BROTHER` and `SISTER` roles): Returns success data with `email`, `isVerified`, and `status`. No tokens. Message: `"Email verified successfully. Your account is now pending admin approval. You will receive an email once an administrator approves your account."`.
+    - If user status is `ACTIVE` (applicable to `JUMMAH` role due to auto-activation, or existing users on email change): Issues `accessToken` + `refreshToken` and returns them in `data`. Message: `"Email verify successfully"`.
 
 #### 2.6b — Forgot-password flow (`verified === true`)
 On match:

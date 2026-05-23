@@ -2,6 +2,7 @@ export enum USER_ROLES {
   SUPER_ADMIN = 'SUPER_ADMIN',
   BROTHER = 'BROTHER',
   SISTER = 'SISTER',
+  JUMMAH = 'JUMMAH',
 }
 
 export enum USER_STATUS {

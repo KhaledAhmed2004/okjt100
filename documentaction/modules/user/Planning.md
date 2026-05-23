@@ -9,35 +9,45 @@ The User module handles profile management, authentication rules, account lifecy
 
 ### 2.1 User Roles
 During registration, users must select their role:
-* **BROTHER (Male)**
-* **SISTER (Female)**
+* **BROTHER (Male)** — Requires admin verification before becoming ACTIVE.
+* **SISTER (Female)** — Requires admin verification before becoming ACTIVE.
+* **JUMMAH** — Community/visitor role. No admin verification needed; auto-activated upon OTP verification.
 
 This selection is used for profile visibility, matching, group permissions, and content filtering.
 
 ### 2.2 Registration Fields
+
+**All roles (BROTHER / SISTER / JUMMAH)**:
 * **Name** (Required)
 * **Email Address** (Required, Unique)
 * **Password** (Required, Hashed)
-* **Revert Duration** (How long since becoming Muslim)
-* **Age** (Minimum: 16 years)
-* **Role Selection** (BROTHER/SISTER)
+* **Date of Birth** (Required, minimum 16 years)
+* **Role Selection** (BROTHER / SISTER / JUMMAH)
+
+**BROTHER / SISTER only** (additional verification fields):
+* **Revert Date** (How long since becoming Muslim — required for BROTHER/SISTER)
 * **Profile Picture** (Verification purposes)
+* **Verification Image** (Manual admin approval)
 * **Verification Video** (Manual admin approval)
+
+> JUMMAH users skip all verification fields and are auto-activated after email OTP verification.
 
 ---
 
 ## 3. Verification System
 
 ### Admin Review Process
-After registration, accounts are set to `pending`. Admins manually review:
-* Profile Picture
+After registration, **BROTHER** and **SISTER** accounts are set to `PENDING`. Admins manually review:
+* Verification Image
 * Verification Video
 
 Admins can **Approve** or **Reject** the user.
 
+> **JUMMAH users bypass this process** — upon successful OTP verification, their account status is automatically set to `ACTIVE` and auth tokens are issued immediately (auto-login).
+
 ### Email Notifications
-* **If Approved**: Acceptance email and welcome message.
-* **If Rejected**: Rejection email with reason.
+* **If Approved (BROTHER/SISTER)**: Acceptance email and welcome message.
+* **If Rejected (BROTHER/SISTER)**: Rejection email with reason.
 
 ---
 
@@ -108,7 +118,7 @@ Users can update their About Me, Revert Story, Interests, Profile Image, and Loc
   "name": "string",
   "email": "string",
   "password": "hashed_string",
-  "role": "BROTHER | SISTER | ADMIN | SUPER_ADMIN",
+  "role": "BROTHER | SISTER | JUMMAH | ADMIN | SUPER_ADMIN",
   "revertDate": "string",
   "age": "number",
   "profileImage": "string",

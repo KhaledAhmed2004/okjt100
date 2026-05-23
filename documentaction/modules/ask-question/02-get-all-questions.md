@@ -35,7 +35,7 @@ Allows the `SUPER_ADMIN` to retrieve a paginated list of all questions submitted
 | :--- | :--- | :--- | :--- |
 | `searchTerm` | `string` | Search within question text | `Wudu` |
 | `status` | `string` | Filter by status (`pending`, `answered`) | `pending` |
-| `userRole` | `string` | Filter by user role (`BROTHER`, `SISTER`) | `SISTER` |
+| `userRole` | `string` | Filter by user role (`BROTHER`, `SISTER`, `JUMMAH`) | `SISTER` |
 | `page` | `number` | Page number | `1` |
 | `limit` | `number` | Items per page | `10` |
 

@@ -3,7 +3,7 @@
 ```http
 PATCH /users/me
 Content-Type: multipart/form-data
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Allows the currently authenticated user to update their own profile (text fields and an optional new `profileImage`). The previous profile image is unlinked from disk when a new one is uploaded.
@@ -37,7 +37,7 @@ Checked after the DB lookup in the auth middleware.
 | `RESTRICTED` | `403 Forbidden` (`"message": "Account is no longer active"`). |
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation (Zod — `updateUserZodSchema`)
@@ -111,7 +111,7 @@ File upload is processed by `fileHandler` **before** validation, so the resultin
 - **Service**: [src/app/modules/user/user.service.ts](file:///src/app/modules/user/user.service.ts) — `updateProfileToDB`
 - **Validation**: [src/app/modules/user/user.validation.ts](file:///src/app/modules/user/user.validation.ts) — `UserValidation.updateUserZodSchema`
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `fileHandler([profileImage])` -> `validateRequest(updateUserZodSchema)` -> `UserController.updateProfile`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `fileHandler([profileImage])` -> `validateRequest(updateUserZodSchema)` -> `UserController.updateProfile`.
 
 ### Service business logic (`updateProfileToDB`)
 1. Resolve `id` from the JWT payload.

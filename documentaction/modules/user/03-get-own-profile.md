@@ -2,7 +2,7 @@
 
 ```http
 GET /users/me
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Returns the **full** profile of the currently authenticated user, including private fields hidden from the public endpoint. Read-only — no DB writes, no side effects.
@@ -38,7 +38,7 @@ Checked after the DB lookup in the auth middleware. **`DELETED` returns 403, not
 > The codebase does not define a `BANNED` status. Do not document `BANNED`.
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation
@@ -81,7 +81,7 @@ All User document fields **except** the excluded list below. Notably included:
 - **Controller**: [src/app/modules/user/user.controller.ts](file:///src/app/modules/user/user.controller.ts) — `getUserProfile`
 - **Service**: [src/app/modules/user/user.service.ts](file:///src/app/modules/user/user.service.ts) — `getUserProfileFromDB`
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `UserController.getUserProfile`. No `fileHandler`, no `validateRequest`, no `rateLimitMiddleware`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `UserController.getUserProfile`. No `fileHandler`, no `validateRequest`, no `rateLimitMiddleware`.
 
 ### Service business logic (`getUserProfileFromDB`)
 1. Resolve `id` from the JWT payload.

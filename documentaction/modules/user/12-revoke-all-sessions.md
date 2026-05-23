@@ -2,7 +2,7 @@
 
 ```http
 POST /users/me/sessions/revoke-all
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Nukes every device session for the authenticated user — clears `deviceTokens[]` entirely **and** bumps `tokenVersion`. Every JWT this user holds (including the one used to call this endpoint) becomes invalid on the next request. The classic "log me out everywhere" / "I lost my phone" button.
@@ -36,7 +36,7 @@ Enforced by the `auth` middleware before the controller is reached.
 | `RESTRICTED` | `403 Forbidden` (`"message": "Account is no longer active"`). |
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation
@@ -66,7 +66,7 @@ If user is missing -> `404` (`"User doesn't exist!"`). Otherwise success.
 - **Controller**: [src/app/modules/user/user.controller.ts](../../../src/app/modules/user/user.controller.ts) — `revokeAllMySessions`
 - **Service**: [src/app/modules/user/user.service.ts](../../../src/app/modules/user/user.service.ts) — `revokeAllMySessionsFromDB`
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `UserController.revokeAllMySessions`. No `validateRequest`, no `rateLimitMiddleware`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `UserController.revokeAllMySessions`. No `validateRequest`, no `rateLimitMiddleware`.
 
 Declared **before** `DELETE /me/sessions/:tokenId` in the route file so Express matches `revoke-all` as a fixed path rather than interpreting it as a `:tokenId` value.
 

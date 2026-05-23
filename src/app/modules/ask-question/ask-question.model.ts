@@ -14,7 +14,7 @@ const AnswerVersionSchema = new Schema(
 const AskQuestionSchema = new Schema<IAskQuestion>(
   {
     userId:   { type: Schema.Types.ObjectId, ref: 'User', required: true },
-    userRole: { type: String, enum: ['BROTHER', 'SISTER'], required: true },
+    userRole: { type: String, enum: ['BROTHER', 'SISTER', 'JUMMAH'], required: true },
     question: { type: String, required: true },
     imageUrl: { type: String },
     status: {

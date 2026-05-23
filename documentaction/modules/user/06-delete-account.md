@@ -3,7 +3,7 @@
 ```http
 DELETE /users/me
 Content-Type: application/json
-Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (SUPER_ADMIN, BROTHER, SISTER, JUMMAH)
 ```
 
 > Lets the authenticated user request deletion of their own account. The account is **soft-deleted** with a 30-day recovery window — during that window the user can come back and re-activate via [auth/10-restore-account.md](../auth/10-restore-account.md). After 30 days, a daily cron job at 03:00 UTC permanently removes the user record and cascade-deletes their owned content (notifications, group activity, ask-imam questions, reset tokens). Subscription history is intentionally retained for billing / IAP-refund audit.
@@ -37,7 +37,7 @@ Enforced by the `auth` middleware before the controller is reached.
 | `RESTRICTED` | `403 Forbidden` (`"message": "Account is no longer active"`). |
 
 ### 2.3 Role-Based Access
-- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`.
+- **Allowed roles**: `SUPER_ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`.
 - **Other roles** -> `403 Forbidden` (`"message": "You don't have permission to access this API"`).
 
 ### 2.4 Input Validation (Zod — `deleteAccountZodSchema`)
@@ -105,7 +105,7 @@ When the cron purges a user, it also deletes (per Q2 product decision: hard dele
 - **Validation**: [src/app/modules/user/user.validation.ts](../../../src/app/modules/user/user.validation.ts) — `UserValidation.deleteAccountZodSchema`
 - **Cron**: [src/app/modules/user/accountPurgeScheduler.ts](../../../src/app/modules/user/accountPurgeScheduler.ts) — `AccountPurgeScheduler` (started in [src/server.ts](../../../src/server.ts))
 
-**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER)` -> `validateRequest(deleteAccountZodSchema)` -> `UserController.requestAccountDeletion`.
+**Middleware order**: `auth(SUPER_ADMIN, BROTHER, SISTER, JUMMAH)` -> `validateRequest(deleteAccountZodSchema)` -> `UserController.requestAccountDeletion`.
 
 ---
 

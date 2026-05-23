@@ -2,11 +2,11 @@
 
 ```http
 GET /ask-question/my-questions
-Auth: Bearer {{accessToken}} (BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, JUMMAH)
 ```
 
 ## 1. Overview
-Allows a registered user (`BROTHER` or `SISTER`) to retrieve a paginated list of questions they have submitted.
+Allows a registered user (`BROTHER`, `SISTER`, or `JUMMAH`) to retrieve a paginated list of questions they have submitted.
 
 ---
 

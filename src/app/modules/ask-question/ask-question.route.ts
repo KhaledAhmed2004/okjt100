@@ -11,7 +11,7 @@ const router = express.Router();
 // User routes
 router.post(
   '/',
-  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.JUMMAH),
   fileHandler([{ name: 'image', maxCount: 1 }]),
   validateRequest(AskQuestionValidation.submitQuestionZodSchema),
   AskQuestionController.submitQuestion,
@@ -23,7 +23,7 @@ router.post(
 // If you add GET /:questionId in the future, register it BELOW this route.
 router.get(
   '/my-questions',
-  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER),
+  auth(USER_ROLES.BROTHER, USER_ROLES.SISTER, USER_ROLES.JUMMAH),
   AskQuestionController.getMyQuestions,
 );
 

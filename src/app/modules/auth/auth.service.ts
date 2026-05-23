@@ -249,17 +249,25 @@ const verifyEmailToDB = async (payload: IVerifyEmail) => {
     );
 
     if (updatedUser?.status === USER_STATUS.PENDING) {
-      message =
-        'Email verified successfully. Your account is now pending admin approval. You will receive an email once an administrator approves your account.';
-      return {
-        data: {
-          email: updatedUser.email,
-          isVerified: updatedUser.isVerified,
-          status: updatedUser.status,
-        },
-        message,
-        tokens: null,
-      };
+      if (updatedUser.role === USER_ROLES.JUMMAH) {
+        // Automatically make them ACTIVE since they do not need admin approval
+        await User.findOneAndUpdate(
+          { _id: updatedUser._id },
+          { $set: { status: USER_STATUS.ACTIVE } }
+        );
+      } else {
+        message =
+          'Email verified successfully. Your account is now pending admin approval. You will receive an email once an administrator approves your account.';
+        return {
+          data: {
+            email: updatedUser.email,
+            isVerified: updatedUser.isVerified,
+            status: updatedUser.status,
+          },
+          message,
+          tokens: null,
+        };
+      }
     }
 
     // Auto-login for users who are already ACTIVE (e.g. email change or re-verify)

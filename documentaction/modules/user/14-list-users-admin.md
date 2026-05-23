@@ -24,7 +24,7 @@ Authorization: Bearer {{accessToken}} (SUPER_ADMIN)
 | :--- | :--- | :--- | :--- |
 | `searchTerm` | Name or email regex search | — | `John` |
 | `email` | Exact or regex email match | — | `dr.john@example.com` |
-| `role` | Filter by role (`SUPER_ADMIN`, `ADMIN`, `BROTHER`, `SISTER`) | — | `BROTHER` |
+| `role` | Filter by role (`SUPER_ADMIN`, `ADMIN`, `BROTHER`, `SISTER`, `JUMMAH`) | — | `BROTHER` |
 | `status` | Filter by status (`ACTIVE`, `PENDING`, `SUSPENDED`, etc.) | — | `PENDING` |
 | `isVerified`| Filter by email verification status | — | `true` |
 | `page` | Pagination page number | `1` | `1` |

@@ -3,11 +3,11 @@
 ```http
 POST /ask-question
 Content-Type: multipart/form-data
-Auth: Bearer {{accessToken}} (BROTHER, SISTER)
+Auth: Bearer {{accessToken}} (BROTHER, SISTER, JUMMAH)
 ```
 
 ## 1. Overview
-Allows a registered user (`BROTHER` or `SISTER`) to submit a new question. The user can optionally attach an image to provide visual context. Questions are initially stored with a `pending` status.
+Allows a registered user (`BROTHER`, `SISTER`, or `JUMMAH`) to submit a new question. The user can optionally attach an image to provide visual context. Questions are initially stored with a `pending` status.
 
 > **Response format**: See [Standard Response Envelope](../../README.md#standard-response-envelope)
 
@@ -17,7 +17,7 @@ Allows a registered user (`BROTHER` or `SISTER`) to submit a new question. The u
 
 ### 2.1 Authentication & Account Status
 - **Protected route** — requires a valid `Bearer` token.
-- **Role restriction**: Only users with the role `BROTHER` or `SISTER` can submit questions.
+- **Role restriction**: Only users with the role `BROTHER`, `SISTER`, or `JUMMAH` can submit questions.
 - **Status check**: The [auth middleware](../../../src/app/middlewares/auth.ts) automatically blocks access if the user status is `DELETED`, `RESTRICTED`, `SUSPENDED`, `REJECTED`, or `INACTIVE`.
 - **Identity & Role**: Both `userId` and `userRole` are automatically extracted from the authenticated token and associated with the record for security and historical tracking.
 
@@ -66,7 +66,7 @@ File upload is processed by `fileHandler` **before** validation.
 - **Service**: [src/app/modules/ask-question/ask-question.service.ts](../../../src/app/modules/ask-question/ask-question.service.ts) — `submitQuestionIntoDB`
 - **Validation**: [src/app/modules/ask-question/ask-question.validation.ts](../../../src/app/modules/ask-question/ask-question.validation.ts) — `AskQuestionValidation.submitQuestionZodSchema`
 
-**Middleware order**: `auth(BROTHER, SISTER)` -> `fileHandler([{ name: 'image', maxCount: 1 }])` -> `validateRequest(AskQuestionValidation.submitQuestionZodSchema)` -> `AskQuestionController.submitQuestion`.
+**Middleware order**: `auth(BROTHER, SISTER, JUMMAH)` -> `fileHandler([{ name: 'image', maxCount: 1 }])` -> `validateRequest(AskQuestionValidation.submitQuestionZodSchema)` -> `AskQuestionController.submitQuestion`.
 
 ---
 
