@@ -1,235 +1,197 @@
-# Implementation Plan: Group Module Load Testing
+# Implementation Plan: group-load-testing
 
 ## Overview
 
-Implement a single TypeScript file at `src/app/modules/group/__tests__/group.load.spec.ts` that provides an in-process load testing suite for the Group API. The file uses the existing Vitest + supertest + MongoMemoryReplSet infrastructure and adds `fast-check` for property-based tests on utility functions. All load scenarios run inside Vitest with `{ timeout: 120000 }` per test and are guarded by `SKIP_LOAD_TESTS` / `LOAD_TEST_THRESHOLDS_ENABLED` env vars.
+Implement a k6-based load testing suite for the Group API. The work splits into three phases: (1) infrastructure — directory layout, thresholds config, auth helper, npm scripts, and `.gitignore` update; (2) seed script — Node.js + mongoose + faker fixture generator; (3) k6 scenario files and the main entry point. Property-based tests for the seed helper and auth helper run via vitest + fast-check.
+
+---
 
 ## Tasks
 
-- [ ] 1. Install fast-check and scaffold the test file skeleton
-  - Run `npm install --save-dev fast-check` to add the PBT library
-  - Create `src/app/modules/group/__tests__/group.load.spec.ts` with:
-    - All `vi.mock` calls (NotificationBuilder, notificationsHelper, redisClient) mirroring `group.e2e.spec.ts`
-    - All threshold constants at the top of the file: `READ_P95_THRESHOLD_MS`, `WRITE_P95_THRESHOLD_MS`, `SCENARIO_P95_THRESHOLD_MS`, `MAX_ERROR_RATE`, and all `BASELINE_*` constants
-    - `SKIP` constant derived from `process.env.SKIP_LOAD_TESTS === 'true'`
-    - All TypeScript interfaces: `LatencyResult`, `Stats`, `ScenarioResult`, `StepResult`, `FixtureData`, `SeedCount`
-    - Empty stubs for all utility functions and the top-level `describe` block
-  - _Requirements: 1.1, 1.2, 1.8, 1.9, 7.1, 8.1, 8.4, 8.5_
+- [ ] 1. Scaffold project structure and central threshold config
+  - [ ] 1.1 Create `load-tests/` directory tree and `config/thresholds.js`
+    - Create directories: `load-tests/config/`, `load-tests/helpers/`, `load-tests/scenarios/`, `load-tests/reports/` (empty placeholder)
+    - Implement `load-tests/config/thresholds.js` exporting the `THRESHOLDS` object with all nine threshold entries (baseline p95<500, read_load p95<1000 + rate<0.01, write_load p95<2000 + rate<0.05, user_journey p95<3000, spike rate<0.05, role_auth rate<0.001, checks rate==1.0)
+    - _Requirements: 1.1, 1.2, 7.1, 7.2_
 
-- [ ] 2. Implement core utility functions
-  - [ ] 2.1 Implement `measureLatency` and `runConcurrent`
-    - `measureLatency` wraps a supertest call with `performance.now()` timing; catches errors and returns `{ durationMs, status: 0 }` on failure
-    - `runConcurrent` slices the request array into batches of `concurrency` and runs each batch with `Promise.all`, collecting all `LatencyResult` objects
-    - _Requirements: 1.3, 1.4_
+  - [ ] 1.2 Update `package.json` with load test npm scripts
+    - Add `"load:seed": "node load-tests/helpers/seed.js"`
+    - Add `"load:test": "k6 run --out web-dashboard load-tests/group.load.js"`
+    - Add `"load:report": "k6 run load-tests/group.load.js"`
+    - Add `"load:ci": "k6 run load-tests/group.load.js --out json=load-tests/reports/results.json"`
+    - _Requirements: 1.10_
 
-  - [ ]* 2.2 Write property test for `runConcurrent` (Property 1)
-    - **Property 1: `runConcurrent` returns exactly N results for any N and concurrency C**
-    - Use `fc.asyncProperty(fc.integer({ min: 1, max: 20 }), fc.integer({ min: 1, max: 10 }), ...)` with `numRuns: 100`
-    - Factories resolve immediately with `{ durationMs: 1, status: 200 }`
-    - **Validates: Requirements 1.3**
+  - [ ] 1.3 Update `.gitignore` with `load-tests/reports/`
+    - Append `load-tests/reports/` to `.gitignore`
+    - _Requirements: 1.11, 9.7_
 
-  - [ ]* 2.3 Write property test for `measureLatency` (Property 2)
-    - **Property 2: `measureLatency` captures non-negative duration and correct status**
-    - Use `fc.integer({ min: 100, max: 599 })` to generate arbitrary status codes
-    - Assert `durationMs >= 0` and `status === generated status`; assert no throw on non-2xx
-    - **Validates: Requirements 1.4**
+- [ ] 2. Implement `load-tests/helpers/auth.js`
+  - [ ] 2.1 Write `auth.js` token helper module
+    - Implement `getUser(fixtures, role, vuIndex)` — selects from `adminUser`, `brotherUsers`, or `sisterUsers` pool using `vuIndex % pool.length`
+    - Implement `getToken(fixtures, role, vuIndex)` — delegates to `getUser`, returns `.token`
+    - Implement `getAuthHeaders(fixtures, role, vuIndex)` — returns `{ Authorization: "Bearer <token>" }`
+    - Pure JS module; no k6 imports; works in both k6 and Node contexts
+    - _Requirements: 1.3_
 
-  - [ ] 2.4 Implement `computeStats` and `toScenarioResult`
-    - `computeStats` sorts durations, computes min/max/mean and percentiles (p50, p95, p99) via linear interpolation; throws on empty array
-    - `toScenarioResult` calls `computeStats` on durations, counts failed results (status < 200 or ≥ 300), and returns `ScenarioResult` with `errorRate`, `totalRequests`, `failedRequests`
+  - [ ]* 2.2 Write property test for `auth.js` — Property 1 & 2: auth enforcement invariants
+    - Create `load-tests/__tests__/auth.test.js`
+    - Install `fast-check` if not present (check `package.json` first)
+    - **Property 1: BROTHER JWT → 403 on admin endpoints** — for any `vuIndex` in [0,9] and any admin endpoint, `getAuthHeaders` returns a header with a BROTHER token; assert token role field decodes to `BROTHER`
+    - **Property 2: SISTER JWT → 403 on BROTHER-typed group endpoints** — for any `vuIndex`, `getUser(fixtures, 'sister', vuIndex)` always returns an entry from `sisterUsers`; assert round-robin wraps correctly for all indices
+    - Use `fc.integer({ min: 0, max: 99 })` as the VU index generator; run 100 iterations
+    - **Validates: Requirements 10.2, 10.3, 10.6**
+
+- [ ] 3. Implement `load-tests/helpers/seed.js`
+  - [ ] 3.1 Write seed script skeleton — env loading, DB connection, and cleanup
+    - `require` dotenv (load from project root), mongoose, bcrypt, jsonwebtoken, fs, path, `@faker-js/faker`
+    - Validate `MONGODB_URI` / `DATABASE_URL` env var; exit 1 with descriptive message if missing
+    - Validate `JWT_SECRET`; exit 1 if missing
+    - Import existing Mongoose models: `User`, `Group`, `GroupPost`, `GroupMember` (locate model paths in `src/`)
+    - Implement idempotent cleanup: `User.deleteMany({ email: /^loadtest-/ })`, `Group.deleteMany({ category: 'load-testing' })`, `GroupPost.deleteMany({ content: /load-test-seed/ })`, `GroupMember.deleteMany({})`
+    - _Requirements: 1.4, 1.7, 1.8_
+
+  - [ ] 3.2 Write fixture creation logic in `seed.js`
+    - Implement `signToken(user)` using `jwt.sign({ id, role, email, tokenVersion: 0 }, JWT_SECRET, { expiresIn: JWT_EXPIRE || '30d' })`
+    - Create 1 SUPER_ADMIN user with email `loadtest-admin@test.com`
+    - Create 10 BROTHER users with emails `loadtest-brother-{0..9}@test.com`; password `bcrypt.hashSync('LoadTest123!', 10)`; `status: 'ACTIVE'`, `isVerified: true`
+    - Create 10 SISTER users with emails `loadtest-sister-{0..9}@test.com`; same password hash and status
+    - Create 2 BROTHER groups (`category: 'load-testing'`, `userType: 'BROTHER'`)
+    - Create 2 SISTER groups (`category: 'load-testing'`, `userType: 'SISTER'`)
+    - Create 5 posts per group (20 total) with `content: 'load-test-seed ' + faker.lorem.sentence()`
     - _Requirements: 1.5_
 
-  - [ ]* 2.5 Write property test for `computeStats` ordering invariant (Property 3)
-    - **Property 3: `computeStats` satisfies `min ≤ p50 ≤ p95 ≤ p99 ≤ max` and `mean ∈ [min, max]`**
-    - Use `fc.array(fc.float({ min: 0, max: 10000 }), { minLength: 1, maxLength: 200 })` with `numRuns: 100`
-    - **Validates: Requirements 1.5**
+  - [ ] 3.3 Write `fixtures.json` output and teardown in `seed.js`
+    - Build the `fixtures` object: `{ adminUser: {id, email, token}, brotherUsers: [{id, email, token}×10], sisterUsers: [{id, email, token}×10], brotherGroups: [{id, name}×2], sisterGroups: [{id, name}×2], posts: [{id, groupId}×20] }`
+    - Write to `load-tests/fixtures.json` via `fs.writeFileSync`
+    - Wrap entire seed function in `try/catch/finally`; `finally` calls `mongoose.disconnect()`; catch logs error and calls `process.exit(1)`; success calls `process.exit(0)`
+    - _Requirements: 1.5, 1.6, 1.8_
 
-- [ ] 3. Implement `createAuthUser` and `seedFixtures`
-  - [ ] 3.1 Implement `createAuthUser`
-    - Mirror the helper from `group.e2e.spec.ts`: create a User document with `isVerified: true`, `status: USER_STATUS.ACTIVE`, unique email via `Date.now() + Math.random()`, and return `{ user, token }` with a 1h JWT
-    - _Requirements: 1.6, 1.7_
+  - [ ]* 3.4 Write property test for `seed.js` — Property 4: fixture completeness invariant
+    - Create `load-tests/__tests__/seed.test.js`
+    - **Property 4: Fixture Completeness Invariant** — after running seed, `fixtures.json` must contain all six required top-level keys with correct types and minimum cardinality
+    - Assert `adminUser` has `{ id: String, email: String, token: String }`
+    - Assert `brotherUsers.length >= 10`, `sisterUsers.length >= 10`
+    - Assert `brotherGroups.length >= 2`, `sisterGroups.length >= 2`
+    - Assert `posts.length >= 10`
+    - Assert every user entry has `{ id: String, token: String }`
+    - This is a structural invariant test (not randomized); run as a standard `it` after executing seed against a test DB
+    - **Validates: Requirements 1.5, 1.6**
 
-  - [ ] 3.2 Implement `seedFixtures`
-    - Step 1: Create `count.users` BROTHER users via `createAuthUser`
-    - Step 2: Create `count.adminUsers ?? 2` SUPER_ADMIN users via `createAuthUser`
-    - Step 3: Insert `count.groups` Group documents directly via `Group.insertMany` (faker name, description, `userType: BROTHER`, faker category, `memberCount: 0`)
-    - Step 4: For each group, create `GroupMember` documents for all BROTHER users and increment `memberCount` to match (use direct `GroupMember.insertMany` + `Group.findByIdAndUpdate` to set `memberCount`)
-    - Step 5: For each group, create `count.postsPerGroup` posts via `GroupPost.create`, cycling through users
-    - Return `FixtureData`
-    - _Requirements: 1.6, 1.7_
+- [ ] 4. Checkpoint — verify seed and auth helper
+  - Ensure `node load-tests/helpers/seed.js` runs without errors against a local MongoDB instance
+  - Ensure `fixtures.json` is written with correct structure
+  - Ensure all tests in `load-tests/__tests__/` pass (`npm run test:run -- load-tests/__tests__`)
+  - Ask the user if questions arise before proceeding to k6 scenario files.
 
-  - [ ]* 3.3 Write property test for `seedFixtures` document counts (Property 4)
-    - **Property 4: `seedFixtures` creates exactly U users, G groups, and G×P posts with correct user fields**
-    - Use `fc.record({ users: fc.integer({ min: 1, max: 5 }), groups: fc.integer({ min: 1, max: 3 }), postsPerGroup: fc.integer({ min: 1, max: 3 }) })` with `numRuns: 20`
-    - Assert document counts in DB and that all users have `isVerified: true` and `status: ACTIVE`
-    - **Validates: Requirements 1.6, 1.7**
+- [ ] 5. Implement k6 scenario files
+  - [ ] 5.1 Write `load-tests/scenarios/baseline.js`
+    - Export `baselineScenario` config: `{ executor: 'per-vu-iterations', vus: 1, iterations: 1, exec: 'runBaseline' }`
+    - Load `fixtures` via `SharedArray` reading `../fixtures.json`
+    - Implement `runBaseline()`: send 7 sequential requests (GET /groups, GET /groups/:id, POST /groups/:id/join, GET /groups/:id/posts, POST /groups/:id/posts, POST /posts/:id/like, POST /posts/:id/comments) using BROTHER user index 0
+    - Tag each request with `{ name: '<endpoint pattern>' }`
+    - `check` each response for 2xx status
+    - Log duration per endpoint via `console.log`
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 4. Implement `assertThresholds` and lifecycle hooks
-  - [ ] 4.1 Implement `assertThresholds`
-    - Check `process.env.LOAD_TEST_THRESHOLDS_ENABLED !== 'false'`; if enabled, use `expect(result.p95).toBeLessThanOrEqual(thresholds.p95Ms)` and `expect(result.errorRate).toBeLessThanOrEqual(thresholds.maxErrorRate)` with descriptive messages
-    - If disabled, emit `console.warn` with violation details and return without throwing
-    - _Requirements: 7.2, 7.3, 7.4, 7.5_
+  - [ ] 5.2 Write `load-tests/scenarios/read-load.js`
+    - Export `readLoadScenario` config: `{ executor: 'constant-vus', vus: 50, duration: '30s', exec: 'runReadLoad' }`
+    - Load `fixtures` via `SharedArray`
+    - Import `readCheckFailures` counter from `../group.load.js`
+    - Implement `runReadLoad()`: 4 read requests (GET /groups, GET /groups/:id, GET /groups/:id/posts, GET /posts/:id/comments) using `__VU - 1` for round-robin selection across groups and posts
+    - `check` each response for status 200; increment `readCheckFailures` on failure
+    - Add `sleep(1)` between iterations
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.6, 3.7_
 
-  - [ ] 4.2 Wire up `beforeAll`, `afterAll`, and `beforeEach` lifecycle hooks
-    - `beforeAll`: disconnect any existing mongoose connection, create `MongoMemoryReplSet` (count: 1), connect mongoose, call `seedFixtures({ users: 50, adminUsers: 5, groups: 3, postsPerGroup: 10 })` and store result in a module-level `fixtures` variable
-    - `afterAll`: close mongoose connection, stop replSet
-    - `beforeEach`: clear all collections via `mongoose.connection.collections`, call `vi.clearAllMocks()`, reset `global.io` mock
-    - _Requirements: 1.1, 1.2, 1.8, 8.2_
+  - [ ] 5.3 Write `load-tests/scenarios/write-load.js`
+    - Export `writeLoadScenario` config: `{ executor: 'constant-vus', vus: 20, duration: '30s', exec: 'runWriteLoad' }`
+    - Load `fixtures` via `SharedArray`
+    - Implement `runWriteLoad()`: 4 sequential write operations (join → create post → like → comment) using `__VU - 1` for user/group selection
+    - Handle join 400 (already member) as non-fatal for flow control; abort iteration on other non-2xx join responses
+    - Capture `postId` from create-post response body; fall back to fixture post if extraction fails
+    - `check` each response; add `sleep(1)` between iterations
+    - _Requirements: 4.1, 4.2, 4.3, 4.5, 4.7, 4.8, 4.9, 4.10_
 
-- [ ] 5. Implement Utility Unit Tests and Baseline Performance describe blocks
-  - [ ] 5.1 Implement `describe('Utility Unit Tests')` block
-    - Wire the four property-based tests from tasks 2.2, 2.3, 2.5, and 3.3 into this describe block
-    - Add a unit test for `assertThresholds` with values above/below thresholds and with `LOAD_TEST_THRESHOLDS_ENABLED=false`
-    - _Requirements: 1.3, 1.4, 1.5, 1.6, 1.7_
+  - [ ] 5.4 Write `load-tests/scenarios/user-journey.js`
+    - Export `userJourneyScenario` config: `{ executor: 'constant-vus', vus: 10, duration: '30s', exec: 'runUserJourney' }`
+    - Load `fixtures` via `SharedArray`
+    - Implement `runUserJourney()`: 7 ordered steps (browse → view group → join → read feed → create post → like → comment) with `sleep(1)` between each step
+    - Capture `postId` from Step 5 response; use it in Steps 6 and 7; fall back to fixture post if Step 5 fails
+    - Implement `step(name, res)` helper that calls `check` and logs step name, status, and body on failure
+    - Tag each request with journey step name (e.g., `journey:browse`, `journey:join`)
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.6, 5.7, 5.8_
 
-  - [ ] 5.2 Implement `describe('Baseline Performance')` block
-    - Single `it` block (timeout: 30000) that calls `measureLatency` once per endpoint for all 7 endpoints: `GET /groups`, `GET /groups/:id`, `GET /groups/:id/posts`, `POST /groups/:id/join`, `POST /groups/:id/posts`, `POST /posts/:id/like`, `POST /posts/:id/comments`
-    - Assert each duration is within its `BASELINE_*` constant
-    - Log results as `console.table([{ endpoint, method, durationMs, statusCode }])`
-    - Use `it.skipIf(SKIP)` guard
-    - _Requirements: 2.1–2.8_
+  - [ ]* 5.5 Write property test for user-journey — Property 3: postId capture and reuse
+    - Create `load-tests/__tests__/journey.test.js`
+    - **Property 3: Journey postId Capture and Reuse** — for any mock Step 5 response with a 2xx status and a valid `_id` in `data`, the extracted `postId` must equal `data._id`, must not be null/undefined, and must appear verbatim in the constructed like URL and comment URL
+    - Use `fc.record({ _id: fc.hexaString({ minLength: 24, maxLength: 24 }) })` as the response data generator
+    - Run 100 iterations
+    - **Validates: Requirements 5.3**
 
-- [ ] 6. Implement Concurrent Read Load describe block
-  - [ ] 6.1 Implement 50 VU `GET /api/v1/groups` load test
-    - Build 50 request factories from `fixtures.users.slice(0, 50)`, each calling `measureLatency` on `GET /groups`
-    - Call `runConcurrent(requests, 50)`, compute `toScenarioResult`, log with `console.table`
-    - Call `assertThresholds` with `{ p95Ms: READ_P95_THRESHOLD_MS, maxErrorRate: 0.01 }`
-    - Use `it.skipIf(SKIP)('...', { timeout: 120000 }, ...)`
-    - _Requirements: 3.1, 3.2, 3.6, 3.7_
+  - [ ] 5.6 Write `load-tests/scenarios/spike.js`
+    - Export `spikeScenario` config: `{ executor: 'ramping-vus', stages: [{ duration: '5s', target: 5 }, { duration: '10s', target: 50 }, { duration: '5s', target: 5 }], exec: 'runSpike' }`
+    - Load `fixtures` via `SharedArray`
+    - Implement `runSpike()`: 3 requests per iteration (GET /groups, GET /groups/:id/posts, POST /posts/:id/like) using `__VU - 1` for selection
+    - Implement `getStageTag(elapsed)` helper returning `'ramp_up'` / `'peak'` / `'recovery'` based on `__ITER`
+    - Tag each request with `{ name: '<endpoint>', stage: <stageTag> }`
+    - `check` each response for 2xx
+    - _Requirements: 6.1, 6.2, 6.3, 6.6_
 
-  - [ ] 6.2 Implement 50 VU `GET /api/v1/groups/:groupId/posts` load test
-    - Same pattern as 6.1 but targeting the feed endpoint for `fixtures.groups[0]._id`
-    - Call `assertThresholds` with `{ p95Ms: READ_P95_THRESHOLD_MS, maxErrorRate: 0.01 }`
-    - _Requirements: 3.3, 3.4, 3.6, 3.7_
+  - [ ] 5.7 Write `load-tests/scenarios/role-auth.js`
+    - Export `roleAuthScenario` config: `{ executor: 'constant-vus', vus: 20, duration: '10s', exec: 'runRoleAuth' }`
+    - Load `fixtures` via `SharedArray`
+    - Import `authBypassCount` counter from `../group.load.js`
+    - Implement `runRoleAuth()`: send 5 SUPER_ADMIN-only requests using BROTHER JWT (POST /groups, PATCH /groups/:id, DELETE /groups/:id, DELETE /groups/:id/members/:userId, PATCH /posts/:id/pin)
+    - `check` each response for status exactly 403; increment `authBypassCount` and log endpoint + status + body on any non-403
+    - Send 1 SISTER-on-BROTHER-group request; `check` for 403
+    - Add `sleep(0.5)` between iterations
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7_
 
-  - [ ] 6.3 Implement 20 VU `GET /api/v1/groups/:groupId` load test
-    - Same pattern using 20 users and `fixtures.groups[0]._id`
-    - Call `assertThresholds` with `{ p95Ms: READ_P95_THRESHOLD_MS, maxErrorRate: 0.01 }`
-    - _Requirements: 3.5, 3.6, 3.7_
+- [ ] 6. Implement `load-tests/group.load.js` main entry point
+  - [ ] 6.1 Write `group.load.js` with options, SharedArray, custom metrics, and handleSummary
+    - Import `SharedArray` from `k6/data`; load `./fixtures.json` once shared across all VUs
+    - Import `htmlReport` from `https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js`
+    - Import `textSummary` from `https://jslib.k6.io/k6-summary/0.0.1/index.js`
+    - Import `Counter` from `k6/metrics`; export `readCheckFailures` and `authBypassCount` counters
+    - Import all six scenario config objects (`baselineScenario`, `readLoadScenario`, `writeLoadScenario`, `userJourneyScenario`, `spikeScenario`, `roleAuthScenario`)
+    - Import `THRESHOLDS` from `./config/thresholds.js`
+    - Export `options` object: `{ scenarios: { baseline: {...baselineScenario, startTime:'0s'}, read_load: {...readLoadScenario, startTime:'5s'}, write_load: {...writeLoadScenario, startTime:'5s'}, user_journey: {...userJourneyScenario, startTime:'5s'}, spike: {...spikeScenario, startTime:'40s'}, role_auth: {...roleAuthScenario, startTime:'5s'} }, thresholds: {...THRESHOLDS} }`
+    - Export `default` function with `SKIP_LOAD_TESTS` guard: `if (__ENV.SKIP_LOAD_TESTS === 'true') return;`
+    - Export `handleSummary(data)` returning `{ 'load-tests/reports/report.html': htmlReport(data), stdout: textSummary(data, { indent: ' ', enableColors: true }) }`
+    - _Requirements: 1.9, 1.12, 7.4, 8.1, 9.1, 9.2, 9.3, 9.4, 11.1_
 
-- [ ] 7. Checkpoint — Ensure all tests pass up to this point
-  - Ensure all tests pass, ask the user if questions arise.
+- [ ] 7. Final checkpoint — wire everything together and verify
+  - Ensure all property tests pass: `npm run test:run -- load-tests/__tests__`
+  - Verify `load:seed` script runs successfully and `fixtures.json` is written
+  - Verify `load:ci` script can be invoked with `SKIP_LOAD_TESTS=true` and exits 0 without errors
+  - Verify `load:test` and `load:report` scripts are syntactically valid in `package.json`
+  - Verify `.gitignore` contains `load-tests/reports/`
+  - Ask the user if questions arise.
 
-- [ ] 8. Implement Concurrent Write Load describe block
-  - [ ] 8.1 Implement 20 VU concurrent join → memberCount round-trip test
-    - Create 20 fresh users (not in fixtures) via `createAuthUser` so none have joined the target group
-    - Build 20 join request factories for `fixtures.groups[1]._id`, run with `runConcurrent(..., 20)`
-    - Assert all 20 responses are HTTP 200 (no duplicate membership errors)
-    - Fetch `GET /groups/:groupId` and assert `memberCount` equals the initial seed count + 20
-    - Call `assertThresholds` with `{ p95Ms: WRITE_P95_THRESHOLD_MS, maxErrorRate: 0 }`
-    - _Requirements: 4.1, 4.2, 4.3_
-
-  - [ ] 8.2 Implement 20 VU concurrent post creation test
-    - Use 20 fixture users who are already members of `fixtures.groups[0]`
-    - Build 20 post request factories, run with `runConcurrent(..., 20)`
-    - Assert at least 95% return HTTP 201
-    - Call `assertThresholds` with `{ p95Ms: WRITE_P95_THRESHOLD_MS, maxErrorRate: 0.05 }`
-    - _Requirements: 4.4_
-
-  - [ ] 8.3 Implement 20 VU concurrent like → likesCount round-trip test
-    - Create 20 fresh users (not in fixtures) who join the group first, then concurrently like `fixtures.posts[0]._id`
-    - Assert all 20 like responses are HTTP 200
-    - Fetch the feed and assert `likesCount === 20` on the target post
-    - _Requirements: 4.5, 4.6_
-
-  - [ ] 8.4 Implement 20 VU concurrent comment → commentsCount round-trip test
-    - Use 20 fixture users, build 20 comment request factories for `fixtures.posts[0]._id`
-    - Run with `runConcurrent(..., 20)`, count HTTP 201 responses
-    - Fetch the feed and assert `commentsCount` equals the number of successful 201 responses
-    - _Requirements: 4.7, 4.8, 4.9_
-
-- [ ] 9. Implement User Journey Scenario describe block
-  - [ ] 9.1 Implement `browseAndEngageScenario` helper function
-    - Implement the 6-step sequence: browse groups → join group → read feed → create post → like existing post → add comment
-    - Each step uses `measureLatency` and appends a `StepResult` to the return array
-    - Accept `token: string` and `fixtures: FixtureData` as parameters; use a unique group per call to avoid join conflicts
-    - _Requirements: 5.1, 5.5_
-
-  - [ ] 9.2 Implement 10 VU concurrent `browseAndEngageScenario` test
-    - Create 10 fresh users (not in fixtures) to avoid join conflicts
-    - Run 10 scenario factories concurrently with `Promise.all`
-    - Flatten all `StepResult[]` arrays, compute per-step stats, log with `console.table([{ step, p50, p95, p99, errorRate }])`
-    - Assert at least 90% of all step responses are 2xx
-    - Assert per-step P95 ≤ `SCENARIO_P95_THRESHOLD_MS`
-    - _Requirements: 5.2, 5.3, 5.4, 5.5_
-
-- [ ] 10. Implement Spike Test describe block
-  - [ ] 10.1 Implement 5 → 50 → 5 spike test on `GET /api/v1/groups`
-    - Phase 1: run 5 sequential requests, record results
-    - Phase 2: run 50 concurrent requests via `runConcurrent(..., 50)`, record results
-    - Phase 3: run 5 sequential requests, record results
-    - Compute `toScenarioResult` separately for each phase
-    - Log per-phase error rate and P95 with `console.table`
-    - Assert overall error rate ≤ 5% across all phases
-    - Assert all 5 post-spike (phase 3) responses are HTTP 200
-    - _Requirements: 6.1, 6.2, 6.3, 6.4_
-
-- [ ] 11. Implement Role-Based Load describe block
-  - [ ] 11.1 Implement 5 admin concurrent `POST /api/v1/groups` test
-    - Use `fixtures.adminUsers.slice(0, 5)` to build 5 create-group request factories
-    - Run with `runConcurrent(..., 5)`, assert all 5 return HTTP 201
-    - _Requirements: 9.1, 9.2_
-
-  - [ ] 11.2 Implement 10 admin concurrent `PATCH /posts/:postId/pin` test
-    - Use `fixtures.adminUsers` and 10 different posts from `fixtures.posts`
-    - Run with `runConcurrent(..., 10)`, assert all 10 return HTTP 200
-    - _Requirements: 9.1, 9.3_
-
-  - [ ] 11.3 Implement 20 BROTHER concurrent `POST /api/v1/groups` → all 403 test
-    - Use 20 fixture BROTHER users to build 20 create-group request factories
-    - Run with `runConcurrent(..., 20)`, assert every single response is HTTP 403 (fail if any is 200 or 201)
-    - _Requirements: 9.4, 9.5_
-
-- [ ] 12. Implement Data Integrity describe block
-  - [ ] 12.1 Implement write-then-read round-trip for posts
-    - Run 10 concurrent `POST /groups/:groupId/posts` requests, collect all HTTP 201 response bodies
-    - Fetch `GET /groups/:groupId/posts` and assert every created post ID appears in the feed
-    - _Requirements: 10.1, 10.5_
-
-  - [ ] 12.2 Implement write-then-read round-trip for comments
-    - Run 10 concurrent `POST /posts/:postId/comments` requests, collect all HTTP 201 response bodies
-    - Fetch `GET /posts/:postId/comments` and assert every created comment ID appears in the response
-    - _Requirements: 10.2, 10.5_
-
-  - [ ] 12.3 Implement like toggle idempotence test
-    - Fetch initial `likesCount` L for a post
-    - User A likes the post (assert HTTP 200, message contains "liked")
-    - User A unlikes the post (assert HTTP 200, message contains "unliked")
-    - Fetch post again and assert `likesCount === L`
-    - _Requirements: 10.3_
-
-- [ ] 13. Add final `console.table` summary and wire all scenario results
-  - After all `it` blocks, add an `afterAll` hook (or use the existing one) that calls `console.table` with the accumulated `scenarioResults` array showing `{ scenario, p50, p95, p99, errorRate, threshold, status: pass/fail }`
-  - Accumulate results by pushing to a module-level `scenarioResults` array inside each `it` block before `assertThresholds`
-  - _Requirements: 8.6_
-
-- [ ] 14. Final checkpoint — Ensure all tests pass
-  - Ensure all tests pass, ask the user if questions arise.
+---
 
 ## Notes
 
-- Tasks marked with `*` are optional and can be skipped for faster MVP
+- Tasks marked with `*` are optional and can be skipped for a faster MVP
 - Each task references specific requirements for traceability
-- `fast-check` must be installed before any PBT tasks can run: `npm install --save-dev fast-check`
-- The `beforeEach` hook clears all collections, so each `it` block starts with a clean DB — tests that need pre-seeded data must re-seed or use the `fixtures` variable populated in `beforeAll`
-- For write tests (tasks 8.1, 8.3, 9.2), create fresh users outside `fixtures` to avoid join/like conflicts from the seed data
-- The `SKIP` guard uses `it.skipIf(SKIP)` — utility unit tests and baseline tests should also be guarded
-- Property tests (tasks 2.2, 2.3, 2.5, 3.3) do not hit the database and run fast; they belong in `describe('Utility Unit Tests')`
-- Checkpoints at tasks 7 and 14 ensure incremental validation before moving to the next phase
+- Checkpoints (tasks 4 and 7) ensure incremental validation before moving to the next phase
+- Property tests use `fast-check` via `vitest`; they live in `load-tests/__tests__/` and run with `npm run test:run -- load-tests/__tests__`
+- The seed script imports existing Mongoose models from `src/` — locate the correct model paths before implementing task 3.1
+- k6 scenario files use ES module syntax (`import`/`export`) as required by k6's runtime; seed.js uses CommonJS (`require`) as it runs in Node.js
+- `readCheckFailures` and `authBypassCount` are exported from `group.load.js` and imported by the scenarios that need them — this creates a circular-style dependency that k6 handles correctly at runtime
+
+---
 
 ## Task Dependency Graph
 
 ```json
 {
   "waves": [
-    { "id": 0, "tasks": ["1"] },
-    { "id": 1, "tasks": ["2.1", "2.4", "3.1"] },
-    { "id": 2, "tasks": ["2.2", "2.3", "2.5", "3.2", "4.1"] },
-    { "id": 3, "tasks": ["3.3", "4.2"] },
-    { "id": 4, "tasks": ["5.1", "5.2"] },
-    { "id": 5, "tasks": ["6.1", "6.2", "6.3", "8.1", "8.2", "8.3", "8.4", "9.1", "10.1", "11.1", "11.2", "11.3", "12.1", "12.2", "12.3"] },
-    { "id": 6, "tasks": ["9.2"] },
-    { "id": 7, "tasks": ["13"] }
+    { "id": 0, "tasks": ["1.1", "1.2", "1.3"] },
+    { "id": 1, "tasks": ["2.1", "3.1"] },
+    { "id": 2, "tasks": ["2.2", "3.2"] },
+    { "id": 3, "tasks": ["3.3"] },
+    { "id": 4, "tasks": ["3.4", "5.1", "5.2", "5.3", "5.4", "5.6", "5.7"] },
+    { "id": 5, "tasks": ["5.5", "6.1"] }
   ]
 }
 ```

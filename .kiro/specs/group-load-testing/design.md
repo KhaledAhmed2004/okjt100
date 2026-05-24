@@ -1,240 +1,829 @@
-# Design Document: Group Module Load Testing
+# Design Document: group-load-testing
 
 ## Overview
 
-This design describes an **in-process load testing suite** for the Group API, built entirely within the existing Vitest + supertest + MongoMemoryReplSet infrastructure. No external tools (k6, Artillery, autocannon) are required. The test file lives at `src/app/modules/group/__tests__/group.load.spec.ts` and is discovered automatically by the existing Vitest glob (`src/**/*.spec.ts`).
+This document describes the technical design for a k6-based load testing suite targeting the Group API of the Educoin backend. The suite exercises all 18 Group API endpoints across six named scenarios — baseline, read-load, write-load, user-journey, spike, and role-auth — using pre-seeded fixture data, a real-time web dashboard, and an auto-generated HTML report.
 
-### Goals
-
-- Measure baseline latency per endpoint under single-user conditions
-- Verify correctness and performance under concurrent read and write load
-- Simulate realistic multi-step user journeys
-- Detect authorization bypass under concurrent conditions
-- Verify data integrity (no race conditions, no over/under-counting)
-- Integrate into CI/CD with `SKIP_LOAD_TESTS` and `LOAD_TEST_THRESHOLDS_ENABLED` env vars
+k6 is an external OS process that sends real HTTP requests over the network to a live server. It is not a unit test framework and does not run inside Node.js. The seed script (`helpers/seed.js`) is a plain Node.js script that populates MongoDB and writes `fixtures.json`; k6 reads that file at startup via `SharedArray`.
 
 ### Key Design Decisions
 
-| Decision | Rationale |
-|---|---|
-| In-process via `Promise.all` | Reuses existing MongoMemoryReplSet + supertest; no separate server needed |
-| Vitest `{ timeout: 120000 }` per test | Each scenario gets its own 120 s budget; global `testTimeout` stays at 30 s |
-| Batched concurrency in `runConcurrent` | Prevents OOM from firing 50 requests simultaneously in a single `Promise.all` |
-| `SKIP_LOAD_TESTS=true` guard | Allows resource-constrained CI environments to skip load tests |
-| `LOAD_TEST_THRESHOLDS_ENABLED=false` | Downgrades threshold failures to warnings in constrained environments |
+- **External tool, real network**: k6 measures actual end-to-end latency including middleware, DB queries, and serialization. No mocking.
+- **Fixture-driven**: All test data is created once by `seed.js` before the run. k6 scenarios are read-only consumers of `fixtures.json` — they do not create users or groups dynamically.
+- **Idempotent seeding**: The seed script deletes all documents whose email matches the prefix `loadtest-` before inserting, making it safe to re-run.
+- **Threshold-as-contract**: All thresholds live in `config/thresholds.js` and are imported into `group.load.js`. A breach causes k6 exit code 99, which fails CI automatically.
+- **SKIP_LOAD_TESTS guard**: The `default` function in `group.load.js` checks `__ENV.SKIP_LOAD_TESTS === 'true'` and returns immediately, enabling CI environments without a live server to skip gracefully.
 
 ---
 
 ## Architecture
 
-### High-Level Flow
+### Component Diagram
+
+```mermaid
+graph TD
+    subgraph "Developer Machine / CI Runner"
+        NPM["npm scripts\n(load:seed / load:test / load:ci)"]
+        SEED["seed.js\n(Node.js + mongoose + faker)"]
+        FIX["fixtures.json"]
+        K6["k6 process"]
+        DASH["Web Dashboard\nlocalhost:5665"]
+        RPT["reports/report.html\nreports/results.json"]
+    end
+
+    subgraph "load-tests/"
+        MAIN["group.load.js\n(options + handleSummary)"]
+        THR["config/thresholds.js"]
+        AUTH["helpers/auth.js"]
+        subgraph "scenarios/"
+            BL["baseline.js"]
+            RL["read-load.js"]
+            WL["write-load.js"]
+            UJ["user-journey.js"]
+            SP["spike.js"]
+            RA["role-auth.js"]
+        end
+    end
+
+    subgraph "Live Server"
+        API["Express API\n:3000/api/v1/groups"]
+        DB["MongoDB"]
+    end
+
+    NPM -->|"node"| SEED
+    SEED -->|"mongoose"| DB
+    SEED -->|"writes"| FIX
+    NPM -->|"k6 run"| K6
+    K6 -->|"imports"| MAIN
+    MAIN -->|"imports"| THR
+    MAIN -->|"imports"| BL & RL & WL & UJ & SP & RA
+    BL & RL & WL & UJ & SP & RA -->|"imports"| AUTH
+    AUTH -->|"reads"| FIX
+    K6 -->|"HTTP"| API
+    API -->|"queries"| DB
+    K6 -->|"--out web-dashboard"| DASH
+    K6 -->|"handleSummary"| RPT
+```
+
+### Execution Flow
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  Vitest Test Runner (group.load.spec.ts)                        │
-│                                                                 │
-│  beforeAll ──► MongoMemoryReplSet.create()                      │
-│             ──► mongoose.connect(uri)                           │
-│             ──► seedFixtures({ users, groups, postsPerGroup })  │
-│                                                                 │
-│  Test 1: Baseline ──► measureLatency(fn) × N endpoints          │
-│  Test 2: Concurrent Reads ──► runConcurrent(requests, 50)       │
-│  Test 3: Concurrent Writes ──► runConcurrent(requests, 20)      │
-│  Test 4: User Journey ──► runConcurrent(scenarios, 10)          │
-│  Test 5: Spike ──► phase1(5) → phase2(50) → phase3(5)          │
-│  Test 6: Role-Based ──► admin writes + auth enforcement         │
-│  Test 7: Data Integrity ──► write → read round-trips            │
-│                                                                 │
-│  afterAll ──► mongoose.disconnect() ──► replSet.stop()          │
-└─────────────────────────────────────────────────────────────────┘
-         │
-         │ supertest(app)  [no network — in-process]
-         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Express App (src/app.ts)                                       │
-│  └── /api/v1/groups  (GroupRoutes)                              │
-│       └── GroupController → GroupService → Mongoose             │
-│                                          └── MongoMemoryReplSet │
-└─────────────────────────────────────────────────────────────────┘
-```
+1. npm run load:seed
+   └─ seed.js connects to MongoDB
+   └─ deletes all docs with email prefix "loadtest-"
+   └─ creates: 1 SUPER_ADMIN, 10 BROTHER users, 10 SISTER users,
+               2 BROTHER groups, 2 SISTER groups, 5 posts per group
+   └─ signs JWT for each user (30d expiry)
+   └─ writes fixtures.json
 
-### Module Dependencies
-
-```
-group.load.spec.ts
-  ├── vitest          (describe, it, expect, vi, beforeAll, afterAll)
-  ├── mongoose        (connection management)
-  ├── mongodb-memory-server (MongoMemoryReplSet)
-  ├── supertest       (request(app))
-  ├── @faker-js/faker (faker)
-  ├── src/app         (Express app instance)
-  ├── src/app/modules/user/user.model (User)
-  ├── src/app/modules/group/group.model (Group, GroupMember, GroupPost, PostLike, PostComment)
-  ├── src/helpers/jwtHelper (jwtHelper.createToken)
-  ├── src/config (config.jwt.jwt_secret)
-  └── src/enums/user (USER_ROLES, USER_STATUS)
-  [mocked]
-  ├── src/app/builder/NotificationBuilder/NotificationBuilder
-  ├── src/app/modules/notification/notificationsHelper
-  └── src/shared/redisClient
+2. npm run load:test  (or load:ci)
+   └─ k6 starts, loads group.load.js
+   └─ SharedArray reads fixtures.json once (shared across all VUs)
+   └─ Checks SKIP_LOAD_TESTS — exits 0 if set
+   └─ Runs 6 scenarios (may overlap based on startTime offsets)
+   └─ Each scenario imports its module, executes VU logic
+   └─ k6 collects metrics, evaluates thresholds at end
+   └─ handleSummary writes report.html + stdout summary
+   └─ Exits 0 (all pass) or 99 (threshold breach)
 ```
 
 ---
 
 ## Components and Interfaces
 
-### 1. TypeScript Interfaces
+### File Structure
 
-```typescript
-/** Result of a single measured request */
-interface LatencyResult {
-  durationMs: number;
-  status: number;
-}
+```
+load-tests/
+├── config/
+│   └── thresholds.js          # Exports THRESHOLDS object
+├── helpers/
+│   ├── seed.js                # Node.js seed script (mongoose + faker)
+│   └── auth.js                # Token helpers for k6 scenarios
+├── scenarios/
+│   ├── baseline.js            # 1 VU, 1 iteration, 7 endpoints
+│   ├── read-load.js           # 50 VUs, 30s, read operations
+│   ├── write-load.js          # 20 VUs, 30s, write operations
+│   ├── user-journey.js        # 10 VUs, 30s, full 7-step flow
+│   ├── spike.js               # ramping-vus: 5→50→5
+│   └── role-auth.js           # 20 VUs, 10s, 403 enforcement
+├── reports/                   # .gitignore'd — generated output
+│   ├── report.html
+│   └── results.json
+├── fixtures.json              # Written by seed.js, read by k6
+└── group.load.js              # Main k6 entry point
+```
 
-/** Computed statistics over an array of durations */
-interface Stats {
-  min: number;
-  max: number;
-  mean: number;
-  p50: number;
-  p95: number;
-  p99: number;
-}
+### Interface: fixtures.json
 
-/** Full scenario result including error rate */
-interface ScenarioResult extends Stats {
-  errorRate: number;       // 0.0 – 1.0
-  totalRequests: number;
-  failedRequests: number;
-}
-
-/** Per-step result for user journey scenarios */
-interface StepResult {
-  step: string;
-  p50: number;
-  p95: number;
-  p99: number;
-  errorRate: number;
-}
-
-/** Seeded fixture data returned by seedFixtures */
-interface FixtureData {
-  users: Array<{ user: IUser; token: string }>;
-  adminUsers: Array<{ user: IUser; token: string }>;
-  groups: IGroup[];
-  posts: IGroupPost[];
-}
-
-/** Count parameter for seedFixtures */
-interface SeedCount {
-  users: number;          // BROTHER role users
-  adminUsers?: number;    // SUPER_ADMIN role users (default: 2)
-  groups: number;
-  postsPerGroup: number;
+```json
+{
+  "adminUser": {
+    "id": "<ObjectId>",
+    "email": "loadtest-admin@test.com",
+    "token": "<JWT>"
+  },
+  "brotherUsers": [
+    { "id": "<ObjectId>", "email": "loadtest-brother-0@test.com", "token": "<JWT>" }
+  ],
+  "sisterUsers": [
+    { "id": "<ObjectId>", "email": "loadtest-sister-0@test.com", "token": "<JWT>" }
+  ],
+  "brotherGroups": [
+    { "id": "<ObjectId>", "name": "Load Test Brothers 0" }
+  ],
+  "sisterGroups": [
+    { "id": "<ObjectId>", "name": "Load Test Sisters 0" }
+  ],
+  "posts": [
+    { "id": "<ObjectId>", "groupId": "<ObjectId>" }
+  ]
 }
 ```
 
-### 2. Utility Function Signatures
+Required keys: `adminUser`, `brotherUsers` (≥10), `sisterUsers` (≥10), `brotherGroups` (≥2), `sisterGroups` (≥2), `posts` (≥10, 5 per group).
 
-```typescript
-/**
- * Executes an array of request factories in batches of `concurrency`.
- * Each batch is a Promise.all; batches run sequentially to bound memory.
- * Returns all LatencyResults in order.
- */
-async function runConcurrent(
-  requests: Array<() => Promise<LatencyResult>>,
-  concurrency: number,
-): Promise<LatencyResult[]>
+### Interface: config/thresholds.js
 
-/**
- * Wraps a supertest call and measures wall-clock duration.
- * Returns { durationMs, status } — never throws on HTTP errors.
- */
-async function measureLatency(
-  fn: () => Promise<{ status: number }>,
-): Promise<LatencyResult>
+```js
+// Exported shape — consumed by group.load.js via spread
+export const THRESHOLDS = {
+  'http_req_duration{scenario:"baseline"}':        ['p(95)<500'],
+  'http_req_duration{scenario:"read_load"}':       ['p(95)<1000'],
+  'http_req_failed{scenario:"read_load"}':         ['rate<0.01'],
+  'http_req_duration{scenario:"write_load"}':      ['p(95)<2000'],
+  'http_req_failed{scenario:"write_load"}':        ['rate<0.05'],
+  'http_req_duration{scenario:"user_journey"}':    ['p(95)<3000'],
+  'http_req_failed{scenario:"spike"}':             ['rate<0.05'],
+  'http_req_failed{scenario:"role_auth"}':         ['rate<0.001'],
+  'checks{scenario:"role_auth"}':                  ['rate==1.0'],
+};
+```
 
-/**
- * Computes percentile statistics over an array of durations (ms).
- * Uses linear interpolation for percentiles.
- * Throws if durations is empty.
- */
-function computeStats(durations: number[]): Stats
+### Interface: helpers/auth.js
 
-/**
- * Derives ScenarioResult from an array of LatencyResults.
- * A result is "failed" if status < 200 or status >= 300.
- */
-function toScenarioResult(results: LatencyResult[]): ScenarioResult
+```js
+// getToken(fixtures, role, vuIndex) → string
+// Returns the JWT for the VU at the given index.
+// role: 'brother' | 'sister' | 'admin'
+// vuIndex: used for round-robin selection from the pool
+export function getToken(fixtures, role, vuIndex) { ... }
 
-/**
- * Seeds the database with users, groups, memberships, and posts.
- * All users are BROTHER role (or SUPER_ADMIN for adminUsers).
- * All users have isVerified: true and status: USER_STATUS.ACTIVE.
- * Returns the created documents with their JWT tokens.
- */
-async function seedFixtures(count: SeedCount): Promise<FixtureData>
+// getAuthHeaders(fixtures, role, vuIndex) → { Authorization: "Bearer <token>" }
+export function getAuthHeaders(fixtures, role, vuIndex) { ... }
 
-/**
- * Creates a single verified user with a JWT token.
- * Mirrors the createAuthUser helper in group.e2e.spec.ts.
- */
-async function createAuthUser(
-  role: string,
-  nameSuffix?: string,
-): Promise<{ user: IUser; token: string }>
-
-/**
- * Asserts that a ScenarioResult meets performance thresholds.
- * When LOAD_TEST_THRESHOLDS_ENABLED=false, logs warnings instead of throwing.
- */
-function assertThresholds(
-  result: ScenarioResult,
-  thresholds: { p95Ms: number; maxErrorRate: number },
-  label: string,
-): void
+// getUser(fixtures, role, vuIndex) → { id, email, token }
+export function getUser(fixtures, role, vuIndex) { ... }
 ```
 
 ---
 
 ## Data Models
 
-### Fixture Seeding Strategy
+### Fixture Generation (seed.js)
 
-`seedFixtures` creates data in this order to satisfy foreign-key constraints:
+The seed script uses `@faker-js/faker` (already in devDependencies) and `mongoose` (already in dependencies). It signs JWTs directly using `jsonwebtoken` with the same `JWT_SECRET` and `JWT_EXPIRE_IN` env vars the server uses.
+
+**User document shape created by seed:**
+
+```js
+{
+  name: faker.person.fullName(),
+  role: 'BROTHER' | 'SISTER' | 'SUPER_ADMIN',
+  email: `loadtest-${role}-${index}@test.com`,   // prefix enables idempotent cleanup
+  password: bcrypt.hashSync('LoadTest123!', 10),
+  status: 'ACTIVE',
+  isVerified: true,
+  dateOfBirth: faker.date.birthdate({ min: 18, max: 40, mode: 'age' }),
+  revertDate: new Date(),                         // required for BROTHER/SISTER
+  profileImage: '/default-avatar.svg',
+  verificationImage: 'https://placeholder.com/verification.jpg',
+  verificationVideo: 'https://placeholder.com/verification.mp4',
+  tokenVersion: 0,
+}
+```
+
+**JWT payload shape** (matches what `jwtHelper.createToken` produces and `auth` middleware reads):
+
+```js
+{
+  id: user._id.toString(),
+  role: user.role,
+  email: user.email,
+  tokenVersion: 0,
+}
+// signed with JWT_SECRET, expires in JWT_EXPIRE_IN (or '30d' fallback)
+```
+
+**Group document shape:**
+
+```js
+{
+  name: `Load Test ${userType} Group ${index}`,
+  description: faker.lorem.sentence(),
+  userType: 'BROTHER' | 'SISTER',
+  category: 'load-testing',
+  memberCount: 0,
+}
+```
+
+**Post document shape** (inserted directly into GroupPost collection):
+
+```js
+{
+  groupId: group._id,
+  userId: adminUser._id,
+  content: faker.lorem.paragraph(),
+  attachments: [],
+  likesCount: 0,
+  commentsCount: 0,
+  isPinned: false,
+}
+```
+
+### SharedArray Loading in k6
+
+```js
+// In group.load.js (and each scenario module)
+import { SharedArray } from 'k6/data';
+
+const fixtures = new SharedArray('fixtures', function () {
+  return [JSON.parse(open('../fixtures.json'))];
+})[0];
+```
+
+`SharedArray` deserializes once and shares the read-only data across all VUs, avoiding per-VU memory duplication.
+
+### Custom Metrics
+
+```js
+// Defined in group.load.js, imported by scenarios that need them
+import { Counter } from 'k6/metrics';
+
+export const readCheckFailures  = new Counter('read_check_failures');
+export const authBypassCount    = new Counter('auth_bypass_count');
+```
+
+---
+
+## Pseudocode Per File
+
+### load-tests/helpers/seed.js
 
 ```
-1. Create N BROTHER users  (isVerified: true, status: ACTIVE)
-2. Create M SUPER_ADMIN users
-3. Create G groups  (userType: BROTHER, category from faker)
-4. For each group: join all N users as members (GroupMember docs)
-   → also increments group.memberCount via joinGroupInDB service
-5. For each group: create P posts per group (one per user, cycling)
+REQUIRE dotenv, mongoose, bcrypt, jsonwebtoken, fs, path, faker
+
+LOAD .env from project root
+
+CONST MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL
+IF NOT MONGODB_URI:
+  console.error("MONGODB_URI is not set")
+  process.exit(1)
+
+CONST JWT_SECRET   = process.env.JWT_SECRET
+CONST JWT_EXPIRE   = process.env.JWT_EXPIRE_IN || '30d'
+CONST EMAIL_PREFIX = 'loadtest-'
+
+FUNCTION signToken(user):
+  RETURN jwt.sign({ id: user._id, role: user.role, email: user.email, tokenVersion: 0 },
+                  JWT_SECRET, { expiresIn: JWT_EXPIRE })
+
+ASYNC FUNCTION seed():
+  TRY:
+    await mongoose.connect(MONGODB_URI)
+    console.log("Connected to MongoDB")
+
+    // Idempotent cleanup — delete all prior load-test documents
+    await User.deleteMany({ email: { $regex: '^' + EMAIL_PREFIX } })
+    await Group.deleteMany({ category: 'load-testing' })
+    // Posts/members/likes/comments cascade via groupId cleanup
+    await GroupPost.deleteMany({ content: { $regex: 'load-test-seed' } })
+    await GroupMember.deleteMany({})  // safe: only load-test groups existed
+
+    // Create SUPER_ADMIN
+    adminUser = await User.create({ ...adminShape, email: 'loadtest-admin@test.com' })
+
+    // Create 10 BROTHER users
+    brotherUsers = await User.insertMany([...10 brotherShapes])
+
+    // Create 10 SISTER users
+    sisterUsers = await User.insertMany([...10 sisterShapes])
+
+    // Create 2 BROTHER groups
+    brotherGroups = await Group.insertMany([...2 brotherGroupShapes])
+
+    // Create 2 SISTER groups
+    sisterGroups = await Group.insertMany([...2 sisterGroupShapes])
+
+    // Create 5 posts per group (20 total)
+    posts = []
+    FOR EACH group IN [...brotherGroups, ...sisterGroups]:
+      FOR i IN 0..4:
+        post = await GroupPost.create({ groupId: group._id, userId: adminUser._id,
+                                        content: 'load-test-seed ' + faker.lorem.sentence() })
+        posts.push({ id: post._id.toString(), groupId: group._id.toString() })
+
+    // Build fixtures object
+    fixtures = {
+      adminUser:    { id, email, token: signToken(adminUser) },
+      brotherUsers: brotherUsers.map(u => ({ id, email, token: signToken(u) })),
+      sisterUsers:  sisterUsers.map(u => ({ id, email, token: signToken(u) })),
+      brotherGroups: brotherGroups.map(g => ({ id, name })),
+      sisterGroups:  sisterGroups.map(g => ({ id, name })),
+      posts,
+    }
+
+    // Write fixtures.json
+    fs.writeFileSync(FIXTURES_PATH, JSON.stringify(fixtures, null, 2))
+    console.log("fixtures.json written with", posts.length, "posts")
+
+    await mongoose.disconnect()
+    process.exit(0)
+
+  CATCH error:
+    console.error("Seed failed:", error.message)
+    await mongoose.disconnect().catch(() => {})
+    process.exit(1)
+
+seed()
 ```
 
-**Why direct model inserts for users/groups, but service calls for joins/posts?**
+### load-tests/helpers/auth.js
 
-- Users and groups are pure data — direct `Model.create()` is faster and avoids auth middleware.
-- Joins use the service (`joinGroupInDB`) to correctly increment `memberCount` via MongoDB transactions, matching production behavior.
-- Posts use direct `GroupPost.create()` for speed; `commentsCount` and `likesCount` start at 0.
+```js
+// Pure helper — no k6 imports, works in both k6 and Node contexts
 
-### Performance Threshold Constants
+export function getUser(fixtures, role, vuIndex) {
+  const pool = role === 'admin'   ? [fixtures.adminUser]
+             : role === 'brother' ? fixtures.brotherUsers
+             :                      fixtures.sisterUsers;
+  return pool[vuIndex % pool.length];
+}
 
-```typescript
-// Defined at the top of group.load.spec.ts
-const READ_P95_THRESHOLD_MS    = 1000;   // GET endpoints under 50 VU load
-const WRITE_P95_THRESHOLD_MS   = 2000;   // POST/PATCH endpoints (transactions)
-const SCENARIO_P95_THRESHOLD_MS = 3000;  // Full user journey per step
-const MAX_ERROR_RATE           = 0.05;   // 5% — applies to all scenarios
-const BASELINE_GET_LIST_MS     = 200;    // Single-user GET /groups
-const BASELINE_GET_SINGLE_MS   = 150;    // Single-user GET /groups/:id
-const BASELINE_GET_FEED_MS     = 200;    // Single-user GET /groups/:id/posts
-const BASELINE_JOIN_MS         = 300;    // Single-user POST join (transaction)
-const BASELINE_POST_MS         = 300;    // Single-user POST post
-const BASELINE_LIKE_MS         = 200;    // Single-user POST like
-const BASELINE_COMMENT_MS      = 200;    // Single-user POST comment
+export function getToken(fixtures, role, vuIndex) {
+  return getUser(fixtures, role, vuIndex).token;
+}
+
+export function getAuthHeaders(fixtures, role, vuIndex) {
+  return { Authorization: `Bearer ${getToken(fixtures, role, vuIndex)}` };
+}
+```
+
+### load-tests/config/thresholds.js
+
+```js
+export const THRESHOLDS = {
+  'http_req_duration{scenario:"baseline"}':     ['p(95)<500'],
+  'http_req_duration{scenario:"read_load"}':    ['p(95)<1000'],
+  'http_req_failed{scenario:"read_load"}':      ['rate<0.01'],
+  'http_req_duration{scenario:"write_load"}':   ['p(95)<2000'],
+  'http_req_failed{scenario:"write_load"}':     ['rate<0.05'],
+  'http_req_duration{scenario:"user_journey"}': ['p(95)<3000'],
+  'http_req_failed{scenario:"spike"}':          ['rate<0.05'],
+  'http_req_failed{scenario:"role_auth"}':      ['rate<0.001'],
+  'checks{scenario:"role_auth"}':               ['rate==1.0'],
+};
+```
+
+### load-tests/group.load.js
+
+```js
+import { SharedArray } from 'k6/data';
+import { htmlReport } from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+import { Counter } from 'k6/metrics';
+import { THRESHOLDS } from './config/thresholds.js';
+import { baselineScenario } from './scenarios/baseline.js';
+import { readLoadScenario } from './scenarios/read-load.js';
+import { writeLoadScenario } from './scenarios/write-load.js';
+import { userJourneyScenario } from './scenarios/user-journey.js';
+import { spikeScenario } from './scenarios/spike.js';
+import { roleAuthScenario } from './scenarios/role-auth.js';
+
+export const readCheckFailures = new Counter('read_check_failures');
+export const authBypassCount   = new Counter('auth_bypass_count');
+
+const fixtures = new SharedArray('fixtures', function () {
+  return [JSON.parse(open('./fixtures.json'))];
+})[0];
+
+export const options = {
+  scenarios: {
+    baseline:     { ...baselineScenario,     startTime: '0s'  },
+    read_load:    { ...readLoadScenario,     startTime: '5s'  },
+    write_load:   { ...writeLoadScenario,    startTime: '5s'  },
+    user_journey: { ...userJourneyScenario,  startTime: '5s'  },
+    spike:        { ...spikeScenario,        startTime: '40s' },
+    role_auth:    { ...roleAuthScenario,     startTime: '5s'  },
+  },
+  thresholds: { ...THRESHOLDS },
+};
+
+export default function () {
+  if (__ENV.SKIP_LOAD_TESTS === 'true') {
+    return;
+  }
+  // Each scenario's exec function is defined in its own module.
+  // k6 routes VUs to the correct exec function via the scenario config.
+}
+
+export function handleSummary(data) {
+  return {
+    'load-tests/reports/report.html': htmlReport(data),
+    stdout: textSummary(data, { indent: ' ', enableColors: true }),
+  };
+}
+```
+
+### load-tests/scenarios/baseline.js
+
+```js
+import http from 'k6/http';
+import { check, group } from 'k6';
+import { SharedArray } from 'k6/data';
+import { getAuthHeaders } from '../helpers/auth.js';
+
+const fixtures = new SharedArray('fixtures', () => [JSON.parse(open('../fixtures.json'))])[0];
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+
+export const baselineScenario = {
+  executor: 'per-vu-iterations',
+  vus: 1,
+  iterations: 1,
+  exec: 'runBaseline',
+};
+
+export function runBaseline() {
+  const headers = getAuthHeaders(fixtures, 'brother', 0);
+  const groupId = fixtures.brotherGroups[0].id;
+  const postId  = fixtures.posts[0].id;
+
+  const endpoints = [
+    { tag: 'GET /groups',              fn: () => http.get(`${BASE_URL}/api/v1/groups`, { headers, tags: { name: 'GET /groups' } }) },
+    { tag: 'GET /groups/:id',          fn: () => http.get(`${BASE_URL}/api/v1/groups/${groupId}`, { headers, tags: { name: 'GET /groups/:id' } }) },
+    { tag: 'POST /groups/:id/join',    fn: () => http.post(`${BASE_URL}/api/v1/groups/${groupId}/join`, null, { headers, tags: { name: 'POST /groups/:id/join' } }) },
+    { tag: 'GET /groups/:id/posts',    fn: () => http.get(`${BASE_URL}/api/v1/groups/${groupId}/posts`, { headers, tags: { name: 'GET /groups/:id/posts' } }) },
+    { tag: 'POST /groups/:id/posts',   fn: () => http.post(`${BASE_URL}/api/v1/groups/${groupId}/posts`, JSON.stringify({ content: 'baseline test post' }), { headers: { ...headers, 'Content-Type': 'application/json' }, tags: { name: 'POST /groups/:id/posts' } }) },
+    { tag: 'POST /posts/:id/like',     fn: () => http.post(`${BASE_URL}/api/v1/groups/posts/${postId}/like`, null, { headers, tags: { name: 'POST /posts/:id/like' } }) },
+    { tag: 'POST /posts/:id/comments', fn: () => http.post(`${BASE_URL}/api/v1/groups/posts/${postId}/comments`, JSON.stringify({ comment: 'baseline comment' }), { headers: { ...headers, 'Content-Type': 'application/json' }, tags: { name: 'POST /posts/:id/comments' } }) },
+  ];
+
+  for (const ep of endpoints) {
+    const res = ep.fn();
+    check(res, { [`${ep.tag} status 2xx`]: (r) => r.status >= 200 && r.status < 300 });
+    console.log(`${ep.tag} → ${res.status} | p50 proxy: ${res.timings.duration}ms`);
+  }
+}
+```
+
+### load-tests/scenarios/read-load.js
+
+```js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { SharedArray } from 'k6/data';
+import { getAuthHeaders } from '../helpers/auth.js';
+import { readCheckFailures } from '../group.load.js';
+
+const fixtures = new SharedArray('fixtures', () => [JSON.parse(open('../fixtures.json'))])[0];
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+
+export const readLoadScenario = {
+  executor: 'constant-vus',
+  vus: 50,
+  duration: '30s',
+  exec: 'runReadLoad',
+};
+
+export function runReadLoad() {
+  const vuIndex = __VU - 1;
+  const headers = getAuthHeaders(fixtures, 'brother', vuIndex);
+  // Distribute across available groups to avoid hotspotting
+  const group   = fixtures.brotherGroups[vuIndex % fixtures.brotherGroups.length];
+  const post    = fixtures.posts[vuIndex % fixtures.posts.length];
+
+  const checks = {
+    'GET /groups 200':           http.get(`${BASE_URL}/api/v1/groups`, { headers, tags: { name: 'GET /groups' } }),
+    'GET /groups/:id 200':       http.get(`${BASE_URL}/api/v1/groups/${group.id}`, { headers, tags: { name: 'GET /groups/:id' } }),
+    'GET /groups/:id/posts 200': http.get(`${BASE_URL}/api/v1/groups/${group.id}/posts`, { headers, tags: { name: 'GET /groups/:id/posts' } }),
+    'GET /posts/:id/comments 200': http.get(`${BASE_URL}/api/v1/groups/posts/${post.id}/comments`, { headers, tags: { name: 'GET /posts/:id/comments' } }),
+  };
+
+  for (const [label, res] of Object.entries(checks)) {
+    const ok = check(res, { [label]: (r) => r.status === 200 });
+    if (!ok) readCheckFailures.add(1);
+  }
+
+  sleep(1);
+}
+```
+
+### load-tests/scenarios/write-load.js
+
+```js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { SharedArray } from 'k6/data';
+import { getAuthHeaders } from '../helpers/auth.js';
+
+const fixtures = new SharedArray('fixtures', () => [JSON.parse(open('../fixtures.json'))])[0];
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+
+export const writeLoadScenario = {
+  executor: 'constant-vus',
+  vus: 20,
+  duration: '30s',
+  exec: 'runWriteLoad',
+};
+
+export function runWriteLoad() {
+  const vuIndex = __VU - 1;
+  const headers = { ...getAuthHeaders(fixtures, 'brother', vuIndex), 'Content-Type': 'application/json' };
+  const group   = fixtures.brotherGroups[vuIndex % fixtures.brotherGroups.length];
+
+  // Step 1: Join group (400 = already member → non-fatal for flow, still a check failure)
+  const joinRes = http.post(`${BASE_URL}/api/v1/groups/${group.id}/join`, null,
+    { headers, tags: { name: 'POST /groups/:id/join' } });
+  const joinOk = joinRes.status >= 200 && joinRes.status < 300;
+  const alreadyMember = joinRes.status === 400;
+  check(joinRes, { 'join 2xx or 400': (r) => joinOk || alreadyMember });
+  if (!joinOk && !alreadyMember) return; // unexpected error — abort iteration
+
+  // Step 2: Create post
+  const postRes = http.post(`${BASE_URL}/api/v1/groups/${group.id}/posts`,
+    JSON.stringify({ content: `write-load post ${Date.now()}` }),
+    { headers, tags: { name: 'POST /groups/:id/posts' } });
+  check(postRes, { 'create post 2xx': (r) => r.status >= 200 && r.status < 300 });
+
+  let postId = null;
+  try { postId = JSON.parse(postRes.body).data?._id; } catch (_) {}
+  if (!postId) postId = fixtures.posts[vuIndex % fixtures.posts.length].id;
+
+  // Step 3: Like post
+  const likeRes = http.post(`${BASE_URL}/api/v1/groups/posts/${postId}/like`, null,
+    { headers, tags: { name: 'POST /posts/:id/like' } });
+  check(likeRes, { 'like 2xx': (r) => r.status >= 200 && r.status < 300 });
+
+  // Step 4: Comment
+  const commentRes = http.post(`${BASE_URL}/api/v1/groups/posts/${postId}/comments`,
+    JSON.stringify({ comment: `write-load comment ${Date.now()}` }),
+    { headers, tags: { name: 'POST /posts/:id/comments' } });
+  check(commentRes, { 'comment 2xx': (r) => r.status >= 200 && r.status < 300 });
+
+  sleep(1);
+}
+```
+
+### load-tests/scenarios/user-journey.js
+
+```js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { SharedArray } from 'k6/data';
+import { getAuthHeaders } from '../helpers/auth.js';
+
+const fixtures = new SharedArray('fixtures', () => [JSON.parse(open('../fixtures.json'))])[0];
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+
+export const userJourneyScenario = {
+  executor: 'constant-vus',
+  vus: 10,
+  duration: '30s',
+  exec: 'runUserJourney',
+};
+
+export function runUserJourney() {
+  const vuIndex = __VU - 1;
+  const headers = { ...getAuthHeaders(fixtures, 'brother', vuIndex), 'Content-Type': 'application/json' };
+  const group   = fixtures.brotherGroups[vuIndex % fixtures.brotherGroups.length];
+
+  function step(name, res) {
+    const ok = check(res, { [`${name} 2xx`]: (r) => r && r.status >= 200 && r.status < 300 });
+    if (!ok) {
+      const body = res ? res.body : '(no response)';
+      console.error(`Journey step failed: ${name} | status=${res?.status} | body=${body}`);
+    }
+    return ok;
+  }
+
+  // Step 1: Browse groups
+  const s1 = http.get(`${BASE_URL}/api/v1/groups`, { headers, tags: { name: 'journey:browse' } });
+  step('Step1:browse', s1);
+  sleep(1);
+
+  // Step 2: View group
+  const s2 = http.get(`${BASE_URL}/api/v1/groups/${group.id}`, { headers, tags: { name: 'journey:view-group' } });
+  step('Step2:view-group', s2);
+  sleep(1);
+
+  // Step 3: Join group
+  const s3 = http.post(`${BASE_URL}/api/v1/groups/${group.id}/join`, null, { headers, tags: { name: 'journey:join' } });
+  step('Step3:join', s3);
+  sleep(1);
+
+  // Step 4: Read feed
+  const s4 = http.get(`${BASE_URL}/api/v1/groups/${group.id}/posts`, { headers, tags: { name: 'journey:read-feed' } });
+  step('Step4:read-feed', s4);
+  sleep(1);
+
+  // Step 5: Create post — capture postId
+  const s5 = http.post(`${BASE_URL}/api/v1/groups/${group.id}/posts`,
+    JSON.stringify({ content: `journey post ${__VU} ${Date.now()}` }),
+    { headers, tags: { name: 'journey:create-post' } });
+  step('Step5:create-post', s5);
+
+  let postId = null;
+  try { postId = JSON.parse(s5.body).data?._id; } catch (_) {}
+  if (!postId) {
+    console.error(`Step5: could not extract postId from response, falling back to fixture`);
+    postId = fixtures.posts[vuIndex % fixtures.posts.length].id;
+  }
+  sleep(1);
+
+  // Step 6: Like the post created in Step 5
+  const s6 = http.post(`${BASE_URL}/api/v1/groups/posts/${postId}/like`, null,
+    { headers, tags: { name: 'journey:like' } });
+  step('Step6:like', s6);
+  sleep(1);
+
+  // Step 7: Comment on the post created in Step 5
+  const s7 = http.post(`${BASE_URL}/api/v1/groups/posts/${postId}/comments`,
+    JSON.stringify({ comment: `journey comment ${__VU} ${Date.now()}` }),
+    { headers, tags: { name: 'journey:comment' } });
+  step('Step7:comment', s7);
+  sleep(1);
+}
+```
+
+### load-tests/scenarios/spike.js
+
+```js
+import http from 'k6/http';
+import { check } from 'k6';
+import { SharedArray } from 'k6/data';
+import { getAuthHeaders } from '../helpers/auth.js';
+
+const fixtures = new SharedArray('fixtures', () => [JSON.parse(open('../fixtures.json'))])[0];
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+
+export const spikeScenario = {
+  executor: 'ramping-vus',
+  stages: [
+    { duration: '5s',  target: 5  },   // ramp_up
+    { duration: '10s', target: 50 },   // peak
+    { duration: '5s',  target: 5  },   // recovery
+  ],
+  exec: 'runSpike',
+};
+
+// Stage detection: approximate by elapsed time within scenario
+// ramp_up: 0–5s, peak: 5–15s, recovery: 15–20s
+function getStageTag(elapsed) {
+  if (elapsed < 5)  return 'ramp_up';
+  if (elapsed < 15) return 'peak';
+  return 'recovery';
+}
+
+export function runSpike() {
+  const vuIndex = __VU - 1;
+  const headers = getAuthHeaders(fixtures, 'brother', vuIndex);
+  const group   = fixtures.brotherGroups[vuIndex % fixtures.brotherGroups.length];
+  const post    = fixtures.posts[vuIndex % fixtures.posts.length];
+  const stage   = getStageTag(__ITER);  // approximate; __ITER increments per VU iteration
+
+  const r1 = http.get(`${BASE_URL}/api/v1/groups`,
+    { headers, tags: { name: 'GET /groups', stage } });
+  check(r1, { 'spike GET /groups 2xx': (r) => r.status >= 200 && r.status < 300 });
+
+  const r2 = http.get(`${BASE_URL}/api/v1/groups/${group.id}/posts`,
+    { headers, tags: { name: 'GET /groups/:id/posts', stage } });
+  check(r2, { 'spike GET /posts 2xx': (r) => r.status >= 200 && r.status < 300 });
+
+  const r3 = http.post(`${BASE_URL}/api/v1/groups/posts/${post.id}/like`, null,
+    { headers, tags: { name: 'POST /posts/:id/like', stage } });
+  check(r3, { 'spike like 2xx': (r) => r.status >= 200 && r.status < 300 });
+}
+```
+
+### load-tests/scenarios/role-auth.js
+
+```js
+import http from 'k6/http';
+import { check, sleep } from 'k6';
+import { SharedArray } from 'k6/data';
+import { getAuthHeaders } from '../helpers/auth.js';
+import { authBypassCount } from '../group.load.js';
+
+const fixtures = new SharedArray('fixtures', () => [JSON.parse(open('../fixtures.json'))])[0];
+const BASE_URL = __ENV.BASE_URL || 'http://localhost:3000';
+
+export const roleAuthScenario = {
+  executor: 'constant-vus',
+  vus: 20,
+  duration: '10s',
+  exec: 'runRoleAuth',
+};
+
+export function runRoleAuth() {
+  const vuIndex = __VU - 1;
+  // BROTHER user attempting SUPER_ADMIN-only endpoints
+  const brotherHeaders = { ...getAuthHeaders(fixtures, 'brother', vuIndex), 'Content-Type': 'application/json' };
+  const sisterHeaders  = { ...getAuthHeaders(fixtures, 'sister',  vuIndex), 'Content-Type': 'application/json' };
+  const groupId = fixtures.brotherGroups[0].id;
+  const postId  = fixtures.posts[0].id;
+  const userId  = fixtures.brotherUsers[0].id;
+
+  const adminEndpoints = [
+    { label: 'POST /groups (create)',          res: http.post(`${BASE_URL}/api/v1/groups`, JSON.stringify({ name:'x', description:'x', userType:'BROTHER', category:'x' }), { headers: brotherHeaders, tags: { name: 'auth:create-group' } }) },
+    { label: 'PATCH /groups/:id (update)',     res: http.patch(`${BASE_URL}/api/v1/groups/${groupId}`, JSON.stringify({ name:'x' }), { headers: brotherHeaders, tags: { name: 'auth:update-group' } }) },
+    { label: 'DELETE /groups/:id (delete)',    res: http.del(`${BASE_URL}/api/v1/groups/${groupId}`, null, { headers: brotherHeaders, tags: { name: 'auth:delete-group' } }) },
+    { label: 'DELETE /groups/:id/members/:uid (kick)', res: http.del(`${BASE_URL}/api/v1/groups/${groupId}/members/${userId}`, null, { headers: brotherHeaders, tags: { name: 'auth:kick-member' } }) },
+    { label: 'PATCH /posts/:id/pin (pin)',     res: http.patch(`${BASE_URL}/api/v1/groups/posts/${postId}/pin`, null, { headers: brotherHeaders, tags: { name: 'auth:pin-post' } }) },
+  ];
+
+  for (const ep of adminEndpoints) {
+    const ok = check(ep.res, { [`${ep.label} → 403`]: (r) => r.status === 403 });
+    if (!ok) {
+      authBypassCount.add(1);
+      console.error(`AUTH BYPASS: ${ep.label} returned ${ep.res.status} | body=${ep.res.body}`);
+    }
+  }
+
+  // SISTER user attempting BROTHER-typed group endpoint
+  const sisterOnBrotherGroup = http.get(`${BASE_URL}/api/v1/groups/${groupId}`,
+    { headers: sisterHeaders, tags: { name: 'auth:sister-on-brother-group' } });
+  check(sisterOnBrotherGroup, { 'sister on brother group → 403': (r) => r.status === 403 });
+
+  sleep(0.5);
+}
+```
+
+---
+
+## Data Flow
+
+### Seed → k6 Data Flow
+
+```
+seed.js
+  │
+  ├─ mongoose.connect(MONGODB_URI)
+  ├─ DELETE User{email: /^loadtest-/}
+  ├─ DELETE Group{category: 'load-testing'}
+  ├─ INSERT User × 21 (1 admin + 10 brother + 10 sister)
+  ├─ INSERT Group × 4 (2 brother + 2 sister)
+  ├─ INSERT GroupPost × 20 (5 per group)
+  ├─ jwt.sign(payload, JWT_SECRET) × 21
+  └─ fs.writeFileSync('fixtures.json', JSON.stringify(fixtures))
+
+k6 startup (init phase, runs once per VU)
+  └─ SharedArray('fixtures', () => JSON.parse(open('./fixtures.json')))
+       └─ Deserialized once, shared read-only across all VUs
+
+VU execution (default/exec function, runs per iteration)
+  └─ fixtures.brotherUsers[vuIndex % 10].token  → Authorization header
+  └─ fixtures.brotherGroups[vuIndex % 2].id     → URL path param
+  └─ fixtures.posts[vuIndex % 20].id            → URL path param
+```
+
+### Request → Response Flow (per VU iteration)
+
+```
+VU
+ │
+ ├─ Build headers: { Authorization: 'Bearer <token>', Content-Type: 'application/json' }
+ ├─ http.get/post/patch/del(url, body, { headers, tags })
+ │
+ │  [Network]
+ │
+ ├─ Express auth middleware
+ │   ├─ Verify JWT (jwtHelper.verifyToken)
+ │   ├─ DB lookup: User.findById(id).select('+tokenVersion status')
+ │   ├─ Check status === ACTIVE
+ │   ├─ Check tokenVersion matches
+ │   └─ Check role in allowedRoles → 403 if not
+ │
+ ├─ Route handler → GroupService → MongoDB
+ └─ Response { success, statusCode, data }
+ │
+ └─ k6 check(res, { 'label': (r) => r.status === expected })
+     └─ Metrics: http_req_duration, http_req_failed, checks
+```
+
+### postId Capture Flow (user-journey.js)
+
+```
+Step 5: POST /api/v1/groups/:groupId/posts
+  Response body: { success: true, statusCode: 201, data: { _id: "abc123", ... } }
+  │
+  └─ postId = JSON.parse(s5.body).data?._id   // "abc123"
+       │
+       ├─ Step 6: POST /api/v1/groups/posts/abc123/like
+       └─ Step 7: POST /api/v1/groups/posts/abc123/comments
+
+Fallback: if postId extraction fails (non-2xx in step 5),
+  postId = fixtures.posts[vuIndex % fixtures.posts.length].id
+  (pre-seeded post — ensures steps 6 and 7 still execute)
 ```
 
 ---
@@ -243,522 +832,295 @@ const BASELINE_COMMENT_MS      = 200;    // Single-user POST comment
 
 *A property is a characteristic or behavior that should hold true across all valid executions of a system — essentially, a formal statement about what the system should do. Properties serve as the bridge between human-readable specifications and machine-verifiable correctness guarantees.*
 
-### Property Reflection
+The following properties were derived from the acceptance criteria prework analysis. Infrastructure checks (SMOKE/INTEGRATION) are excluded from property-based testing and covered by integration tests instead.
 
-Before listing properties, redundancy was eliminated:
-
-- Properties 3 (concurrent reads error rate) and 4 (concurrent reads P95) are complementary, not redundant — error rate and latency are independent dimensions.
-- Properties 5 (concurrent join success) and 6 (memberCount after joins) can be combined: the round-trip property (join N users → memberCount == N) subsumes the individual success check.
-- Properties 9 (concurrent like success) and 10 (likesCount after likes) are similarly combined into one round-trip property.
-- Properties 13 (write-then-read posts) and 14 (write-then-read comments) are the same pattern applied to different resources — kept separate for clarity.
-- Property 15 (double-toggle like) and Property 16 (concurrent like count) are distinct: one is idempotence, the other is concurrency correctness.
+**Property Reflection:** After reviewing all testable criteria, five distinct properties were identified. Properties 1 and 2 both relate to auth enforcement but cover different role/endpoint combinations — they are kept separate because they test different access control paths (role-based vs. type-based). Property 3 (postId capture) and Property 4 (fixture completeness) are independent structural invariants. Property 5 (spike recovery) is a metamorphic property comparing two measurements. No redundancy was found.
 
 ---
 
-### Property 1: `runConcurrent` returns all results
+### Property 1: Auth Enforcement — BROTHER Cannot Access Admin Endpoints
 
-*For any* array of N async request factories and any concurrency level C (1 ≤ C ≤ N), `runConcurrent` SHALL return exactly N `LatencyResult` objects, one per input factory, regardless of whether individual requests succeed or fail.
+*For any* BROTHER user JWT token and any SUPER_ADMIN-only endpoint (`POST /groups`, `PATCH /groups/:id`, `DELETE /groups/:id`, `DELETE /groups/:id/members/:userId`, `PATCH /posts/:id/pin`), the HTTP response status MUST be exactly 403.
 
-**Validates: Requirements 1.3**
-
----
-
-### Property 2: `measureLatency` captures non-negative duration and correct status
-
-*For any* async function that returns a response object with a `status` field, `measureLatency` SHALL return `{ durationMs >= 0, status == response.status }` and SHALL NOT throw even when the response has a non-2xx status code.
-
-**Validates: Requirements 1.4**
+**Validates: Requirements 10.2, 10.3, 10.4**
 
 ---
 
-### Property 3: `computeStats` ordering invariant
+### Property 2: Auth Enforcement — SISTER Cannot Access BROTHER-Typed Group Endpoints
 
-*For any* non-empty array of duration values, `computeStats` SHALL return values satisfying `min ≤ p50 ≤ p95 ≤ p99 ≤ max`, and `mean` SHALL be within `[min, max]`.
+*For any* SISTER user JWT token accessing a BROTHER-typed group's detail endpoint (`GET /groups/:id`), the HTTP response status MUST be exactly 403.
 
-**Validates: Requirements 1.5**
-
----
-
-### Property 4: `seedFixtures` creates exactly the requested document counts
-
-*For any* valid `SeedCount` `{ users: U, groups: G, postsPerGroup: P }`, calling `seedFixtures` SHALL result in exactly U user documents, G group documents, and G × P post documents being present in the database, and all U users SHALL have `isVerified: true` and `status: USER_STATUS.ACTIVE`.
-
-**Validates: Requirements 1.6, 1.7**
+**Validates: Requirements 10.6**
 
 ---
 
-### Property 5: Concurrent reads maintain low error rate and acceptable P95
+### Property 3: Journey postId Capture and Reuse
 
-*For any* set of 50 concurrent `GET /api/v1/groups` requests using pre-seeded fixture data, the error rate SHALL be ≤ 1% and P95 latency SHALL be ≤ 1000ms. The same property holds for `GET /api/v1/groups/:groupId/posts` (50 VUs) and `GET /api/v1/groups/:groupId` (20 VUs).
+*For any* user journey execution where Step 5 (create post) returns a 2xx response, the `postId` extracted from the Step 5 response body MUST be the same ID used in the URL path of Step 6 (like) and Step 7 (comment). The postId must not be null, undefined, or a fallback fixture ID when Step 5 succeeds.
 
-**Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.5**
-
----
-
-### Property 6: Concurrent joins produce correct memberCount (round-trip)
-
-*For any* group and any set of N distinct users (N = 20) who have not previously joined that group, when all N users concurrently send `POST /api/v1/groups/:groupId/join`, all N requests SHALL return HTTP 200 with no duplicate membership errors, and a subsequent `GET /api/v1/groups/:groupId` SHALL return `memberCount == N`.
-
-**Validates: Requirements 4.1, 4.2, 4.3**
+**Validates: Requirements 5.3**
 
 ---
 
-### Property 7: Concurrent likes produce correct likesCount (round-trip)
+### Property 4: Fixture Completeness Invariant
 
-*For any* post and any set of N distinct users (N = 20) who have not previously liked that post, when all N users concurrently send `POST /api/v1/groups/posts/:postId/like`, all N requests SHALL return HTTP 200, and a subsequent feed fetch SHALL return `likesCount == N` with no over-counting or under-counting.
+*For any* execution of `seed.js`, the resulting `fixtures.json` MUST contain all six required top-level keys (`adminUser`, `brotherUsers`, `sisterUsers`, `brotherGroups`, `sisterGroups`, `posts`), each with the correct type and minimum cardinality: `adminUser` is an object with `id`, `email`, `token`; `brotherUsers` and `sisterUsers` are arrays of length ≥ 10; `brotherGroups` and `sisterGroups` are arrays of length ≥ 2; `posts` is an array of length ≥ 10.
 
-**Validates: Requirements 4.5, 4.6, 10.4**
-
----
-
-### Property 8: Concurrent comments produce correct commentsCount (round-trip)
-
-*For any* post and any set of N distinct users (N = 20) concurrently sending `POST /api/v1/groups/posts/:postId/comments`, at least 95% SHALL return HTTP 201, and a subsequent feed fetch SHALL return `commentsCount` equal to the number of successful (201) responses.
-
-**Validates: Requirements 4.7, 4.8, 4.9**
+**Validates: Requirements 1.5, 1.6**
 
 ---
 
-### Property 9: User journey scenario completes end-to-end for all VUs
+### Property 5: Spike Recovery Error Rate
 
-*For any* set of 10 distinct users each executing the `browseAndEngageScenario` (browse → join → read feed → create post → like → comment) concurrently, at least 90% of users SHALL complete all 6 steps with HTTP 2xx responses, and the P95 latency per step SHALL be ≤ 3000ms.
+*For any* spike test run, the HTTP error rate measured during the recovery stage (ramp-down from 50 to 5 VUs) MUST NOT exceed the error rate measured during the ramp-up stage (0 to 5 VUs) by more than 2 percentage points. Formally: `error_rate_recovery ≤ error_rate_ramp_up + 0.02`.
 
-**Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5**
-
----
-
-### Property 10: Spike test — server survives and recovers
-
-*For any* spike pattern of 5 pre-spike requests → 50 concurrent spike requests → 5 post-spike requests to `GET /api/v1/groups`, the overall error rate SHALL be ≤ 5%, and all 5 post-spike requests SHALL return HTTP 200, confirming the server has not crashed.
-
-**Validates: Requirements 6.1, 6.2, 6.3, 6.4**
-
----
-
-### Property 11: Authorization is strictly enforced under concurrent conditions
-
-*For any* N concurrent requests (N = 20) from users with BROTHER role to the admin-only endpoint `POST /api/v1/groups`, ALL N requests SHALL return HTTP 403 — no request SHALL return HTTP 200 or 201, confirming that concurrent load does not bypass authorization checks.
-
-**Validates: Requirements 9.4, 9.5**
-
----
-
-### Property 12: Write-then-read round-trip for posts
-
-*For any* set of posts created during the concurrent write load test (identified by their HTTP 201 response bodies), a subsequent `GET /api/v1/groups/:groupId/posts` SHALL return all created posts, with no post missing from the feed.
-
-**Validates: Requirements 10.1**
-
----
-
-### Property 13: Write-then-read round-trip for comments
-
-*For any* set of comments created during the concurrent comment load test (identified by their HTTP 201 response bodies), a subsequent `GET /api/v1/groups/posts/:postId/comments` SHALL return all created comments.
-
-**Validates: Requirements 10.2**
-
----
-
-### Property 14: Like toggle is idempotent (double-toggle restores original state)
-
-*For any* post with initial `likesCount` L and any user who has not previously liked that post, performing like → unlike in sequence SHALL result in `likesCount == L` (the original value), confirming the toggle operation is its own inverse.
-
-**Validates: Requirements 10.3**
+**Validates: Requirements 6.4, 6.5**
 
 ---
 
 ## Error Handling
 
-### Request-Level Error Handling
+### seed.js Error Handling
 
-`measureLatency` wraps every supertest call in a try/catch. Network-level errors (connection refused, timeout) are caught and returned as `{ durationMs: elapsed, status: 0 }`. This ensures `runConcurrent` always collects N results even if some requests fail, and `computeStats` always has a complete dataset.
+| Condition | Behavior |
+|---|---|
+| `MONGODB_URI` / `DATABASE_URL` not set | Log descriptive error, `process.exit(1)` |
+| MongoDB connection timeout / auth failure | Catch in try/catch, log error, disconnect, `process.exit(1)` |
+| `JWT_SECRET` not set | `jwt.sign` will throw — caught, logged, `process.exit(1)` |
+| `insertMany` partial failure | Mongoose throws — caught, logged, `process.exit(1)` |
+| `fs.writeFileSync` failure (permissions) | Caught, logged, `process.exit(1)` |
+| Successful run | `process.exit(0)` |
 
-```typescript
-async function measureLatency(fn: () => Promise<{ status: number }>): Promise<LatencyResult> {
-  const start = performance.now();
-  try {
-    const res = await fn();
-    return { durationMs: performance.now() - start, status: res.status };
-  } catch (err) {
-    return { durationMs: performance.now() - start, status: 0 };
-  }
-}
+The seed script uses a single top-level `try/catch` with a `finally` block that calls `mongoose.disconnect()` before exiting, ensuring no dangling connections.
+
+### k6 Scenario Error Handling
+
+| Condition | Behavior |
+|---|---|
+| `fixtures.json` missing at k6 startup | `open()` throws — k6 aborts with init error before any VU runs |
+| Server not reachable at `BASE_URL` | k6 records connection errors as `http_req_failed`; threshold `rate<0.05` will breach immediately, causing exit 99 |
+| Non-2xx on join (write-load) | 400 → treated as non-fatal (already member); other non-2xx → `return` (abort iteration) |
+| Step 5 fails in user-journey | `postId` falls back to fixture post; steps 6 and 7 still execute against a known-good post |
+| Non-403 in role-auth | `authBypassCount.add(1)` + `console.error` with endpoint, status, body; check fails → threshold `checks rate==1.0` breaches |
+| `JSON.parse` failure on response body | Wrapped in `try/catch`; falls back to fixture ID or logs error |
+| `SKIP_LOAD_TESTS=true` | `default` function returns immediately; no HTTP requests made; exit 0 |
+
+### Threshold Breach Behavior
+
+k6 evaluates all thresholds at the end of the run. If any threshold is breached, k6 exits with code 99. The npm scripts do not suppress this exit code, so `npm run load:ci` will propagate exit 99 to the CI runner, failing the pipeline step.
+
 ```
-
-### Threshold Assertion Error Handling
-
-`assertThresholds` checks `process.env.LOAD_TEST_THRESHOLDS_ENABLED`:
-
-- If `"false"`: logs a `console.warn` with the violation details and returns without throwing.
-- Otherwise (default): calls `expect(result.p95).toBeLessThanOrEqual(threshold)` and `expect(result.errorRate).toBeLessThanOrEqual(MAX_ERROR_RATE)`, which causes Vitest to fail the test with a descriptive message.
-
-### Timeout Handling
-
-Each load test `it()` block uses `{ timeout: 120000 }`. If a test exceeds 120 s, Vitest cancels it and reports a timeout error. To aid debugging, a `Promise.race` pattern with a 110 s sentinel can log in-flight request counts before the hard timeout fires:
-
-```typescript
-// Pseudocode — implemented inside long-running tests
-const timeoutSentinel = new Promise<never>((_, reject) =>
-  setTimeout(() => reject(new Error(`Timeout: ${inFlightCount} requests still in-flight`)), 110_000)
-);
-const result = await Promise.race([runConcurrent(requests, concurrency), timeoutSentinel]);
-```
-
-### Fixture Seeding Errors
-
-If `seedFixtures` fails (e.g., duplicate email from a previous test run), `beforeAll` will throw and all tests in the suite will be skipped with a clear error message. The `beforeEach` hook clears all collections to prevent cross-test contamination.
-
-### CI/CD Skip Guard
-
-```typescript
-const SKIP = process.env.SKIP_LOAD_TESTS === 'true';
-const skipIf = SKIP ? it.skip : it;
-// Usage:
-skipIf('concurrent read load', { timeout: 120000 }, async () => { ... });
+k6 exit codes:
+  0  → all thresholds passed (or no thresholds defined)
+  99 → one or more thresholds breached
+  107 → usage error (bad flag, missing file)
 ```
 
 ---
 
 ## Testing Strategy
 
-### Test File Structure
+### Overview
 
-```
-src/app/modules/group/__tests__/group.load.spec.ts
-│
-├── [mocks]  vi.mock for NotificationBuilder, notificationsHelper, redisClient
-│
-├── [constants]  READ_P95_THRESHOLD_MS, WRITE_P95_THRESHOLD_MS, etc.
-│
-├── [utilities]  runConcurrent, measureLatency, computeStats, toScenarioResult,
-│                seedFixtures, createAuthUser, assertThresholds
-│
-├── [lifecycle]  beforeAll (replSet + mongoose), afterAll, beforeEach (clearDB)
-│
-└── describe('Group Load Tests')
-    ├── describe('Utility Unit Tests')
-    │   ├── it: runConcurrent returns N results for any N and concurrency C
-    │   ├── it: measureLatency captures duration and status
-    │   ├── it: computeStats ordering invariant
-    │   └── it: seedFixtures creates correct counts with correct user fields
-    │
-    ├── describe('Baseline Performance', { timeout: 30000 })
-    │   └── it: single-request latency for all 7 endpoints
-    │
-    ├── describe('Concurrent Read Load', { timeout: 120000 })
-    │   ├── it: 50 VU GET /groups — error rate + P95
-    │   ├── it: 50 VU GET /groups/:id/posts — error rate + P95
-    │   └── it: 20 VU GET /groups/:id — error rate + P95
-    │
-    ├── describe('Concurrent Write Load', { timeout: 120000 })
-    │   ├── it: 20 VU concurrent join → memberCount round-trip
-    │   ├── it: 20 VU concurrent post creation
-    │   ├── it: 20 VU concurrent like → likesCount round-trip
-    │   └── it: 20 VU concurrent comment → commentsCount round-trip
-    │
-    ├── describe('User Journey Scenario', { timeout: 120000 })
-    │   └── it: 10 VU browseAndEngageScenario — per-step stats
-    │
-    ├── describe('Spike Test', { timeout: 120000 })
-    │   └── it: 5 → 50 → 5 spike on GET /groups
-    │
-    ├── describe('Role-Based Load', { timeout: 120000 })
-    │   ├── it: 5 admin concurrent POST /groups → all 201
-    │   ├── it: 10 admin concurrent PATCH pin → all 200
-    │   └── it: 20 BROTHER concurrent POST /groups → all 403
-    │
-    └── describe('Data Integrity', { timeout: 120000 })
-        ├── it: write-then-read round-trip for posts
-        ├── it: write-then-read round-trip for comments
-        └── it: like toggle idempotence (like → unlike → original count)
-```
+This suite uses a **dual approach**: property-based tests for correctness invariants (Properties 1–5 above), and integration tests for scenario behavior against a live server. Unit tests are not applicable to k6 scenario files (they are k6 scripts, not Node.js modules), but the seed script and auth helper are plain Node.js and can be unit tested.
 
-### Utility Implementation Pseudocode
+### Property-Based Tests
 
-#### `runConcurrent`
+The property-based testing library for this feature is **[fast-check](https://github.com/dubzzz/fast-check)** (JavaScript), run via `vitest`. Each property test is tagged with the design property it validates.
 
-```typescript
-async function runConcurrent(
-  requests: Array<() => Promise<LatencyResult>>,
-  concurrency: number,
-): Promise<LatencyResult[]> {
-  const results: LatencyResult[] = [];
-  for (let i = 0; i < requests.length; i += concurrency) {
-    const batch = requests.slice(i, i + concurrency);
-    const batchResults = await Promise.all(batch.map(fn => fn()));
-    results.push(...batchResults);
-  }
-  return results;
-}
-```
+**Minimum 100 iterations per property test.**
 
-#### `computeStats`
+Tag format: `Feature: group-load-testing, Property {N}: {property_text}`
 
-```typescript
-function computeStats(durations: number[]): Stats {
-  if (durations.length === 0) throw new Error('computeStats: empty array');
-  const sorted = [...durations].sort((a, b) => a - b);
-  const percentile = (p: number) => {
-    const idx = (p / 100) * (sorted.length - 1);
-    const lo = Math.floor(idx), hi = Math.ceil(idx);
-    return sorted[lo] + (sorted[hi] - sorted[lo]) * (idx - lo);
-  };
-  return {
-    min: sorted[0],
-    max: sorted[sorted.length - 1],
-    mean: sorted.reduce((a, b) => a + b, 0) / sorted.length,
-    p50: percentile(50),
-    p95: percentile(95),
-    p99: percentile(99),
-  };
-}
-```
+#### Property 1 & 2: Auth Enforcement
 
-#### `seedFixtures`
+These properties are validated by the `role-auth` scenario itself running 20 VUs × 10s against the live server. The k6 threshold `checks{scenario:"role_auth"} rate==1.0` is the machine-verifiable assertion. Every single check must pass — any 403 miss causes threshold breach and exit 99.
 
-```typescript
-async function seedFixtures(count: SeedCount): Promise<FixtureData> {
-  // 1. Create BROTHER users
-  const users = await Promise.all(
-    Array.from({ length: count.users }, (_, i) =>
-      createAuthUser(USER_ROLES.BROTHER, `load-${i}`)
-    )
-  );
+For unit-level validation of the auth helper logic:
 
-  // 2. Create SUPER_ADMIN users
-  const adminCount = count.adminUsers ?? 2;
-  const adminUsers = await Promise.all(
-    Array.from({ length: adminCount }, (_, i) =>
-      createAuthUser(USER_ROLES.SUPER_ADMIN, `admin-${i}`)
-    )
-  );
-
-  // 3. Create groups via direct model insert (faster than API)
-  const groups = await Group.insertMany(
-    Array.from({ length: count.groups }, () => ({
-      name: faker.company.name(),
-      description: faker.lorem.sentence(),
-      userType: USER_ROLES.BROTHER,
-      category: faker.helpers.arrayElement(['Spiritual', 'Community', 'Education']),
-      memberCount: 0,
-    }))
-  );
-
-  // 4. Create posts via direct model insert
-  const posts: IGroupPost[] = [];
-  for (const group of groups) {
-    for (let i = 0; i < count.postsPerGroup; i++) {
-      const user = users[i % users.length];
-      posts.push(await GroupPost.create({
-        groupId: group._id,
-        userId: user.user._id,
-        content: faker.lorem.paragraph(),
-        attachments: [],
-      }));
+```js
+// Feature: group-load-testing, Property 1: BROTHER JWT → 403 on admin endpoints
+// Feature: group-load-testing, Property 2: SISTER JWT → 403 on BROTHER-typed group endpoints
+describe('auth enforcement', () => {
+  it.prop([fc.integer({ min: 0, max: 9 }), fc.constantFrom(...ADMIN_ENDPOINTS)])(
+    'BROTHER user always gets 403 on admin endpoints',
+    async (vuIndex, endpoint) => {
+      const headers = getAuthHeaders(fixtures, 'brother', vuIndex);
+      const res = await sendRequest(endpoint, headers);
+      expect(res.status).toBe(403);
     }
-  }
-
-  return { users, adminUsers, groups, posts };
-}
-```
-
-#### `browseAndEngageScenario`
-
-```typescript
-async function browseAndEngageScenario(
-  token: string,
-  fixtures: FixtureData,
-): Promise<StepResult[]> {
-  const steps: StepResult[] = [];
-  const group = fixtures.groups[0];
-
-  // Step 1: Browse groups
-  const browse = await measureLatency(() =>
-    request(app).get('/api/v1/groups').set('Authorization', `Bearer ${token}`)
-  );
-  steps.push({ step: 'browse', ...singleToStats(browse) });
-
-  // Step 2: Join group
-  const join = await measureLatency(() =>
-    request(app).post(`/api/v1/groups/${group._id}/join`)
-      .set('Authorization', `Bearer ${token}`)
-  );
-  steps.push({ step: 'join', ...singleToStats(join) });
-
-  // Step 3: Read feed
-  const feed = await measureLatency(() =>
-    request(app).get(`/api/v1/groups/${group._id}/posts`)
-      .set('Authorization', `Bearer ${token}`)
-  );
-  steps.push({ step: 'read-feed', ...singleToStats(feed) });
-
-  // Step 4: Create post
-  const post = await measureLatency(() =>
-    request(app).post(`/api/v1/groups/${group._id}/posts`)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ content: faker.lorem.sentence() })
-  );
-  steps.push({ step: 'create-post', ...singleToStats(post) });
-
-  // Step 5: Like an existing post
-  const existingPost = fixtures.posts.find(p => p.groupId.toString() === group._id.toString());
-  if (existingPost) {
-    const like = await measureLatency(() =>
-      request(app).post(`/api/v1/groups/posts/${existingPost._id}/like`)
-        .set('Authorization', `Bearer ${token}`)
-    );
-    steps.push({ step: 'like-post', ...singleToStats(like) });
-  }
-
-  // Step 6: Comment on existing post
-  if (existingPost) {
-    const comment = await measureLatency(() =>
-      request(app).post(`/api/v1/groups/posts/${existingPost._id}/comments`)
-        .set('Authorization', `Bearer ${token}`)
-        .send({ comment: faker.lorem.sentence() })
-    );
-    steps.push({ step: 'comment', ...singleToStats(comment) });
-  }
-
-  return steps;
-}
-```
-
-### Property-Based Testing
-
-This feature uses **Vitest** as the test runner. The utility functions (`runConcurrent`, `measureLatency`, `computeStats`, `seedFixtures`) are pure or near-pure functions that are well-suited for property-based testing. The load scenarios themselves are property tests in the sense that they verify universal invariants (error rate, latency bounds, data integrity) across many concurrent inputs.
-
-**PBT Library**: [`fast-check`](https://github.com/dubzzz/fast-check) — TypeScript-native, Vitest-compatible.
-
-Install: `npm install --save-dev fast-check`
-
-**Property test configuration**: minimum 100 iterations per property test (via `fc.assert(fc.property(...), { numRuns: 100 })`).
-
-**Tag format**: Each property test includes a comment:
-```
-// Feature: group-load-testing, Property N: <property_text>
-```
-
-#### Property Tests for Utility Functions
-
-```typescript
-import * as fc from 'fast-check';
-
-// Feature: group-load-testing, Property 1: runConcurrent returns N results
-it('runConcurrent returns exactly N results for any N and concurrency', async () => {
-  await fc.assert(
-    fc.asyncProperty(
-      fc.integer({ min: 1, max: 20 }),
-      fc.integer({ min: 1, max: 10 }),
-      async (n, concurrency) => {
-        const factories = Array.from({ length: n }, () =>
-          () => Promise.resolve({ durationMs: 1, status: 200 })
-        );
-        const results = await runConcurrent(factories, concurrency);
-        return results.length === n;
-      }
-    ),
-    { numRuns: 100 }
-  );
-});
-
-// Feature: group-load-testing, Property 3: computeStats ordering invariant
-it('computeStats satisfies min <= p50 <= p95 <= p99 <= max', () => {
-  fc.assert(
-    fc.property(
-      fc.array(fc.float({ min: 0, max: 10000 }), { minLength: 1, maxLength: 200 }),
-      (durations) => {
-        const stats = computeStats(durations);
-        return (
-          stats.min <= stats.p50 &&
-          stats.p50 <= stats.p95 &&
-          stats.p95 <= stats.p99 &&
-          stats.p99 <= stats.max &&
-          stats.mean >= stats.min &&
-          stats.mean <= stats.max
-        );
-      }
-    ),
-    { numRuns: 100 }
   );
 });
 ```
 
-#### Load Scenario Tests (Vitest `it` with `{ timeout: 120000 }`)
+#### Property 3: Journey postId Capture
 
-The load scenarios (concurrent reads, writes, user journey, spike, role-based, data integrity) are implemented as standard Vitest `it` blocks with `{ timeout: 120000 }`. They are not property tests in the fast-check sense — they run once with a fixed concurrency level — but they verify the correctness properties defined above through direct assertion.
-
-```typescript
-// Feature: group-load-testing, Property 5: concurrent reads maintain low error rate
-it('50 VU concurrent GET /groups — error rate ≤ 1%, P95 ≤ 1000ms',
-  { timeout: 120000 },
-  async () => {
-    const requests = fixtures.users.slice(0, 50).map(({ token }) =>
-      () => measureLatency(() =>
-        request(app).get('/api/v1/groups').set('Authorization', `Bearer ${token}`)
-      )
-    );
-    const results = await runConcurrent(requests, 50);
-    const scenario = toScenarioResult(results);
-    console.table([{ endpoint: 'GET /groups', ...scenario }]);
-    assertThresholds(scenario, { p95Ms: READ_P95_THRESHOLD_MS, maxErrorRate: 0.01 }, 'GET /groups 50VU');
-  }
-);
+```js
+// Feature: group-load-testing, Property 3: postId from step 5 used in steps 6 and 7
+describe('user journey postId capture', () => {
+  it.prop([fc.record({ content: fc.string({ minLength: 1 }) })])(
+    'postId extracted from create-post response is used in like and comment URLs',
+    async (postBody) => {
+      // Simulate step 5 response
+      const mockResponse = { status: 201, body: JSON.stringify({ data: { _id: 'abc123' } }) };
+      const postId = JSON.parse(mockResponse.body).data?._id;
+      expect(postId).toBe('abc123');
+      expect(postId).not.toBeNull();
+      expect(postId).not.toBeUndefined();
+      // Verify URL construction
+      const likeUrl    = `${BASE_URL}/api/v1/groups/posts/${postId}/like`;
+      const commentUrl = `${BASE_URL}/api/v1/groups/posts/${postId}/comments`;
+      expect(likeUrl).toContain(postId);
+      expect(commentUrl).toContain(postId);
+    }
+  );
+});
 ```
 
-### Unit Tests
+#### Property 4: Fixture Completeness
 
-Unit tests (without fast-check) cover:
+```js
+// Feature: group-load-testing, Property 4: fixtures.json has all required keys
+describe('fixture completeness', () => {
+  it('fixtures.json contains all required keys with correct cardinality', () => {
+    const fixtures = JSON.parse(fs.readFileSync(FIXTURES_PATH, 'utf8'));
+    expect(fixtures).toHaveProperty('adminUser');
+    expect(fixtures.adminUser).toMatchObject({ id: expect.any(String), email: expect.any(String), token: expect.any(String) });
+    expect(fixtures.brotherUsers.length).toBeGreaterThanOrEqual(10);
+    expect(fixtures.sisterUsers.length).toBeGreaterThanOrEqual(10);
+    expect(fixtures.brotherGroups.length).toBeGreaterThanOrEqual(2);
+    expect(fixtures.sisterGroups.length).toBeGreaterThanOrEqual(2);
+    expect(fixtures.posts.length).toBeGreaterThanOrEqual(10);
+    // Every entity must have id field
+    for (const user of [...fixtures.brotherUsers, ...fixtures.sisterUsers]) {
+      expect(user).toMatchObject({ id: expect.any(String), token: expect.any(String) });
+    }
+  });
+});
+```
 
-- `measureLatency` with a mock that returns a known status and simulated delay
-- `assertThresholds` with values above and below thresholds, and with `LOAD_TEST_THRESHOLDS_ENABLED=false`
-- `seedFixtures` verifying document counts and user field values
-- Baseline latency assertions (single-request, no concurrency)
+#### Property 5: Spike Recovery Error Rate
 
-### CI/CD Integration
+This property is validated by the spike scenario's k6 threshold `http_req_failed{scenario:"spike"} rate < 0.05`. The stage-tagged metrics allow post-run analysis of ramp_up vs. recovery error rates in `results.json`.
 
-**vitest.config.ts** — no changes needed. The load test file is discovered by the existing glob.
+For a unit-level metamorphic check:
 
-**Per-test timeout override**: The global `testTimeout: 30000` in `vitest.config.ts` is overridden per test using `it('...', { timeout: 120000 }, async () => { ... })`. This is the correct Vitest API for per-test timeouts.
+```js
+// Feature: group-load-testing, Property 5: recovery error rate ≤ ramp_up error rate + 2%
+describe('spike recovery', () => {
+  it.prop([
+    fc.float({ min: 0, max: 0.05 }),  // ramp_up error rate
+    fc.float({ min: 0, max: 0.05 }),  // recovery error rate
+  ])(
+    'recovery error rate does not exceed ramp_up rate by more than 2%',
+    (rampUpRate, recoveryRate) => {
+      // This property holds when the system recovers correctly
+      expect(recoveryRate).toBeLessThanOrEqual(rampUpRate + 0.02);
+    }
+  );
+});
+```
 
-**Environment variables**:
+### Integration Tests (Scenario Execution)
 
-| Variable | Default | Effect |
-|---|---|---|
-| `SKIP_LOAD_TESTS` | unset | When `"true"`, all load scenarios are skipped via `it.skip` |
-| `LOAD_TEST_THRESHOLDS_ENABLED` | unset | When `"false"`, threshold violations become warnings |
+Run the full suite against a live server:
 
-**GitHub Actions example** (add to `.github/workflows/deploy-aws.yml` or a separate CI job):
+```bash
+npm run load:seed    # populate fixtures
+npm run load:ci      # run all scenarios, output results.json
+```
+
+Verify:
+- Exit code 0 when all thresholds pass
+- Exit code 99 when a threshold is deliberately breached (test with a 1ms threshold)
+- `reports/report.html` is generated
+- `reports/results.json` is generated and parseable
+
+### Smoke Tests (Structure Checks)
+
+```bash
+# Verify file structure
+ls load-tests/config/thresholds.js
+ls load-tests/helpers/seed.js
+ls load-tests/helpers/auth.js
+ls load-tests/scenarios/*.js
+ls load-tests/group.load.js
+
+# Verify npm scripts
+node -e "const p = require('./package.json'); console.log(Object.keys(p.scripts).filter(k => k.startsWith('load:')))"
+
+# Verify .gitignore
+grep 'load-tests/reports' .gitignore
+```
+
+### Test Configuration
+
+```js
+// vitest.config.ts (existing project config)
+// Property tests live in: load-tests/__tests__/
+// Run with: npm run test:run -- load-tests/__tests__
+```
+
+Each property test uses `fc.assert(fc.property(...), { numRuns: 100 })` (fast-check default is 100 runs).
+
+---
+
+## npm Scripts
+
+The following scripts are added to `package.json`:
+
+```json
+{
+  "load:seed":   "node load-tests/helpers/seed.js",
+  "load:test":   "k6 run --out web-dashboard load-tests/group.load.js",
+  "load:report": "k6 run load-tests/group.load.js",
+  "load:ci":     "k6 run load-tests/group.load.js --out json=load-tests/reports/results.json"
+}
+```
+
+- `load:seed` — runs the Node.js seed script; requires `MONGODB_URI` (or `DATABASE_URL`) and `JWT_SECRET` in environment.
+- `load:test` — runs k6 with the real-time web dashboard at `http://localhost:5665`; requires k6 installed globally.
+- `load:report` — runs k6 without the dashboard; generates `report.html` only.
+- `load:ci` — runs k6 without the dashboard; outputs machine-readable JSON to `reports/results.json`; exit code propagates to CI.
+
+### .gitignore Addition
+
+```
+load-tests/reports/
+```
+
+### GitHub Actions Workflow Snippet
 
 ```yaml
+- name: Install k6
+  run: sudo apt-get install -y k6
+
+- name: Start server
+  run: npm run start &
+  env:
+    NODE_ENV: test
+
+- name: Wait for server
+  run: npx wait-on http://localhost:3000/health --timeout 30000
+
+- name: Seed load test data
+  run: npm run load:seed
+  env:
+    MONGODB_URI: ${{ secrets.MONGODB_URI }}
+    JWT_SECRET: ${{ secrets.JWT_SECRET }}
+
 - name: Run load tests
+  run: npm run load:ci
+  timeout-minutes: 5
   env:
-    SKIP_LOAD_TESTS: "false"
-    LOAD_TEST_THRESHOLDS_ENABLED: "true"
-  run: npx vitest run --reporter=verbose src/app/modules/group/__tests__/group.load.spec.ts
-```
+    BASE_URL: http://localhost:3000
+    MONGODB_URI: ${{ secrets.MONGODB_URI }}
+    JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
-To skip in resource-constrained environments:
-
-```yaml
-- name: Run load tests (skip in PR)
-  env:
-    SKIP_LOAD_TESTS: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
-  run: npx vitest run src/app/modules/group/__tests__/group.load.spec.ts
-```
-
-### Summary Table Output
-
-At the end of the test run, `console.table` produces a human-readable summary:
-
-```
-┌─────────────────────────────┬──────┬──────┬──────┬──────┬──────┬───────────┬────────┐
-│ scenario                    │ min  │ mean │ p50  │ p95  │ p99  │ errorRate │ status │
-├─────────────────────────────┼──────┼──────┼──────┼──────┼──────┼───────────┼────────┤
-│ GET /groups 50VU            │  12  │  87  │  82  │ 210  │ 340  │   0.00%   │  PASS  │
-│ GET /groups/:id/posts 50VU  │  15  │  95  │  90  │ 250  │ 380  │   0.00%   │  PASS  │
-│ Concurrent Join 20VU        │  45  │ 180  │ 170  │ 420  │ 610  │   0.00%   │  PASS  │
-│ browseAndEngage 10VU (p95)  │  —   │  —   │  —   │ 890  │  —   │   0.00%   │  PASS  │
-│ Spike Test (all phases)     │  10  │  95  │  88  │ 310  │ 490  │   1.67%   │  PASS  │
-└─────────────────────────────┴──────┴──────┴──────┴──────┴──────┴───────────┴────────┘
+- name: Upload load test results
+  if: always()
+  uses: actions/upload-artifact@v4
+  with:
+    name: load-test-results
+    path: load-tests/reports/
 ```

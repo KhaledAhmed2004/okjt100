@@ -16,29 +16,31 @@ This folder has three layers, each with a single responsibility:
 
 | Folder / file | Purpose | Read this when… |
 |---|---|---|
+| [`standards/`](./standards/) | **Global Standards** — API response envelopes, error handling, naming conventions. | Ensuring consistency across new modules. |
+| [`architecture/`](./architecture/) | **Architecture & CI/CD** — Deployment guides, GitHub Actions, and refactor logs. | Deploying to VPS/AWS or understanding system history. |
 | [`app-screens/`](./app-screens/), [`dashboard-screens/`](./dashboard-screens/) | **UX flow only** — user journeys, screen behaviour, edge cases. | Building or designing a screen. |
 | [`modules/`](./modules/) | **Canonical API specs** — request/response shapes, business logic, implementation pointers. | Implementing or consuming an endpoint. |
 | [`api-inventory.md`](./api-inventory.md) | **Tracker view** — every endpoint with wiring status (which screen, implementation done). | Auditing coverage or finding orphaned endpoints. |
 
-**Source of truth rule**: contract changes go in `modules/` only. Journey changes go in `app-screens/` or `dashboard-screens/` only. Cross-link between layers via anchors so navigation stays one click.
+**Source of truth rule**: contract changes go in `modules/` or `standards/` only. Journey changes go in `app-screens/` or `dashboard-screens/` only. Cross-link between layers via anchors so navigation stays one click.
 
 ---
 
 ## Standard Response Envelope
 
-Shob API ei format follow kore:
+Shob API unified format follow kore (`sendResponse()` use kore). **[Full Standard Details Details](./standards/api-response-standard.md)**.
 
 ```json
 {
   "success": true,
   "statusCode": 200,
-  "message": "...",
-  "pagination": { "page": 1, "limit": 10, "total": 50, "totalPage": 5 },
-  "data": "..."
+  "message": "Human readable message",
+  "meta": { "limit": 10, "nextCursor": "...", "hasNext": true },
+  "data": { ... }
 }
 ```
 
-`pagination` শুধু list endpoint e thake. `data` er shape endpoint bhede alada.
+`meta` is flat (no nesting). `data` er shape endpoint bhede alada.
 
 ---
 

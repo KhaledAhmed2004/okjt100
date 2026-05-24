@@ -31,15 +31,15 @@
 
 ## Response Envelope
 
-All endpoints return responses through `sendResponse()`:
+All endpoints return responses through `sendResponse()`. For detailed metadata and cursor-based pagination logic, see **[API Response Standard](./api-response-standard.md)**.
 
 ```json
 {
   "success": true,
   "statusCode": 200,
   "message": "Human-readable message",
-  "data": { },
-  "meta": { }
+  "meta": { "limit": 10, "hasNext": true, "nextCursor": "..." },
+  "data": { }
 }
 ```
 
@@ -49,30 +49,24 @@ All endpoints return responses through `sendResponse()`:
 | `statusCode` | number | Mirrors HTTP status code |
 | `message` | string | Localized when `Accept-Language` is sent |
 | `data` | object \| array \| null | Payload — null on actions that have no body |
-| `meta` | object | Present on paginated responses (see below) |
+| `meta` | object | Flat metadata (pagination, unread counts, etc.) |
 
 ---
 
 ## Error Shape
 
-Error responses use the same envelope plus an optional `errorSources` array:
+Error responses use the same envelope. Validation errors include an `errorMessages` array (see standard doc for full details).
 
 ```json
 {
   "success": false,
   "statusCode": 400,
   "message": "Validation failed",
-  "errorSources": [
-    { "path": "email", "message": "Invalid email" },
-    { "path": "password", "message": "Must be at least 8 characters" }
+  "errorMessages": [
+    { "path": "email", "message": "Invalid email" }
   ]
 }
 ```
-
-| Field | When |
-|---|---|
-| `errorSources` | Validation errors (Zod) — one entry per failed field |
-| `stack` | Only in non-production environments |
 
 ---
 
@@ -98,35 +92,21 @@ Error responses use the same envelope plus an optional `errorSources` array:
 
 ## Pagination, Sorting, Filtering, Search
 
-All list endpoints powered by `QueryBuilder` accept the following query parameters:
+List endpoints powered by `QueryBuilder` accept the following query parameters. We support both **Offset** and **Cursor** pagination.
 
 | Param | Type | Default | Example | Notes |
 |---|---|---|---|---|
-| `page` | number | `1` | `?page=2` | 1-indexed |
+| `nextCursor` | string | — | `?nextCursor=abc==` | Used for Cursor pagination (Feeds/Chats) |
+| `page` | number | `1` | `?page=2` | Used for Offset pagination (Admin tables) |
 | `limit` | number | `10` | `?limit=20` | Max `100` |
 | `sort` | string | `-createdAt` | `?sort=-updatedAt,name` | Comma-separated; prefix `-` for descending |
 | `fields` | string | all | `?fields=name,email` | Whitelisted projection |
 | `searchTerm` | string | — | `?searchTerm=sara` | Matches indexed text fields per module |
 | `<field>` | any | — | `?role=USER&status=ACTIVE` | Direct equality filter |
 
-**Paginated response shape**
+**Response shape (Meta)**
 
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "message": "OK",
-  "data": [ /* items */ ],
-  "meta": {
-    "page": 1,
-    "limit": 10,
-    "total": 137,
-    "totalPages": 14
-  }
-}
-```
-
-> Operators like `gte` / `lte` / `in` are passed as `?price[gte]=100&price[lte]=500&tags[in]=a,b`.
+See **[API Response Standard](./api-response-standard.md)** for detailed meta object shapes for different pagination types.
 
 ---
 

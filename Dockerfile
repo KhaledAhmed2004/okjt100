@@ -28,16 +28,18 @@ RUN npm ci --only=production
 
 # Copy built assets from builder
 COPY --from=builder /app/dist ./dist
-# Copy public/assets if needed
+# Copy public/assets
 COPY --from=builder /app/public ./public
-# Copy any other necessary folders (e.g., scripts)
+# Copy scripts
 COPY --from=builder /app/scripts ./scripts
+# Copy secrets folder (required for Apple/Google keys)
+COPY --from=builder /app/secrets ./secrets
 
 # Set environment to production
 ENV NODE_ENV=production
 
-# Expose port (adjust if your app uses a different one)
-EXPOSE 5000
+# Expose port (must match your app's port in .env/config)
+EXPOSE 5002
 
 # Start the application
 CMD ["npm", "start"]

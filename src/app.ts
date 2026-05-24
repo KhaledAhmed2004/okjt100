@@ -6,7 +6,6 @@ import './app/logging/opentelemetry';
 import './app/logging/patchBcrypt';
 import './app/logging/patchJWT';
 import router from './routes';
-import { Morgan } from './shared/morgen';
 import swaggerUi from 'swagger-ui-express';
 import { StatusCodes } from 'http-status-codes';
 import express, { Request, Response } from 'express';
@@ -18,11 +17,11 @@ import { requestLogger } from './app/logging/requestLogger';
 import { otelExpressMiddleware } from './app/logging/otelExpress';
 import fs from 'fs';
 import path from 'path';
+import config from './config';
 import { allowedOrigins, maybeLogCors } from './app/logging/corsLogger';
 // autoLabelBootstrap moved above router import to ensure controllers are wrapped before route binding
 
 const app = express();
-
 
 // (disabled) Morgan logging - now integrated beautifully within our custom requestLogger
 
@@ -99,7 +98,7 @@ app.use(
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       credentials: true,
     });
-  })
+  }),
 );
 
 // Explicitly handle preflight OPTIONS requests
@@ -118,7 +117,7 @@ app.options(
 // registered before the generic express.json() middleware below.
 app.use(
   '/api/v1/subscriptions/apple/webhook',
-  express.raw({ type: 'application/json' })
+  express.raw({ type: 'application/json' }),
 );
 
 // Google Play RTDN webhook (Pub/Sub push) — keep raw bytes so the
@@ -126,7 +125,7 @@ app.use(
 // registered before express.json() below.
 app.use(
   '/api/v1/subscriptions/google/webhook',
-  express.raw({ type: 'application/json' })
+  express.raw({ type: 'application/json' }),
 );
 
 app.use(express.json());
@@ -138,6 +137,7 @@ app.use(cookieParser());
 // Request/Response logging
 // Initialize request-scoped context BEFORE logging
 app.use(requestContextInit);
+
 // Detect device/OS/browser from headers (Client Hints + UA fallback)
 app.use(clientInfo);
 app.use(requestLogger);
@@ -159,7 +159,17 @@ app.use('/api/v1', router);
 
 // Live response
 app.get('/', (req: Request, res: Response) => {
-  res.sendFile(path.join(__dirname, '../public/serverLiveWallpaper.html'));
+  const filePath = path.join(__dirname, '../public/serverLiveWallpaper.html');
+  if (fs.existsSync(filePath)) {
+    let html = fs.readFileSync(filePath, 'utf8');
+    html = html.replace(/{{APP_NAME}}/g, config.app.name || 'Server');
+    res.send(html);
+  } else {
+    res.status(StatusCodes.OK).json({
+      success: true,
+      message: `${config.app.name || 'Server'} is Live 🚀`,
+    });
+  }
 });
 
 // Global error handler

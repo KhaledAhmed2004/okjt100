@@ -67,7 +67,7 @@ const formatData = (obj: any, seen = new WeakSet()): any => {
  * ── meta convention ──────────────────────────────────────────────────────────
  *
  * `meta` is optional. When present, all fields sit flat at the top level —
- * no nested `pagination` sub-object. See RESPONSE_STANDARD.md for the full
+ * no nested `pagination` sub-object. See docs/standards/api-response-standard.md for the full
  * contract.
  *
  * Cursor pagination (real-time feeds — notifications, profiles, connections):

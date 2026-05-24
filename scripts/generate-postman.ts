@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const DOCS_BASE_DIR = path.join(process.cwd(), 'documentaction');
+const DOCS_BASE_DIR = path.join(process.cwd(), 'docs');
 const INVENTORY_FILE = path.join(DOCS_BASE_DIR, 'api-inventory.md');
 const SOCKET_HELPER_PATH = path.join(process.cwd(), 'src', 'helpers', 'socketHelper.ts');
 

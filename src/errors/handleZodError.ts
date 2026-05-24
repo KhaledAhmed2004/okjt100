@@ -1,24 +1,3 @@
-// import { ZodError } from 'zod';
-// import { IErrorMessage } from '../types/errors.types';
-
-// const handleZodError = (error: ZodError) => {
-//   const errorMessages: IErrorMessage[] = error.errors.map(el => {
-//     return {
-//       path: el.path[el.path.length - 1],
-//       message: el.message,
-//     };
-//   });
-
-//   const statusCode = 400;
-//   return {
-//     statusCode,
-//     message: 'Validation Error',
-//     errorMessages,
-//   };
-// };
-
-// export default handleZodError;
-
 import {
   ZodError,
   ZodIssueCode,
@@ -33,7 +12,7 @@ const cleanPath = (pathArray: (string | number)[]): string =>
   pathArray.join('.').replace(/^body\./, '');
 
 const handleZodError = (
-  error: ZodError
+  error: ZodError,
 ): { statusCode: number; message: string; errorMessages: IErrorMessage[] } => {
   const allErrorMessages: IErrorMessage[] = [];
   const missingFields: string[] = [];
@@ -46,10 +25,10 @@ const handleZodError = (
         .flatMap(issue =>
           issue.code === ZodIssueCode.invalid_type && issue.path.length > 1
             ? [String(issue.path[1])]
-            : []
+            : [],
         )
-        .filter(Boolean)
-    )
+        .filter(Boolean),
+    ),
   );
 
   // Single pass over all Zod issues
