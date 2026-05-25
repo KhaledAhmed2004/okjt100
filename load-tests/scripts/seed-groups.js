@@ -60,7 +60,10 @@ if (!JWT_SECRET) {
   process.exit(1);
 }
 
-const JWT_EXPIRE = process.env.JWT_EXPIRE_IN || '30d';
+// Load test tokens should have a very long expiry so tests don't fail due to token expiration.
+// Production JWT_EXPIRE_IN is typically 1-7 days, but load test fixtures need to remain valid
+// across multiple test runs without re-seeding.
+const JWT_EXPIRE = process.env.LOAD_TEST_JWT_EXPIRE || '365d';
 const EMAIL_PREFIX = 'loadtest-';
 
 // ── Fixture output paths ──────────────────────────────────────────────────────

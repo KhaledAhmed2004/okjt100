@@ -102,6 +102,8 @@
     "load:pending-email:stress": "k6 run --out web-dashboard -e SCENARIO=stress load-tests/modules/pending-email/pending-email.load.js",
     "load:pending-email:baseline": "k6 run --out web-dashboard -e SCENARIO=baseline load-tests/modules/pending-email/pending-email.load.js",
     "load:seed:pending-email": "node load-tests/scripts/seed-pending-email.js",
+    "load:report:admin": "start load-tests/reports/admin/report.html",
+    "load:report:open": "start load-tests/reports",
     "docker:up": "docker-compose up -d --build",
     "docker:down": "docker-compose down",
     "docker:logs": "docker-compose logs -f api",
