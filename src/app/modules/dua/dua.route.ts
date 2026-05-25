@@ -15,7 +15,7 @@ router.get('/:duaId', DuaController.getSingleDua);
 router.post(
   '/',
   auth(USER_ROLES.SUPER_ADMIN),
-  fileHandler([{ name: 'audio', maxCount: 1 }], { maxFileSizeMB: 10 }),
+  fileHandler([{ name: 'audio', maxCount: 1 }], { maxFileSizeMB: 100 }),
   validateRequest(DuaValidation.createDuaZodSchema),
   DuaController.createDua,
 );
@@ -23,7 +23,7 @@ router.post(
 router.patch(
   '/:duaId',
   auth(USER_ROLES.SUPER_ADMIN),
-  fileHandler([{ name: 'audio', maxCount: 1 }], { maxFileSizeMB: 10 }),
+  fileHandler([{ name: 'audio', maxCount: 1 }], { maxFileSizeMB: 100 }),
   validateRequest(DuaValidation.updateDuaZodSchema),
   DuaController.updateDua,
 );

@@ -1,0 +1,104 @@
+{
+  "brotherGroups": [
+    {
+      "id": "6a121d22f476457bd68d5ff7",
+      "name": "Load Test Brothers Group 0"
+    },
+    {
+      "id": "6a121d22f476457bd68d5ff9",
+      "name": "Load Test Brothers Group 1"
+    }
+  ],
+  "sisterGroups": [
+    {
+      "id": "6a121d22f476457bd68d5ffb",
+      "name": "Load Test Sisters Group 0"
+    },
+    {
+      "id": "6a121d22f476457bd68d5ffd",
+      "name": "Load Test Sisters Group 1"
+    }
+  ],
+  "posts": [
+    {
+      "id": "6a121d22f476457bd68d611b",
+      "groupId": "6a121d22f476457bd68d5ff7"
+    },
+    {
+      "id": "6a121d22f476457bd68d611d",
+      "groupId": "6a121d22f476457bd68d5ff7"
+    },
+    {
+      "id": "6a121d22f476457bd68d611f",
+      "groupId": "6a121d22f476457bd68d5ff7"
+    },
+    {
+      "id": "6a121d22f476457bd68d6121",
+      "groupId": "6a121d22f476457bd68d5ff7"
+    },
+    {
+      "id": "6a121d22f476457bd68d6123",
+      "groupId": "6a121d22f476457bd68d5ff7"
+    },
+    {
+      "id": "6a121d22f476457bd68d6125",
+      "groupId": "6a121d22f476457bd68d5ff9"
+    },
+    {
+      "id": "6a121d22f476457bd68d6127",
+      "groupId": "6a121d22f476457bd68d5ff9"
+    },
+    {
+      "id": "6a121d22f476457bd68d6129",
+      "groupId": "6a121d22f476457bd68d5ff9"
+    },
+    {
+      "id": "6a121d22f476457bd68d612b",
+      "groupId": "6a121d22f476457bd68d5ff9"
+    },
+    {
+      "id": "6a121d22f476457bd68d612d",
+      "groupId": "6a121d22f476457bd68d5ff9"
+    },
+    {
+      "id": "6a121d22f476457bd68d612f",
+      "groupId": "6a121d22f476457bd68d5ffb"
+    },
+    {
+      "id": "6a121d22f476457bd68d6131",
+      "groupId": "6a121d22f476457bd68d5ffb"
+    },
+    {
+      "id": "6a121d22f476457bd68d6133",
+      "groupId": "6a121d22f476457bd68d5ffb"
+    },
+    {
+      "id": "6a121d22f476457bd68d6135",
+      "groupId": "6a121d22f476457bd68d5ffb"
+    },
+    {
+      "id": "6a121d22f476457bd68d6137",
+      "groupId": "6a121d22f476457bd68d5ffb"
+    },
+    {
+      "id": "6a121d22f476457bd68d6139",
+      "groupId": "6a121d22f476457bd68d5ffd"
+    },
+    {
+      "id": "6a121d22f476457bd68d613b",
+      "groupId": "6a121d22f476457bd68d5ffd"
+    },
+    {
+      "id": "6a121d22f476457bd68d613d",
+      "groupId": "6a121d22f476457bd68d5ffd"
+    },
+    {
+      "id": "6a121d22f476457bd68d613f",
+      "groupId": "6a121d22f476457bd68d5ffd"
+    },
+    {
+      "id": "6a121d22f476457bd68d6141",
+      "groupId": "6a121d22f476457bd68d5ffd"
+    }
+  ]
+}

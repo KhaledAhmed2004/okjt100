@@ -1,0 +1,7 @@
+{
+  "adminUserRef": {
+    "id": "6a121d0ff476457bd68d5f69",
+    "email": "loadtest-admin@test.com",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjZhMTIxZDBmZjQ3NjQ1N2JkNjhkNWY2OSIsInJvbGUiOiJTVVBFUl9BRE1JTiIsImVtYWlsIjoibG9hZHRlc3QtYWRtaW5AdGVzdC5jb20iLCJ0b2tlblZlcnNpb24iOjAsImlhdCI6MTc3OTU3MjAwMiwiZXhwIjoxNzc5NjU4NDAyfQ.YTVxXntVhkHpka07hK8eCdk5wf1PZw616hFbwJGTvfk"
+  }
+}
