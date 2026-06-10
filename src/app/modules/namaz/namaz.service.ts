@@ -199,6 +199,7 @@ const getPrayerGuide = async (salahType: TSalahType) => {
 
 export const NamazService = {
   getSurahList,
+  fetchSurahData,
   upsertSalahConfig,
   getAllSalahConfigs,
   getPrayerGuide,

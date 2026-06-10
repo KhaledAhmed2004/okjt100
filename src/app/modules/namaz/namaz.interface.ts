@@ -10,6 +10,7 @@ export interface IPrayerStep extends Document {
   transliteration: string;
   translation: string;
   isPlaceholder: boolean;   // true only for 'additional-surah' step
+  verses?: IVerse[];        // dynamically fetched verses for steps like 'surah-al-fatihah'
   createdAt: Date;
   updatedAt: Date;
 }

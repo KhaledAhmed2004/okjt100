@@ -1,21 +1,6 @@
 import { Schema, model } from 'mongoose';
 import { IPrayerStep, ISalahConfig, IVerse, IRakatConfig } from './namaz.interface';
 
-const PrayerStepSchema = new Schema<IPrayerStep>(
-  {
-    stepKey:         { type: String, required: true, unique: true },
-    order:           { type: Number, required: true },
-    stepName:        { type: String, required: true },
-    arabicText:      { type: String, required: function() { return !this.isPlaceholder; } },
-    transliteration: { type: String, required: function() { return !this.isPlaceholder; } },
-    translation:     { type: String, required: function() { return !this.isPlaceholder; } },
-    isPlaceholder:   { type: Boolean, default: false },
-  },
-  { timestamps: true },
-);
-
-PrayerStepSchema.index({ order: 1 });
-
 const VerseSchema = new Schema<IVerse>(
   {
     verseNumber:     { type: Number, required: true },
@@ -27,6 +12,24 @@ const VerseSchema = new Schema<IVerse>(
   },
   { _id: false },
 );
+
+const PrayerStepSchema = new Schema<IPrayerStep>(
+  {
+    stepKey:         { type: String, required: true, unique: true },
+    order:           { type: Number, required: true },
+    stepName:        { type: String, required: true },
+    arabicText:      { type: String, required: function() { return !this.isPlaceholder; } },
+    transliteration: { type: String, required: function() { return !this.isPlaceholder; } },
+    translation:     { type: String, required: function() { return !this.isPlaceholder; } },
+    isPlaceholder:   { type: Boolean, default: false },
+    verses:          { type: [VerseSchema], default: undefined },
+  },
+  { timestamps: true },
+);
+
+PrayerStepSchema.index({ order: 1 });
+
+
 
 const RakatConfigSchema = new Schema<IRakatConfig>(
   {

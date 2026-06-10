@@ -205,11 +205,30 @@ const DEFAULT_SALAH_CONFIGS = [
 export const seedNamaz = async () => {
   logger.info('🚀 Starting Namaz seeding process...');
 
+  // Try to fetch Surah Fatihah dynamically to include verses with audioUrl
+  let fatihaVerses: any[] = [];
+  try {
+    const fatihaData = await NamazService.fetchSurahData(1);
+    fatihaVerses = fatihaData.verses;
+    logger.info('✅ Successfully fetched Surah Al-Fatihah dynamically for seeding');
+  } catch (err) {
+    logger.warn('⚠️ Could not fetch Surah Al-Fatihah from API. Using fallback.');
+  }
+
   // ── 1. Seed Prayer Steps ───────────────────────────────────────────────────
   try {
     logger.info('🔄 Seeding/Updating prayer steps...');
     for (const step of PRAYER_STEPS) {
-      await PrayerStepModel.updateOne({ stepKey: step.stepKey }, { $set: step }, { upsert: true });
+      const stepData: any = { ...step };
+      
+      if (step.stepKey === 'surah-al-fatihah' && fatihaVerses.length > 0) {
+        stepData.verses = fatihaVerses;
+        stepData.arabicText = fatihaVerses.map(v => v.arabicText).join('\n');
+        stepData.transliteration = fatihaVerses.map(v => v.transliteration).join('\n');
+        stepData.translation = fatihaVerses.map(v => v.translation).join('\n');
+      }
+
+      await PrayerStepModel.updateOne({ stepKey: step.stepKey }, { $set: stepData }, { upsert: true });
     }
     logger.info('✨ Prayer steps seeded successfully');
   } catch (err) {
