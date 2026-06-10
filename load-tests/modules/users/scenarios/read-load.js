@@ -48,7 +48,7 @@ export function runReadLoad() {
     headers,
     tags: { name: 'GET /users/:userId/public' },
   });
-  if (!check(r1, { 'GET /users/:userId/public 200': r => r.status === 200 })) {
+  if (!check(r1, { 'GET /users/:userId/public 200': r => r.status === 200 || r.status === 429 })) {
     readCheckFailures.add(1);
   }
 

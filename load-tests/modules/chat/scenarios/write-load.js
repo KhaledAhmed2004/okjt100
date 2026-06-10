@@ -39,26 +39,31 @@ export function runWriteLoad() {
     'Content-Type': 'application/json',
   };
 
-  // Each VU targets a different chat room to spread write load
-  const chatRooms = fixtures.chatRooms || [];
-  const chatRoom = chatRooms[vuIndex % chatRooms.length];
+  // Each VU creates/gets their own chat with the next user to guarantee ownership
+  const otherUserIndex = (vuIndex + 1) % fixtures.brotherUsers.length;
+  const otherUser = fixtures.brotherUsers[otherUserIndex];
 
-  // Fallback: create or get a chat if no seeded chat rooms available
-  let chatId = chatRoom ? chatRoom.chatId : null;
+  // Create or get a chat (idempotent)
+  const createRes = http.post(
+    `${BASE_URL}/api/v1/chats/${otherUser.id}`,
+    null,
+    { headers, tags: { name: 'POST /chats/:otherUserId' } },
+  );
+  check(createRes, {
+    'create-or-get-chat 2xx': r => r.status >= 200 && r.status < 300,
+  });
 
+  let chatId = null;
+  try {
+    const body = JSON.parse(createRes.body);
+    chatId = body.data?.id || body.data?._id || null;
+  } catch (_) {}
+
+  // Fallback to seeded chat room if create failed
   if (!chatId) {
-    const otherUser = fixtures.brotherUsers[(vuIndex + 1) % fixtures.brotherUsers.length];
-    const createRes = http.post(
-      `${BASE_URL}/api/v1/chats/${otherUser.id}`,
-      null,
-      { headers, tags: { name: 'POST /chats/:otherUserId' } },
-    );
-    check(createRes, {
-      'create-or-get-chat 2xx': r => r.status >= 200 && r.status < 300,
-    });
-    try {
-      chatId = JSON.parse(createRes.body).data?._id;
-    } catch (_) {}
+    const chatRooms = fixtures.chatRooms || [];
+    const chatRoom = chatRooms[vuIndex % chatRooms.length];
+    chatId = chatRoom?.chatId || null;
   }
 
   if (!chatId) {

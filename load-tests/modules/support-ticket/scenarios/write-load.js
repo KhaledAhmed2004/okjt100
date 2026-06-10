@@ -49,14 +49,25 @@ export function runWriteLoad() {
     );
     check(res, { 'POST /support-tickets 2xx': r => r.status >= 200 && r.status < 300 });
   } else {
-    // Reply to an existing ticket
-    const ticket = fixtures.tickets[vuIndex % fixtures.tickets.length];
-    const res = http.post(
-      `${BASE_URL}/api/v1/support-tickets/${ticket.id}/reply`,
+    // Create a ticket first, then reply to it (ensures ownership)
+    const createRes = http.post(
+      `${BASE_URL}/api/v1/support-tickets`,
+      JSON.stringify({
+        subject: `loadtest-write-reply-base VU${__VU}`,
+        message: `Base ticket for reply VU${__VU}`,
+      }),
+      { headers, tags: { name: 'POST /support-tickets' } },
+    );
+    let ticketId = null;
+    try { ticketId = JSON.parse(createRes.body)?.data?.ticket?.id; } catch (_) {}
+    if (!ticketId) return;
+
+    const replyRes = http.post(
+      `${BASE_URL}/api/v1/support-tickets/${ticketId}/reply`,
       JSON.stringify({ message: `Write load reply VU${__VU} ${Date.now()}` }),
       { headers, tags: { name: 'POST /support-tickets/:id/reply' } },
     );
-    check(res, { 'POST /support-tickets/:id/reply 2xx': r => r.status >= 200 && r.status < 300 });
+    check(replyRes, { 'POST /support-tickets/:id/reply 2xx': r => r.status >= 200 && r.status < 300 });
   }
 
   sleep(1);

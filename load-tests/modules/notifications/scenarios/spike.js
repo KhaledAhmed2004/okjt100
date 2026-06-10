@@ -65,12 +65,13 @@ export function runSpike() {
       'Content-Type': 'application/json',
     };
     const broadcastRes = http.post(
-      `${BASE_URL}/api/v1/notifications/broadcast`,
+      `${BASE_URL}/api/v1/notifications/broadcasts`,
       JSON.stringify({
         title: `spike-broadcast-${Date.now()}`,
-        message: `Load test broadcast spike iteration ${__ITER}`,
+        text: `Load test broadcast spike iteration ${__ITER}`,
+        audience: 'ALL',
       }),
-      { headers: adminHeaders, tags: { name: 'POST /notifications/broadcast', stage } },
+      { headers: adminHeaders, tags: { name: 'POST /notifications/broadcasts', stage } },
     );
     check(broadcastRes, {
       'spike broadcast 2xx': r => r.status >= 200 && r.status < 300,
@@ -99,10 +100,15 @@ export function runSpike() {
   }
 
   // Step 3: Some VUs mark notifications as read (simulates user interaction after fetch)
-  // This adds write pressure on top of the read amplification.
+  // Uses notifications that belong to this VU's user to avoid 403 errors.
   if (__ITER % 3 === 0 && fixtures.notifications && fixtures.notifications.length > 0) {
-    const notificationId =
-      fixtures.notifications[vuIndex % fixtures.notifications.length].notificationId;
+    // Find a notification owned by this VU's user
+    const vuUserId = fixtures.brotherUsers[vuIndex % fixtures.brotherUsers.length]?.id;
+    const ownedNotifs = fixtures.notifications.filter(n => n.userId === vuUserId);
+    const notif = ownedNotifs.length > 0
+      ? ownedNotifs[__ITER % ownedNotifs.length]
+      : fixtures.notifications[vuIndex % fixtures.notifications.length];
+    const notificationId = notif.notificationId;
     const markRes = http.patch(
       `${BASE_URL}/api/v1/notifications/${notificationId}/read`,
       null,

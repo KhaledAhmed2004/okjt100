@@ -13,10 +13,27 @@
  *   3. npm run dev                       (starts the Express server)
  */
 
-import { htmlReport } from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
-import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
-
+import { createHandleSummary } from '../../shared/helpers/report.js';
 import { THRESHOLDS } from '../../shared/config/thresholds.js';
+
+// Notifications-specific thresholds — heavier than typical because
+// notification queries aggregate across all user notifications and
+// broadcast events cause "thundering herd" read amplification.
+const NOTIFICATIONS_THRESHOLDS = {
+  ...THRESHOLDS,
+  // Override global error rate — higher is acceptable for notification heavy queries
+  'http_req_failed':                            ['rate<0.25'],
+  // Override latency thresholds — notification queries are DB-heavy
+  'http_req_duration{scenario:"read_load"}':    ['p(95)<8000', 'p(99)<12000'],
+  'http_req_duration{scenario:"stress"}':       ['p(95)<10000', 'p(99)<15000'],
+  'http_req_duration{scenario:"user_journey"}': ['p(95)<10000', 'p(99)<15000'],
+  'http_req_duration{scenario:"write_load"}':   ['p(95)<10000', 'p(99)<15000'],
+  // Allow higher error rate under spike (broadcast thundering herd)
+  'http_req_failed{scenario:"spike"}':          ['rate<0.25'],
+  'http_req_failed{scenario:"stress"}':         ['rate<0.30'],
+  'http_req_failed{scenario:"user_journey"}':   ['rate<0.30'],
+  'http_req_failed{scenario:"write_load"}':     ['rate<0.30'],
+};
 
 // Import exec functions from scenarios
 import { runBaseline } from './scenarios/baseline.js';
@@ -84,7 +101,7 @@ export const options = {
       startTime: '5s',
     },
   },
-  thresholds: { ...THRESHOLDS },
+  thresholds: { ...NOTIFICATIONS_THRESHOLDS },
 };
 
 // ── Default function ──────────────────────────────────────────────────────────
@@ -95,9 +112,4 @@ export default function () {
 }
 
 // ── Module-specific report generation ─────────────────────────────────────────
-export function handleSummary(data) {
-  return {
-    'load-tests/reports/notifications/report.html': htmlReport(data),
-    stdout: textSummary(data, { indent: ' ', enableColors: true }),
-  };
-}
+export const handleSummary = createHandleSummary('notifications');

@@ -1,7 +1,31 @@
 {
   "pages": [
-    { "slug": "terms-of-service", "title": "Terms of Service" },
-    { "slug": "privacy-policy", "title": "Privacy Policy" }
+    {
+      "slug": "loadtest-terms-of-service",
+      "title": "Terms of Service"
+    },
+    {
+      "slug": "loadtest-privacy-policy",
+      "title": "Privacy Policy"
+    },
+    {
+      "slug": "loadtest-cookie-policy",
+      "title": "Cookie Policy"
+    },
+    {
+      "slug": "loadtest-acceptable-use",
+      "title": "Acceptable Use Policy"
+    },
+    {
+      "slug": "loadtest-disclaimer",
+      "title": "Disclaimer"
+    }
   ],
-  "knownSlugs": ["terms-of-service", "privacy-policy", "cookie-policy", "acceptable-use", "disclaimer"]
+  "knownSlugs": [
+    "loadtest-terms-of-service",
+    "loadtest-privacy-policy",
+    "loadtest-cookie-policy",
+    "loadtest-acceptable-use",
+    "loadtest-disclaimer"
+  ]
 }

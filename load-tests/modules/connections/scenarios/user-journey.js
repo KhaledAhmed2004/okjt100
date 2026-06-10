@@ -60,10 +60,11 @@ function step(name, res) {
 export function runUserJourney() {
   const vuIndex = __VU - 1;
 
-  // Each VU uses a unique pair of brother users to avoid conflicts
-  // Sender: even-indexed user, Receiver: odd-indexed user
-  const senderIndex = (vuIndex * 2) % fixtures.brotherUsers.length;
-  const receiverIndex = (vuIndex * 2 + 1) % fixtures.brotherUsers.length;
+  // Each VU uses rotating pairs across iterations to avoid "already connected" state
+  // 50 brothers = 25 possible pairs; rotate by __ITER to spread across them
+  const pairOffset = (__ITER * 2) % (fixtures.brotherUsers.length - 1);
+  const senderIndex = (vuIndex + pairOffset) % fixtures.brotherUsers.length;
+  const receiverIndex = (vuIndex + pairOffset + 1) % fixtures.brotherUsers.length;
 
   const senderHeaders = {
     ...getAuthHeaders(fixtures, 'brother', senderIndex),

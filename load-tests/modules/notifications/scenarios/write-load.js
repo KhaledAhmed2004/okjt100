@@ -52,14 +52,18 @@ export function runWriteLoad() {
     'broadcast 2xx': r => r.status >= 200 && r.status < 300,
   });
 
-  // ── Step 2: Concurrent mark-as-read on existing notifications ───────────────
+  // ── Step 2: Concurrent mark-as-read on own notifications ──────────────────
   const userHeaders = {
     ...getAuthHeaders(fixtures, 'brother', vuIndex),
     'Content-Type': 'application/json',
   };
 
-  // Each VU targets a different notification from the fixture pool
-  const notification = fixtures.notifications[vuIndex % fixtures.notifications.length];
+  // Each VU targets only notifications belonging to their own user
+  const vuUserId = fixtures.brotherUsers[vuIndex % fixtures.brotherUsers.length]?.id;
+  const ownedNotifs = fixtures.notifications.filter(n => n.userId === vuUserId);
+  const notification = ownedNotifs.length > 0
+    ? ownedNotifs[__ITER % ownedNotifs.length]
+    : fixtures.notifications[vuIndex % fixtures.notifications.length];
 
   const markReadRes = http.patch(
     `${BASE_URL}/api/v1/notifications/${notification.notificationId}/read`,

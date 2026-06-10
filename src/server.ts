@@ -4,6 +4,7 @@ import app from './app';
 import config from './config';
 import { allowedOrigins } from './app/logging/corsLogger';
 import { seedSuperAdmin } from './DB/seedAdmin';
+import { seedNamaz } from './DB/seedNamaz';
 import { socketHelper } from './helpers/socketHelper';
 import { SocketManager } from './helpers/socketManager';
 import { errorLogger, logger, notifyCritical } from './shared/logger';
@@ -81,13 +82,14 @@ async function main() {
     }
 
     // Seed Super Admin after database connection is successful
-    const seedSpinner = createSpinner({ text: 'Verifying super admin account...', color: 'cyan' });
+    const seedSpinner = createSpinner({ text: 'Verifying system seeds...', color: 'cyan' });
     try {
       await seedSuperAdmin();
-      seedSpinner.succeed('Super admin ready');
+      await seedNamaz();
+      seedSpinner.succeed('System seeds ready');
     } catch (seedError) {
-      seedSpinner.fail('Super admin verification failed');
-      errorLogger.error('❌ Super admin seeding error:', seedError);
+      seedSpinner.fail('System seeding failed');
+      errorLogger.error('❌ System seeding error:', seedError);
       throw seedError;
     }
 

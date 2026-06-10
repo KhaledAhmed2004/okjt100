@@ -88,7 +88,7 @@ function signToken(user) {
  * Hash a password synchronously.
  */
 function hashPassword(plain) {
-  return bcrypt.hashSync(plain, 10);
+  return bcrypt.hashSync(plain, 12);
 }
 
 // ── Main seed function ────────────────────────────────────────────────────────
@@ -118,7 +118,8 @@ async function seed() {
   // They are separate from the shared base users to avoid interfering with other modules.
   console.log(`[seed-${MODULE_NAME}] Creating auth test accounts...`);
 
-  const hashedPassword = hashPassword(KNOWN_PASSWORD);
+  // Use plain password — User.create() pre-save hook will hash it with config.bcrypt_salt_rounds
+  const plainPassword = KNOWN_PASSWORD;
   const testAccounts = [];
 
   // Create 10 auth test accounts (mix of roles for rate-limit distribution)
@@ -140,7 +141,7 @@ async function seed() {
       name: `Load Test Auth ${config.suffix}`,
       role: config.role,
       email: `${EMAIL_PREFIX}${config.suffix}@test.com`,
-      password: hashedPassword,
+      password: plainPassword,
       status: 'ACTIVE',
       isVerified: true,
       dateOfBirth: new Date('1990-01-01'),
@@ -160,7 +161,7 @@ async function seed() {
     name: 'Load Test Auth OTP',
     role: 'BROTHER',
     email: `${EMAIL_PREFIX}otp@test.com`,
-    password: hashedPassword,
+    password: plainPassword,
     status: 'ACTIVE',
     isVerified: true,
     dateOfBirth: new Date('1990-01-01'),

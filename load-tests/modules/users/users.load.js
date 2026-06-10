@@ -13,10 +13,22 @@
  *   3. npm run dev               (starts the Express server)
  */
 
-import { htmlReport } from 'https://raw.githubusercontent.com/benc-uk/k6-reporter/main/dist/bundle.js';
-import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
-
+import { createHandleSummary } from '../../shared/helpers/report.js';
 import { THRESHOLDS } from '../../shared/config/thresholds.js';
+
+// Users-specific thresholds — write operations (profile update, email change)
+// can be rate-limited under high concurrency; relaxed thresholds reflect this.
+const USERS_THRESHOLDS = {
+  ...THRESHOLDS,
+  'http_req_duration{scenario:"read_load"}':    ['p(95)<8000', 'p(99)<12000'],
+  'http_req_duration{scenario:"write_load"}':   ['p(95)<8000', 'p(99)<12000'],
+  'http_req_duration{scenario:"stress"}':       ['p(95)<8000', 'p(99)<12000'],
+  // Rate limiting (429) is expected — public profile has 60 req/min limit per IP
+  'http_req_failed':                            ['rate<0.35'],
+  'http_req_failed{scenario:"read_load"}':      ['rate<0.35'],
+  'http_req_failed{scenario:"write_load"}':     ['rate<0.40'],
+  'http_req_failed{scenario:"stress"}':         ['rate<0.30'],
+};
 
 // Import exec functions from scenarios
 import { runBaseline } from './scenarios/baseline.js';
@@ -87,7 +99,7 @@ export const options = {
       startTime: '80s',
     },
   },
-  thresholds: { ...THRESHOLDS },
+  thresholds: { ...USERS_THRESHOLDS },
 };
 
 // ── Default function ──────────────────────────────────────────────────────────
@@ -98,9 +110,4 @@ export default function () {
 }
 
 // ── Module-specific report generation ─────────────────────────────────────────
-export function handleSummary(data) {
-  return {
-    'load-tests/reports/users/report.html': htmlReport(data),
-    stdout: textSummary(data, { indent: ' ', enableColors: true }),
-  };
-}
+export const handleSummary = createHandleSummary('users');

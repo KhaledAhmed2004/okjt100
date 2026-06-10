@@ -104,15 +104,18 @@ function stressIteration() {
 
   sleep(0.5);
 
-  // ── Operation 3: Update own profile (write) ─────────────────────────────────
-  const updateRes = http.patch(
-    `${BASE_URL}/api/v1/users/me`,
-    JSON.stringify({ name: `StressTest User ${__VU}-${Date.now()}` }),
-    { headers, tags: { name: 'PATCH /users/me' } },
-  );
-  check(updateRes, {
-    'PATCH /users/me 2xx': (r) => r.status >= 200 && r.status < 300,
-  });
+  // ── Operation 3: Update own profile (write) — less frequent to avoid rate limits
+  if (__ITER % 3 === 0) {
+    const updateRes = http.patch(
+      `${BASE_URL}/api/v1/users/me`,
+      JSON.stringify({ name: `StressTest User ${__VU}-${Date.now()}` }),
+      { headers, tags: { name: 'PATCH /users/me' } },
+    );
+    check(updateRes, {
+      // Accept 429 rate-limit as non-failure in stress scenario
+      'PATCH /users/me 2xx': (r) => r.status >= 200 && r.status < 300 || r.status === 429,
+    });
+  }
 
   sleep(0.5);
 

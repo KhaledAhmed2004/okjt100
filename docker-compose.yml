@@ -1,20 +1,28 @@
 
 services:
-  # --- MongoDB Service ---
+  # --- MongoDB Service (Replica Set rs0) ---
+  # Replica set is required for multi-document transactions used by modules
+  # like support-ticket, connections, chat, etc.
   mongodb:
     image: mongo:latest
     container_name: okjt100-mongodb
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - okjt100-network
     healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      test: >
+        mongosh --quiet --eval
+        "try { rs.status().ok } catch(e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongodb:27017'}]}).ok }"
+        | grep -q 1
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
   # --- Redis Service ---
   redis:
@@ -43,7 +51,7 @@ services:
       - .env
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=mongodb://mongodb:27017/okjt100
+      - DATABASE_URL=mongodb://mongodb:27017/okjt100?replicaSet=rs0
       - REDIS_URL=redis://redis:6379
     depends_on:
       mongodb:

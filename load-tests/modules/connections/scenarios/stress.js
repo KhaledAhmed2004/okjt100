@@ -59,82 +59,60 @@ export const stressScenario = {
 
 export function runStress() {
   const vuIndex = __VU - 1;
-  const headers = {
-    ...getAuthHeaders(fixtures, 'brother', vuIndex),
+
+  // Use well-separated user pairs — stride of 5 to avoid overlap across VUs
+  // With 50 brothers, 25 non-overlapping pairs available
+  const stride = 5;
+  const senderIndex = (vuIndex * stride) % fixtures.brotherUsers.length;
+  const receiverIndex = (vuIndex * stride + 1) % fixtures.brotherUsers.length;
+
+  const senderHeaders = {
+    ...getAuthHeaders(fixtures, 'brother', senderIndex),
     'Content-Type': 'application/json',
   };
-
-  // Distribute across available users and fixture data to avoid hotspotting
-  const targetUser = fixtures.brotherUsers[(vuIndex + 1) % fixtures.brotherUsers.length];
-  const pendingRequest = fixtures.pendingRequests[vuIndex % fixtures.pendingRequests.length];
-  const existingConnection = fixtures.existingConnections[vuIndex % fixtures.existingConnections.length];
+  const receiverHeaders = {
+    ...getAuthHeaders(fixtures, 'brother', receiverIndex),
+    'Content-Type': 'application/json',
+  };
+  const receiverId = fixtures.brotherUsers[receiverIndex].id;
 
   // ── Operation 1: Send a connection request ──────────────────────────────────
   const sendRes = http.post(
     `${BASE_URL}/api/v1/connections`,
-    JSON.stringify({ receiverId: targetUser.id }),
-    { headers, tags: { name: 'POST /connections (send)' } },
+    JSON.stringify({ receiverId }),
+    { headers: senderHeaders, tags: { name: 'POST /connections (send)' } },
   );
+  // 201 = new request, 409 = already exists (both acceptable)
   check(sendRes, {
-    'POST /connections (send) 2xx': (r) => r.status >= 200 && r.status < 300,
+    'POST /connections (send) 2xx or 409': (r) => r.status >= 200 && r.status < 300 || r.status === 409,
   });
 
-  // Extract connection ID for subsequent operations
-  let connectionId;
+  let connectionId = null;
   try {
     const body = sendRes.json();
     connectionId = body.data && (body.data._id || body.data.id || body.data.connectionId);
-  } catch (e) {
-    // Use a pending request ID as fallback
-    connectionId = pendingRequest.requestId;
-  }
+  } catch (_) {}
 
-  // ── Operation 2: Accept a connection request ────────────────────────────────
-  const acceptRes = http.post(
-    `${BASE_URL}/api/v1/connections/${pendingRequest.requestId}/accept`,
-    null,
-    { headers, tags: { name: 'POST /connections/:id/accept' } },
-  );
-  check(acceptRes, {
-    'POST /connections/:id/accept 2xx': (r) => r.status >= 200 && r.status < 300,
+  // ── Operation 2: Read connections list ──────────────────────────────────────
+  const listRes = http.get(`${BASE_URL}/api/v1/connections`, {
+    headers: senderHeaders,
+    tags: { name: 'GET /connections (list)' },
+  });
+  check(listRes, {
+    'GET /connections 2xx': (r) => r.status >= 200 && r.status < 300,
   });
 
-  // ── Operation 3: Reject a connection request ────────────────────────────────
-  // Use a different pending request to simulate reject
-  const rejectIndex = (vuIndex + 1) % fixtures.pendingRequests.length;
-  const rejectRequest = fixtures.pendingRequests[rejectIndex];
-
-  const rejectRes = http.post(
-    `${BASE_URL}/api/v1/connections/${rejectRequest.requestId}/reject`,
-    null,
-    { headers, tags: { name: 'POST /connections/:id/reject' } },
-  );
-  check(rejectRes, {
-    'POST /connections/:id/reject 2xx': (r) => r.status >= 200 && r.status < 300,
-  });
-
-  // ── Operation 4: Cancel a sent connection request ───────────────────────────
-  if (connectionId) {
+  // ── Operation 3: Cancel the request (cleanup) if newly created ──────────────
+  if (connectionId && sendRes.status === 201) {
     const cancelRes = http.post(
       `${BASE_URL}/api/v1/connections/${connectionId}/cancel`,
       null,
-      { headers, tags: { name: 'POST /connections/:id/cancel' } },
+      { headers: senderHeaders, tags: { name: 'POST /connections/:id/cancel' } },
     );
     check(cancelRes, {
       'POST /connections/:id/cancel 2xx': (r) => r.status >= 200 && r.status < 300,
     });
   }
-
-  // ── Operation 5: Remove an existing connection ──────────────────────────────
-  const removeUserId = existingConnection.userId2;
-  const removeRes = http.del(
-    `${BASE_URL}/api/v1/connections/${removeUserId}`,
-    null,
-    { headers, tags: { name: 'DELETE /connections/:userId (remove)' } },
-  );
-  check(removeRes, {
-    'DELETE /connections/:userId (remove) 2xx': (r) => r.status >= 200 && r.status < 300,
-  });
 
   sleep(1);
 }

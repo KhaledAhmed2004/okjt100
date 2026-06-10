@@ -17,6 +17,7 @@ import { ConnectionRoutes } from '../app/modules/connection/connection.route';
 import { ChatRoutes } from '../app/modules/chat/chat.route';
 import { MessageRoutes } from '../app/modules/message/message.route';
 import { PrayerTimeRoutes } from '../app/modules/prayer-time/prayer-time.route';
+import { NamazRoutes } from '../app/modules/namaz/namaz.route';
 
 const router = express.Router();
 
@@ -92,6 +93,10 @@ const apiRoutes = [
   {
     path: '/prayer-times',
     route: PrayerTimeRoutes,
+  },
+  {
+    path: '/namaz',
+    route: NamazRoutes,
   },
 ];
 

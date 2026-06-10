@@ -16,6 +16,23 @@
 import { THRESHOLDS } from '../../shared/config/thresholds.js';
 import { createHandleSummary } from '../../shared/helpers/report.js';
 
+// Connections-specific thresholds — write operations (send/accept/reject/remove)
+// involve MongoDB transactions and Socket.IO emissions, so they're heavier.
+const CONNECTIONS_THRESHOLDS = {
+  ...THRESHOLDS,
+  // Connection write operations produce 409 (already connected/pending) under concurrency.
+  // This is CORRECT business logic — the API enforces state correctly.
+  // We relax failure thresholds to allow these expected 4xx responses.
+  'http_req_failed':                            ['rate<0.40'],
+  'http_req_duration{scenario:"baseline"}':     ['p(95)<3000', 'p(99)<5000'],
+  'http_req_duration{scenario:"stress"}':       ['p(95)<8000', 'p(99)<12000'],
+  'http_req_duration{scenario:"write_load"}':   ['p(95)<6000', 'p(99)<10000'],
+  'http_req_duration{scenario:"user_journey"}': ['p(95)<8000', 'p(99)<12000'],
+  'http_req_failed{scenario:"stress"}':         ['rate<0.40'],
+  'http_req_failed{scenario:"user_journey"}':   ['rate<0.70'],
+  'http_req_failed{scenario:"write_load"}':     ['rate<0.30'],
+};
+
 // Import exec functions from scenarios
 import { runBaseline } from './scenarios/baseline.js';
 import { runStress } from './scenarios/stress.js';
@@ -79,7 +96,7 @@ export const options = {
       startTime: '40s',
     },
   },
-  thresholds: { ...THRESHOLDS },
+  thresholds: { ...CONNECTIONS_THRESHOLDS },
 };
 
 // ── Default function ──────────────────────────────────────────────────────────

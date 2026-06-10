@@ -15,6 +15,12 @@
 import { THRESHOLDS } from '../../shared/config/thresholds.js';
 import { createHandleSummary } from '../../shared/helpers/report.js';
 
+// pending-email write_load uses responseCallback to mark 400 as expected.
+const PENDING_EMAIL_THRESHOLDS = {
+  ...THRESHOLDS,
+  'http_req_failed{scenario:"write_load"}': ['rate<0.10'],
+};
+
 // Import exec functions from scenarios
 import { runBaseline } from './scenarios/baseline.js';
 import { runStress } from './scenarios/stress.js';
@@ -56,7 +62,7 @@ export const options = {
       startTime: '5s',
     },
   },
-  thresholds: { ...THRESHOLDS },
+  thresholds: { ...PENDING_EMAIL_THRESHOLDS },
 };
 
 // ── Default function ──────────────────────────────────────────────────────────

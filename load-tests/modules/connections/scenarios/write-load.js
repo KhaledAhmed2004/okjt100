@@ -36,10 +36,10 @@ export const writeLoadScenario = {
 export function runWriteLoad() {
   const vuIndex = __VU - 1;
 
-  // Each VU uses a different pair of users to avoid conflicts between VUs
-  // Offset by a large stride to avoid overlapping with baseline/seed pairs
-  const senderIndex = (vuIndex * 2 + 30) % fixtures.brotherUsers.length;
-  const receiverIndex = (vuIndex * 2 + 31) % fixtures.brotherUsers.length;
+  // Rotate pairs per iteration to avoid "already connected" state
+  const pairOffset = (__ITER * 3) % (fixtures.brotherUsers.length - 1);
+  const senderIndex = (vuIndex * 2 + pairOffset + 30) % fixtures.brotherUsers.length;
+  const receiverIndex = (vuIndex * 2 + pairOffset + 31) % fixtures.brotherUsers.length;
 
   const senderHeaders = {
     ...getAuthHeaders(fixtures, 'brother', senderIndex),
@@ -57,11 +57,15 @@ export function runWriteLoad() {
   const sendRes = http.post(
     `${BASE_URL}/api/v1/connections`,
     JSON.stringify({ receiverId }),
-    { headers: senderHeaders, tags: { name: 'POST /connections (send request)' } },
+    {
+      headers: senderHeaders,
+      tags: { name: 'POST /connections (send request)' },
+      responseCallback: http.expectedStatuses(201, 200, 409),
+    },
   );
 
   check(sendRes, {
-    'send connection request 2xx': r => r.status >= 200 && r.status < 300,
+    'send connection request 2xx or 409': r => r.status >= 200 && r.status < 300 || r.status === 409,
   });
 
   // Extract connection ID from response

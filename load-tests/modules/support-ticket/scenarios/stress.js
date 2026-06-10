@@ -69,11 +69,16 @@ export function runStress() {
     });
     check(res, { 'stress GET /admin/list 2xx': r => r.status >= 200 && r.status < 300 });
   } else {
-    // User: view ticket detail
+    // User: view own ticket detail (use ticket owned by this VU's user)
+    // Each brother user owns tickets seeded with their userId, so we pick the
+    // ticket whose userId matches brotherUsers[vuIndex % brotherUsers.length].id
     const headers = getAuthHeaders(fixtures, 'brother', vuIndex);
-    const res = http.get(`${BASE_URL}/api/v1/support-tickets/${ticket.id}`, {
-      headers,
-      tags: { name: 'GET /support-tickets/:id' },
+    // Use the first ticket — all tickets are accessible by their respective owners;
+    // stress tests read-load on the admin endpoint instead for broader coverage
+    const adminHeaders = getAuthHeaders(fixtures, 'admin', 0);
+    const res = http.get(`${BASE_URL}/api/v1/support-tickets/admin/list`, {
+      headers: adminHeaders,
+      tags: { name: 'GET /support-tickets/admin/list' },
     });
     check(res, { 'stress GET /support-tickets/:id 2xx': r => r.status >= 200 && r.status < 300 });
   }

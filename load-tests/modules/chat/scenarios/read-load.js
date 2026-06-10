@@ -40,10 +40,7 @@ export function runReadLoad() {
   const vuIndex = __VU - 1;
   const headers = getAuthHeaders(fixtures, 'brother', vuIndex);
 
-  // Distribute across available chat rooms to avoid hotspotting a single chat
-  const chatRoom = fixtures.chatRooms[vuIndex % fixtures.chatRooms.length];
-
-  // GET /api/v1/chats (list-my-chats)
+  // GET /api/v1/chats (list-my-chats) — get this user's own chats
   const r1 = http.get(`${BASE_URL}/api/v1/chats`, {
     headers,
     tags: { name: 'GET /chats' },
@@ -52,8 +49,29 @@ export function runReadLoad() {
     readCheckFailures.add(1);
   }
 
+  // Use a chat this user participates in — get from list response or fallback to fixture
+  let chatId = null;
+  try {
+    const body = r1.json();
+    const chats = body.data || [];
+    if (Array.isArray(chats) && chats.length > 0) {
+      chatId = chats[0]._id || chats[0].id;
+    }
+  } catch (_) {}
+
+  // Fallback to seeded chat room (first one this user is in)
+  if (!chatId) {
+    const chatRooms = fixtures.chatRooms || [];
+    const ownedRoom = chatRooms.find(r => r.participants && r.participants.includes(
+      fixtures.brotherUsers[vuIndex % fixtures.brotherUsers.length]?.id
+    ));
+    chatId = ownedRoom?.chatId || chatRooms[vuIndex % chatRooms.length]?.chatId;
+  }
+
+  if (!chatId) { sleep(1); return; }
+
   // GET /api/v1/messages/chat/:chatId (get-chat-messages)
-  const r2 = http.get(`${BASE_URL}/api/v1/messages/chat/${chatRoom.chatId}`, {
+  const r2 = http.get(`${BASE_URL}/api/v1/messages/chat/${chatId}`, {
     headers,
     tags: { name: 'GET /messages/chat/:chatId' },
   });

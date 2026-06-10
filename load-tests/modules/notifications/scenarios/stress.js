@@ -64,8 +64,12 @@ export function runStress() {
     'Content-Type': 'application/json',
   };
 
-  // Distribute across available notifications to avoid hotspotting
-  const notification = fixtures.notifications[vuIndex % fixtures.notifications.length];
+  // Distribute across own notifications only to avoid 403 ownership errors
+  const vuUserId = fixtures.brotherUsers[vuIndex % fixtures.brotherUsers.length]?.id;
+  const ownedNotifs = fixtures.notifications.filter(n => n.userId === vuUserId);
+  const notification = ownedNotifs.length > 0
+    ? ownedNotifs[(vuIndex + __ITER) % ownedNotifs.length]
+    : fixtures.notifications[vuIndex % fixtures.notifications.length];
 
   // ── Operation 1: Fetch notifications list ───────────────────────────────────
   const listRes = http.get(`${BASE_URL}/api/v1/notifications/me`, {

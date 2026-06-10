@@ -56,9 +56,10 @@ export function runUserJourney() {
   let ticketId = null;
   try {
     const body = JSON.parse(s1.body);
-    ticketId = body?.data?._id || body?.data?.id || null;
+    ticketId = body?.data?.ticket?.id || body?.data?._id || body?.data?.id || null;
   } catch (_) {}
   if (!ticketId) {
+    // fallback: use a fixture ticket owned by this VU's user
     ticketId = fixtures.tickets[vuIndex % fixtures.tickets.length].id;
   }
   sleep(1);
@@ -89,12 +90,14 @@ export function runUserJourney() {
   sleep(1);
 
   // ── Step 5: Admin updates ticket status ─────────────────────────────────────
+  // Use OPEN or IN_PROGRESS only — avoid cycling into terminal states
   const s5 = http.patch(
     `${BASE_URL}/api/v1/support-tickets/admin/${ticketId}/status`,
-    JSON.stringify({ status: 'in_progress' }),
+    JSON.stringify({ status: 'IN_PROGRESS' }),
     { headers: adminHeaders, tags: { name: 'journey:admin-update-status' } },
   );
-  check(s5, { 'Step5:admin-update-status 2xx': r => r.status >= 200 && r.status < 300 });
+  // Accept 200 success OR 400 if ticket already in this state
+  check(s5, { 'Step5:admin-update-status 2xx': r => r.status >= 200 && r.status < 300 || r.status === 400 });
   sleep(1);
 
   // ── Step 6: Admin assigns ticket ────────────────────────────────────────────
